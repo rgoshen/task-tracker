@@ -34,8 +34,11 @@
 
 ## Features
 
-1. user sees list of current tasks (status: To-do and In Progress) sorted asc by due date then desc priority  using flags
-2. user can see a list of all tasks (status: all) show current first sorted by due date (asc) then priority (desc) then completed tasks sorted completed date (asc) using flags
-3. user should be able to create a new task using flag
-4. user should be able update a created task using flag
-5. user should be able to delete a created task using flag
+1. install cli app
+2. upon first installation, create a csv file for user tasks
+   1. if already installed, check for task file and if absent create it
+3. user sees list of current tasks (status: To-do and In Progress) sorted asc by due date then desc priority  using flags
+4. user can see a list of all tasks (status: all) show current first sorted by due date (asc) then priority (desc) then completed tasks sorted completed date (asc) using flags
+5. user should be able to create a new task using flag
+6. user should be able update a created task using flag
+7. user should be able to delete a created task using flag
