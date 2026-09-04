@@ -3,11 +3,12 @@
 ## Requirements
 
 - Type: CLI
-- Task Status
+
+- Task Status (enum)
   - To-do
   - In Progress
   - Done
-- Priority
+- Priority (enum)
   - Critical
   - High
   - Medium
@@ -17,3 +18,12 @@
   - Read tasks
   - Update tasks
   - Delete tasks
+
+- Task object
+  - id (auto gen)
+  - task name
+  - task description
+  - created date (default current)
+  - updated date (default current)
+  - status (string enum)
+  - priority (string enum)
