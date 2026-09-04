@@ -49,3 +49,4 @@
 ### Developer requirements
 
 - ruff version: >=0.16.6
+- pyright version: >=1.1.411
