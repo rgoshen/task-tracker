@@ -42,3 +42,7 @@
 5. user should be able to create a new task using flag
 6. user should be able update a created task using flag
 7. user should be able to delete a created task using flag
+
+## App requirements
+
+- Python version: 3.14.7
