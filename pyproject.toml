@@ -1,0 +1,17 @@
+[project]
+name = "task-tracker"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Richard Goshen", email = "rick.goshen@gmail.com" }
+]
+requires-python = ">=3.13.8"
+dependencies = []
+
+[project.scripts]
+task-tracker = "task_tracker:main"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13.0"]
+build-backend = "uv_build"
