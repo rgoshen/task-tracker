@@ -20,7 +20,7 @@
   - Delete tasks
 
 - Task object
-  - id (auto gen) (required)
+  - ID (auto gen) (required)
   - task name (string) (required)
   - task description (string)
   - created date (default current)
@@ -36,7 +36,7 @@
 
 1. install cli app
 2. using a flag, create a either project level (default) task listing or a global task listing
-3. user sees list of current tasks (status: To-do and In Progress) sorted asc by due date then desc priority  using flags
+3. user sees list of current tasks (status: todo and In Progress) sorted asc by due date then desc priority using flags
 4. user can see a list of all tasks (status: all) show current first sorted by due date (asc) then priority (desc) then completed tasks sorted completed date (asc) using flags
 5. user should be able to create a new task using flag
 6. user should be able update a created task using flag
@@ -53,7 +53,7 @@
 
 ## Commands
 
-### Running github actions locally
+### Running GitHub Actions locally
 
 > NOTE: Must have [act](https://github.com/nektos/act) installed already
 
