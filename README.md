@@ -50,3 +50,16 @@
 
 - ruff version: >=0.16.6
 - pyright version: >=1.1.411
+
+## Commands
+
+### Running github actions locally
+
+> NOTE: Must have [act](https://github.com/nektos/act) installed already
+
+```bash
+act push -j build \
+  --container-architecture linux/amd64 \
+  --env RUN_LOCAL=true \
+  --env DEFAULT_BRANCH=main
+```
