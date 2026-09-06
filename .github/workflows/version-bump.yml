@@ -1,0 +1,62 @@
+---
+name: Version Bump
+
+on: # yamllint disable-line rule:truthy
+  pull_request:
+    types: [closed]
+
+permissions: {} # yamllint disable-line rule:braces
+
+jobs:
+  bump:
+    name: Bump version and changelog
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check trigger conditions
+        id: gate
+        env:
+          MERGED: ${{ github.event.pull_request.merged }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          should_run="false"
+          if [[ "$MERGED" == "true" && "$BASE_REF" == "main" ]] \
+            && [[ "$HEAD_REF" == release/* || "$HEAD_REF" == hotfix/* ]]; then
+            should_run="true"
+          fi
+          echo "should_run=${should_run}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout code
+        if: steps.gate.outputs.should_run == 'true'
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Install uv
+        if: steps.gate.outputs.should_run == 'true'
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Bump version and update changelog
+        if: steps.gate.outputs.should_run == 'true'
+        id: bump
+        run: |
+          new_version=$(./scripts/bump-version.sh)
+          echo "version=${new_version}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and tag
+        if: steps.gate.outputs.should_run == 'true' && steps.bump.outputs.version != ''
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml uv.lock CHANGELOG.md
+          git commit -m "chore(release): v${VERSION}"
+          git tag "v${VERSION}"
+          git push origin main
+          git push origin "v${VERSION}"
