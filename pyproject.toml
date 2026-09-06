@@ -7,6 +7,17 @@ authors = [
     { name = "Richard Goshen", email = "rick.goshen@gmail.com" }
 ]
 requires-python = ">=3.14"
+classifiers = [
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: MacOS",
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Environment :: MacOS X",
+    "Intended Audience :: Developers",
+    "Natural Language :: English"
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
 dependencies = []
 
 [project.scripts]
