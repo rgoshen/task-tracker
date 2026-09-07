@@ -5,6 +5,10 @@ on: # yamllint disable-line rule:truthy
   push: null
   pull_request: null
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions: {} # yamllint disable-line rule:braces
 
 jobs:
@@ -13,20 +17,13 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      # contents permission to clone the repository
-      contents: read
-      packages: read
-      # issues and pull-requests permissions to write results as pull
-      # request comments. Omit them if you don't need summary comments
-      issues: write
-      pull-requests: write
-      # To report GitHub Actions status checks. Omit if you don't need
-      # to update commit status
-      statuses: write
+      contents: read # to clone the repository
+      packages: read # to pull linter images/dependencies
+      issues: write # to write lint results as issue/PR comments
+      pull-requests: write # to write lint results as PR comments
+      statuses: write # to report GitHub Actions status checks
 
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@c4b8ade4fd2ccc7465a9eaf76f8f42bd21516f1d # v0.13.1
       - name: Checkout code
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -36,8 +33,9 @@ jobs:
           persist-credentials: false
 
       - name: Super-linter
-        uses: super-linter/super-linter@4ce20838b8ab83717e78138c5b3a1407148e0918 # v8.7.0 # x-release-please-version
+        uses: super-linter/super-linter@4ce20838b8ab83717e78138c5b3a1407148e0918 # v8.7.0
         env:
           # To report GitHub Actions status checks
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FILTER_REGEX_EXCLUDE: '\.serena/'
+          FILTER_REGEX_EXCLUDE: '\.serena/|\.claude/'
+          LOG_LEVEL: DEBUG

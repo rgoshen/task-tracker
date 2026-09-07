@@ -5,6 +5,10 @@ on: # yamllint disable-line rule:truthy
   pull_request:
     types: [closed]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions: {} # yamllint disable-line rule:braces
 
 jobs:
@@ -13,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write
+      contents: write # to commit the version bump, tag, and push to main
 
     steps:
       - name: Check trigger conditions
@@ -36,6 +40,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          persist-credentials: true
 
       - name: Install uv
         if: steps.gate.outputs.should_run == 'true'
