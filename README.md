@@ -68,6 +68,7 @@ Every option has a long and a short form.
 
 - ruff version: >=0.16.6
 - pyright version: >=1.1.411
+- Test runner: pytest with pytest-cov (added in M1)
 
 ## Commands
 

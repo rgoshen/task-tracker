@@ -1,6 +1,6 @@
 # Task Tracker Implementation Plan
 
-> **You implement this plan.** It pins what to build, the tests that prove each piece, and the decisions still owed. It holds no implementation code: every test is a Given/When/Then with exact values for you to turn into a pytest test. Check boxes off as you go.
+> **You implement this plan.** It pins what to build, the tests that prove each piece, and the decisions behind them (all made on 2026-10-23). It holds no implementation code: every test is a Given/When/Then with exact values for you to turn into a pytest test. Check boxes off as you go.
 
 **Goal:** Ship the seven `README.md` features as an installable `task-tracker` CLI.
 
@@ -22,7 +22,7 @@
 - Commits use Conventional Commits with lowercase scopes. `scripts/bump-version.sh` only recognizes scopes matching `[a-z0-9_-]+`, so `feat(CLI):` produces no version bump.
 - From your global CLAUDE.md: tests first, at least 80% coverage on changed code, GitFlow branches, a `TODO.md` entry before each milestone, a `SUMMARY.md` entry before each commit.
 
-## Decisions to make before M1
+## Decisions (all made on 2026-10-23)
 
 ### D1. Storage format
 
@@ -71,7 +71,7 @@ The global list lives under the home directory, for example `~/.task-tracker/tas
 
 **Decision (2026-10-23): naive local** for a single-user local CLI. A bare `--due 2026-11-02` parses to midnight with `datetime.fromisoformat`.
 
-## Spec questions (answer in `README.md` during M0)
+## Spec questions (answered in `README.md`)
 
 - Q1. **Decided:** users type and see the enum names (`TO_DO`, `IN_PROGRESS`, `DONE`; `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`). `Priority.MED` is renamed `MEDIUM` so the word matches `README.md`. Do it before any task file exists: the stored value is the enum value.
 - Q2. **Decided:** `due` is optional and defaults to `None`. Tasks without a due date sort after tasks with one, then by priority. (Defaulting to now made every new task overdue and ranked undated tasks ahead of future deadlines.)
@@ -105,9 +105,9 @@ Coverage: `uv run pytest --cov=task_tracker --cov-report=term-missing --cov-fail
 
 ### M0. Groundwork (no code)
 
-- [ ] Create `develop` from `main` and push it. The version-bump workflow only runs when `release/*` or `hotfix/*` merges into `main`, so features land in `develop` first.
+- [x] Create `develop` from `main` and push it. The version-bump workflow only runs when `release/*` or `hotfix/*` merges into `main`, so features land in `develop` first.
 - [ ] Tag `v0.1.0` on `main` and push the tag. With no tags, the first release scans all history and `7c90c7f fix: pin to specific shaw to fix linting error` lands in the first CHANGELOG.
-- [ ] Decide D1 to D6, answer Q1 to Q6, and update `README.md`, including the Python floor. Decided on 2026-10-23: D1 to D6, Q1 to Q6, and the Python floor.
+- [x] Decide D1 to D6, answer Q1 to Q6, and update `README.md`, including the Python floor. Decided on 2026-10-23: D1 to D6, Q1 to Q6, and the Python floor.
 
 **Done when:** `develop` and `v0.1.0` exist on origin and `README.md` reflects the answers.
 

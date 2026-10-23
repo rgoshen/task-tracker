@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-10-23 13:22] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `README.md`)
+
+**Summary:**
+Follow-up to the commit that recorded the M0 decisions. Removed wording in the plan that still described the decisions as pending, ticked the two M0 boxes that are complete, and added the test runner to the developer requirements in `README.md`.
+
+**Rationale:**
+The previous pass searched for the new text it had added, not for old text that had become false, so three statements still said the decisions were owed: the plan introduction, the "Decisions to make before M1" heading, and the "answer in `README.md` during M0" heading.
+The M0 boxes for creating `develop` and for the decisions are now ticked in the plan to match issue #4.
+The decision about pytest (D4) was missing from `README.md`, so it now lists pytest with pytest-cov.
+This is a new commit, not an amend, because the pull request is already open and an amend would need a force push.
+
+**References:**
+
+- `TODO.md`: none (no entry was written before this change)
+- Issue: #4 (M0). Not complete: the `v0.1.0` tag is still outstanding
+- Pull request: #14
+
 ## [2026-10-23 13:10] Commit Summary
 
 **Change Type:** Docs
