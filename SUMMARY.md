@@ -1,5 +1,50 @@
 # Summary
 
+## [2026-10-23 13:22] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `README.md`)
+
+**Summary:**
+Follow-up to the commit that recorded the M0 decisions. Removed wording in the plan that still described the decisions as pending, ticked the two M0 boxes that are complete, and added the test runner to the developer requirements in `README.md`.
+
+**Rationale:**
+The previous pass searched for the new text it had added, not for old text that had become false, so three statements still said the decisions were owed: the plan introduction, the "Decisions to make before M1" heading, and the "answer in `README.md` during M0" heading.
+The M0 boxes for creating `develop` and for the decisions are now ticked in the plan to match issue #4.
+The decision about pytest (D4) was missing from `README.md`, so it now lists pytest with pytest-cov.
+This is a new commit, not an amend, because the pull request is already open and an amend would need a force push.
+
+**References:**
+
+- `TODO.md`: none (no entry was written before this change)
+- Issue: #4 (M0). Not complete: the `v0.1.0` tag is still outstanding
+- Pull request: #14
+
+## [2026-10-23 13:10] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `docs/implementation-plan.md`, `CLAUDE.md`)
+
+**Summary:**
+Recorded every M0 decision where it is consumed. `README.md` now types the Task object (datetime fields, nullable `due`, ID rule), lists the enum names, gains an Options table with short and long forms, and names the commands in features 3 to 7.
+The plan marks D1 to D6 and Q1 to Q6 as decided and updates the M1 to M7 checklists to match.
+Project `CLAUDE.md` replaces the label-mismatch note and says the plan, the matching issue, and `README.md` change together.
+
+**Rationale:**
+The plan was written with recommendations; the decisions replace them so the milestones stop describing options.
+Each decision pins a test where behavior could silently drift: the `MEDIUM` rename, a naive datetime check, a null `due` round trip, undated tasks sorting last, a mandatory delete confirmation, short-form parity, and a `-d` versus `-D` slip that must create nothing.
+GitHub issues #4 to #13 were edited in place to mirror the plan, so the plan stays the source and the issues are copies.
+Two choices differ from the recommendation given at the time: plain `start` and `stop` fields (Q3) and `-d` for `--dir`.
+Alternatives not taken: recording D1 to D6 as ADRs, and splitting this into one commit per file, which would leave the plan, `README.md`, and `CLAUDE.md` disagreeing between commits.
+
+**References:**
+
+- `TODO.md`: none (no entry was written before this change)
+- Issues: #4 to #13 (M0 to M9), updated on GitHub, not part of this commit
+- Pending code change: rename `Priority.MED` to `MEDIUM` in `src/task_tracker/priority.py`, the first box in M1 (#5)
+
 ## [2026-10-23 12:18] Commit Summary
 
 **Change Type:** Fix
