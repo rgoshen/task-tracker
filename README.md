@@ -5,14 +5,14 @@
 - Type: CLI
 
 - Task Status (enum)
-  - To-do
-  - In Progress
-  - Done
+  - `TO_DO`
+  - `IN_PROGRESS`
+  - `DONE`
 - Priority (enum)
-  - Critical
-  - High
-  - Medium
-  - Low
+  - `CRITICAL`
+  - `HIGH`
+  - `MEDIUM`
+  - `LOW`
 - Manage tasks
   - Create tasks
   - Read tasks
@@ -20,31 +20,49 @@
   - Delete tasks
 
 - Task object
-  - ID (auto gen) (required)
+  - ID (auto gen: highest existing ID + 1) (required)
   - task name (string) (required)
   - task description (string)
-  - created date (default current)
-  - updated date (default current)
-  - due date (default current)
-  - date completed (default null)
-  - status (string enum default To-do)
-  - priority (string enum default Low)
-  - start time (default current)
-  - stop time (default current)
+  - created date (datetime, default current)
+  - updated date (datetime, default current)
+  - due date (datetime, default null; tasks without one sort last)
+  - date completed (datetime, default null; cleared when a done task is reopened)
+  - status (string enum default `TO_DO`)
+  - priority (string enum default `LOW`)
+  - start time (datetime, default current)
+  - stop time (datetime, default current)
 
 ## Features
 
 1. install cli app
-2. using a flag, create a either project level (default) task listing or a global task listing
-3. user sees list of current tasks (status: todo and In Progress) sorted asc by due date then desc priority using flags
-4. user can see a list of all tasks (status: all) show current first sorted by due date (asc) then priority (desc) then completed tasks sorted completed date (asc) using flags
-5. user should be able to create a new task using flag
-6. user should be able update a created task using flag
-7. user should be able to delete a created task using flag
+2. using a flag, create a either project level (default) task listing or a global task listing. The project level listing is `tasks.json` in the current directory unless `--dir PATH` (`-d PATH`) names another directory
+3. user sees list of current tasks (status: todo and In Progress) sorted asc by due date (tasks without a due date last) then desc priority using the `list` command
+4. user can see a list of all tasks (status: all) show current first sorted by due date (asc, tasks without a due date last) then priority (desc) then completed tasks sorted completed date (asc) using `list --all`
+5. user should be able to create a new task using the `add` command
+6. user should be able update a created task using the `update` command
+7. user should be able to delete a created task using the `delete` command, after a confirmation prompt that shows the task name
+
+## Options
+
+Every option has a long and a short form.
+
+| Long         | Short |
+| ------------ | ----- |
+| `--dir PATH` | `-d`  |
+| `--global`   | `-g`  |
+| `--priority` | `-p`  |
+| `--due`      | `-D`  |
+| `--status`   | `-s`  |
+| `--name`     | `-n`  |
+| `--all`      | `-a`  |
 
 ## App requirements
 
-- Python version: >=3.14.7
+- Python version: >=3.14
+- Storage format: JSON
+- Project task list: `tasks.json` in the current directory, or in the directory named by `--dir`
+- Global task list: `tasks.json` in `~/.task-tracker/`
+- Dates and times: naive local time, stored as ISO 8601 strings
 
 ### Developer requirements
 

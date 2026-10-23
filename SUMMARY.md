@@ -1,5 +1,29 @@
 # Summary
 
+## [2026-10-23 13:10] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `docs/implementation-plan.md`, `CLAUDE.md`)
+
+**Summary:**
+Recorded every M0 decision where it is consumed. `README.md` now types the Task object (datetime fields, nullable `due`, ID rule), lists the enum names, gains an Options table with short and long forms, and names the commands in features 3 to 7.
+The plan marks D1 to D6 and Q1 to Q6 as decided and updates the M1 to M7 checklists to match.
+Project `CLAUDE.md` replaces the label-mismatch note and says the plan, the matching issue, and `README.md` change together.
+
+**Rationale:**
+The plan was written with recommendations; the decisions replace them so the milestones stop describing options.
+Each decision pins a test where behavior could silently drift: the `MEDIUM` rename, a naive datetime check, a null `due` round trip, undated tasks sorting last, a mandatory delete confirmation, short-form parity, and a `-d` versus `-D` slip that must create nothing.
+GitHub issues #4 to #13 were edited in place to mirror the plan, so the plan stays the source and the issues are copies.
+Two choices differ from the recommendation given at the time: plain `start` and `stop` fields (Q3) and `-d` for `--dir`.
+Alternatives not taken: recording D1 to D6 as ADRs, and splitting this into one commit per file, which would leave the plan, `README.md`, and `CLAUDE.md` disagreeing between commits.
+
+**References:**
+
+- `TODO.md`: none (no entry was written before this change)
+- Issues: #4 to #13 (M0 to M9), updated on GitHub, not part of this commit
+- Pending code change: rename `Priority.MED` to `MEDIUM` in `src/task_tracker/priority.py`, the first box in M1 (#5)
+
 ## [2026-10-23 12:18] Commit Summary
 
 **Change Type:** Fix
