@@ -118,6 +118,7 @@ Branch `feature/task-model`. Covers `README.md` "Task object".
 - [ ] Rename `Priority.MED` to `Priority.MEDIUM` in `src/task_tracker/priority.py` (Q1). The stored value is the enum value, so do this before any task file exists.
 - [ ] `uv add --dev pytest pytest-cov` ([uv dependencies]).
 - [ ] Add a CI workflow that runs `uv run pytest` on push and pull request. Follow `version-bump.yml`: top-level `permissions: {}`, SHA-pinned `actions/checkout` and `astral-sh/setup-uv`.
+- [ ] Add a Tests badge for that workflow to `README.md`, next to the Lint badge, so "passing" means the tests passed.
 - [ ] Given only the name "Buy milk", when a task is created, then status is `Status.TO_DO`, priority is `Priority.LOW`, due is `None`, and date completed is `None`.
 - [ ] Given the time captured just before and just after creating a task, then its created timestamp falls between the two. Repeat for `updated`, `start`, and `stop`; `due` is excluded because it defaults to `None` (Q2).
 - [ ] Given a task is created, then every datetime field is naive (`tzinfo is None`) (D6).
@@ -248,6 +249,7 @@ Branch `release/0.2.0` from `develop`. Covers feature 1.
 - [ ] Install from the local checkout with `uv tool install` ([uv tools]), then run `task-tracker list` from an unrelated directory.
 - [ ] Add a `README.md` Usage section with one example per command.
 - [ ] Open a PR from `release/0.2.0` into `main`. On merge, the version-bump workflow should compute a minor bump from the feat commits since `v0.1.0`, commit `chore(release): v0.2.0`, and tag `v0.2.0`.
+- [ ] After that merge, the Latest tag badge in `README.md` shows `v0.2.0`.
 - [ ] Merge `main` back into `develop`. The bot commits only to `main`, so otherwise `develop` keeps the old version and has no `CHANGELOG.md`.
 
 **Think about:** how does `uv tool install` pick up a local project instead of a PyPI package? Where does it put the executable, and is that directory on your `PATH`?
