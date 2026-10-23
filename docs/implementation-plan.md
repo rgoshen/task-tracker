@@ -2,20 +2,20 @@
 
 > **You implement this plan.** It pins what to build, the tests that prove each piece, and the decisions still owed. It holds no implementation code: every test is a Given/When/Then with exact values for you to turn into a pytest test. Check boxes off as you go.
 
-**Goal:** Ship the seven README features as an installable `task-tracker` CLI.
+**Goal:** Ship the seven `README.md` features as an installable `task-tracker` CLI.
 
-**Architecture:** Grow it in vertical slices. `add` and `list` work end to end first (M3), then one command per milestone. Splitting into domain, storage, and CLI layers waits until M8, when working code shows where the seams are.
+**Architecture:** Grow it in vertical slices. `add` and `list` work end-to-end first (M3), then one command per milestone. Splitting into domain, storage, and CLI layers waits until M8, when working code shows where the seams are.
 
-**Tech stack:** Python 3.14 standard library at runtime ([argparse], [dataclasses], [enum], [datetime], [json], [pathlib], [os.replace]). Dev: pytest, pytest-cov, ruff, pyright, uv.
+**Tech stack:** Python 3.14 standard library at runtime ([argparse], [dataclasses], [enum], [datetime], [JSON], [pathlib], [os.replace]). Dev: pytest, pytest-cov, ruff, pyright, uv.
 
 **Spec:** `README.md`, sections Requirements and Features.
 
 ## Global Constraints
 
-- Python: `.python-version` pins 3.14.7; README says `>=3.14.7`, `pyproject.toml` says `>=3.14`. Align them in M0.
+- Python: `.python-version` pins 3.14.7; `README.md` says `>=3.14.7`, `pyproject.toml` says `>=3.14`. Align them in M0.
 - Runtime dependencies stay empty (`dependencies = []`).
 - `Status`: `TO_DO`, `IN_PROGRESS`, `DONE`. `Priority` by rank, highest first: `CRITICAL`, `HIGH`, `MED`, `LOW`.
-- README defaults: status To-do, priority Low, date completed null; created, updated, due, start, and stop default to the current time.
+- `README.md` defaults: status "To-do", priority Low, date completed null; created, updated, due, start, and stop default to the current time.
 - "Current" tasks are `TO_DO` plus `IN_PROGRESS`.
 - The project-level list is the default; a flag selects the global list.
 - Commits use Conventional Commits with lowercase scopes. `scripts/bump-version.sh` only recognizes scopes matching `[a-z0-9_-]+`, so `feat(CLI):` produces no version bump.
@@ -25,16 +25,16 @@
 
 ### D1. Storage format
 
-- **JSON** ([json]). Pro: integers and `null` survive as-is; one call each way. Con: the whole file is rewritten on every change; dates and enums still need converting.
+- **JSON** ([JSON]). Pro: integers and `null` survive as-is; one call each way. Con: the whole file is rewritten on every change; dates and enums still need converting.
 - **CSV** ([csv]). Pro: opens in a spreadsheet; the flat task fields fit. Con: every value loads back as a string, so IDs, `None`, dates, and enums all need converting.
-- **SQLite** ([sqlite3]). Pro: atomic writes and auto-increment IDs built in. Con: not human-readable; priority rank needs a SQL `CASE`; the most to learn up front.
+- **SQLite** ([SQLite3]). Pro: built-in atomic writes and auto-increment IDs. Con: not human-readable; priority rank needs a SQL `CASE`; the most to learn up front.
 
-**Recommendation: JSON**, the fewest conversions for a flat list. Pick CSV if you want CSV-handling practice or spreadsheet-editable files. The examples below assume JSON; swap the file names if you choose otherwise.
+**Recommendation: JSON**, the fewest conversions for a flat list. Pick CSV if you want CSV-handling practice or spreadsheet-editable files. The examples below assume JSON; swap the filenames if you choose otherwise.
 
 ### D2. Where the lists live
 
 - **Current directory only** (project list at `./tasks.json`). Pro: simple, no searching. Con: running from a subdirectory starts a second list.
-- **Walk up to the nearest `.git`**. Pro: one list per repo from anywhere inside it. Con: more code, and you need an answer for "not in a repo".
+- **Walk up to the nearest `.git`**. Pro: one list per repository from anywhere inside it. Con: more code, and you need an answer for "not in a repository".
 
 The global list lives under the home directory, for example `~/.task-tracker/tasks.json`.
 
@@ -42,8 +42,8 @@ The global list lives under the home directory, for example `~/.task-tracker/tas
 
 ### D3. CLI shape
 
-- **argparse subcommands with flags** (`task-tracker add "Buy milk" --priority HIGH`). Pro: each action gets its own options and `--help`; [argparse] supports it directly. Con: reads less like the README's "using a flag" wording.
-- **Flags only** (`task-tracker --add "Buy milk"`). Pro: literal match to the README. Con: options that apply to one action only, plus mutual-exclusion rules to maintain.
+- **argparse subcommands with flags** (`task-tracker add "Buy milk" --priority HIGH`). Pro: each action gets its own options and `--help`; [argparse] supports it directly. Con: reads less like the `README.md` "using a flag" wording.
+- **Flags only** (`task-tracker --add "Buy milk"`). Pro: literal match to `README.md`. Con: options that apply to one action only, plus mutual-exclusion rules to maintain.
 - **click or typer**. Pro: less boilerplate. Con: adds the first runtime dependency.
 
 **Recommendation: argparse subcommands.** The milestones below assume them.
@@ -70,9 +70,9 @@ The global list lives under the home directory, for example `~/.task-tracker/tas
 
 **Recommendation: naive local** for a single-user local CLI.
 
-## Spec questions (answer in README during M0)
+## Spec questions (answer in `README.md` during M0)
 
-- Q1. The README says "To-do" and "Medium"; the enums say `TO_DO` and `MED`. Which spelling does a user type and see?
+- Q1. `README.md` says "To-do" and "Medium"; the enums say `TO_DO` and `MED`. Which spelling does a user type and see?
 - Q2. Due date defaults to "current", so every new task is overdue the moment it's created. Intended? Alternatives: require `--due`, default to today's date, or allow no due date and sort those last.
 - Q3. Start and stop time default to "current". What do they measure? If time tracking, should start be set on moving to `IN_PROGRESS` and stop on moving to `DONE`?
 - Q4. When a `DONE` task is reopened, is its date completed cleared?
@@ -106,13 +106,13 @@ Coverage: `uv run pytest --cov=task_tracker --cov-report=term-missing --cov-fail
 
 - [ ] Create `develop` from `main` and push it. The version-bump workflow only runs when `release/*` or `hotfix/*` merges into `main`, so features land in `develop` first.
 - [ ] Tag `v0.1.0` on `main` and push the tag. With no tags, the first release scans all history and `7c90c7f fix: pin to specific shaw to fix linting error` lands in the first CHANGELOG.
-- [ ] Decide D1 to D6, answer Q1 to Q6, and update the README, including the Python floor.
+- [ ] Decide D1 to D6, answer Q1 to Q6, and update `README.md`, including the Python floor.
 
-**Done when:** `develop` and `v0.1.0` exist on origin and the README reflects the answers.
+**Done when:** `develop` and `v0.1.0` exist on origin and `README.md` reflects the answers.
 
 ### M1. Task model
 
-Branch `feature/task-model`. Covers README "Task object".
+Branch `feature/task-model`. Covers `README.md` "Task object".
 
 - [ ] `uv add --dev pytest pytest-cov` ([uv dependencies]).
 - [ ] Add a CI workflow that runs `uv run pytest` on push and pull request. Follow `version-bump.yml`: top-level `permissions: {}`, SHA-pinned `actions/checkout` and `astral-sh/setup-uv`.
@@ -230,7 +230,7 @@ Branch `feature/refactor-layers`. No behavior change: every test stays green, an
 Branch `release/0.2.0` from `develop`. Covers feature 1.
 
 - [ ] Install from the local checkout with `uv tool install` ([uv tools]), then run `task-tracker list` from an unrelated directory.
-- [ ] Add a README Usage section with one example per command.
+- [ ] Add a `README.md` Usage section with one example per command.
 - [ ] Open a PR from `release/0.2.0` into `main`. On merge, the version-bump workflow should compute a minor bump from the feat commits since `v0.1.0`, commit `chore(release): v0.2.0`, and tag `v0.2.0`.
 - [ ] Merge `main` back into `develop`. The bot commits only to `main`, so otherwise `develop` keeps the old version and has no `CHANGELOG.md`.
 
