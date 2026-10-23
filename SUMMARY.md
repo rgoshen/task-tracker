@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-10-23 13:46] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Added four status badges under the title of `README.md`: Lint (the `super-linter.yml` workflow on `main`), License (MIT), Latest tag, and Python (read from `pyproject.toml`). Added two follow-up boxes to the plan: a Tests badge in M1, and a check in M9 that the tag badge shows `v0.2.0`.
+
+**Rationale:**
+Each badge URL was fetched and its displayed text read before it was chosen.
+The first badge is named Lint because no workflow runs pytest yet, so a generic build badge would claim more than CI checks. The Tests badge waits for the pytest workflow in M1.
+The Python badge reads `requires-python` from `pyproject.toml` on `main`, so it cannot drift from the real floor the way a hardcoded badge would.
+Rejected: GitHub Releases (no releases exist, only tags), PyPI version and coverage (nothing published, no tests yet), OpenSSF Scorecard (invalid repository path), Version Bump workflow (no status on `main`), and the Ruff, uv, and pre-commit badges as decorative.
+
+**References:**
+
+- `TODO.md`: none (no entry was written before this change)
+- Issues: #5 and #13 updated to mirror the plan, ahead of this change merging
+- Pull request: pending
+
 ## [2026-10-23 13:22] Commit Summary
 
 **Change Type:** Docs
