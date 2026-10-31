@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-10-31 13:03] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`)
+
+**Summary:**
+Ticked the eight M1 boxes and updated the plan to match what was built: the rename test wording, the CI template, and the outcomes of two "Think about" questions.
+
+**Rationale:**
+The rename bullet now describes the test that exists, which parses each name `README.md` promises, because a test that a removed name stays removed fails only on a redesign. The CI bullet now says to follow `super-linter.yml` and not `version-bump.yml`, which closes audit finding G11: the bump job needs `contents: write`, a test job should have `contents: read` only.
+The timestamp and empty-name questions keep their text and gain the current answer. The empty-name note records a known limit for M5: `__post_init__` covers construction, but assigning `task.name = ""` later skips it.
+Ticked after the full verification run: tests, coverage gate at 96.77%, ruff, pyright, all pre-commit hooks, and both Markdown linters. The Tests workflow itself is still unproven on GitHub, so issue #5 stays open and unticked until this pull request's CI result is in.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5 (boxes ticked after CI passes)
+- Pull request: pending
+
 ## [2026-10-31 13:01] Commit Summary
 
 **Change Type:** Docs

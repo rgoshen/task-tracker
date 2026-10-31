@@ -117,20 +117,21 @@ Coverage: `uv run pytest --cov=task_tracker --cov-report=term-missing --cov-fail
 
 Branch `feature/task-model`. Covers `README.md` "Task object".
 
-- [ ] `uv add --dev pytest pytest-cov` ([uv dependencies]). First, so every later step can start with a failing test.
-- [ ] Rename `Priority.MED` to `Priority.MEDIUM` in `src/task_tracker/priority.py` (Q1). Red first: a test that `Priority.MEDIUM` exists and `Priority.MED` does not. The stored value is the enum value, so do this before any task file exists.
-- [ ] Given ID 1 and the name "Buy milk", when a task is created, then status is `Status.TO_DO`, priority is `Priority.LOW`, description is `""`, due is `None`, and date completed is `None`.
-- [ ] Given the time captured just before and just after creating a task, then its created timestamp falls between the two. Repeat for `updated`, `start`, and `stop`; `due` is excluded because it defaults to `None` (Q2).
-- [ ] Given a task is created, then every datetime field that is not `None` is naive (`tzinfo is None`) (D6). `due` and date completed default to `None`, which has no `tzinfo`.
-- [ ] Given the name `""` or `"   "`, when a task is created, then `ValueError` is raised.
-- [ ] Add a CI workflow that runs `uv run pytest` on push and pull request, once the tests above exist: pytest exits with code 5 when it collects no tests ([pytest exit codes]), so an earlier workflow fails its first run. Follow `version-bump.yml`: top-level `permissions: {}`, SHA-pinned `actions/checkout` and `astral-sh/setup-uv`.
-- [ ] Add a Tests badge for that workflow to `README.md`, next to the Lint badge, so "passing" means the tests passed.
+- [x] `uv add --dev pytest pytest-cov` ([uv dependencies]). First, so every later step can start with a failing test.
+- [x] Rename `Priority.MED` to `Priority.MEDIUM` in `src/task_tracker/priority.py` (Q1). Red first: a test that parses each name `README.md` promises (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`) with `Priority(name)`; it fails only for `MEDIUM`. A test that `MED` no longer exists would fail only on a redesign, never on a bug. The stored value is the enum value, so do this before any task file exists.
+- [x] Given ID 1 and the name "Buy milk", when a task is created, then status is `Status.TO_DO`, priority is `Priority.LOW`, description is `""`, due is `None`, and date completed is `None`.
+- [x] Given the time captured just before and just after creating a task, then its created timestamp falls between the two. Repeat for `updated`, `start`, and `stop`; `due` is excluded because it defaults to `None` (Q2).
+- [x] Given a task is created, then every datetime field that is not `None` is naive (`tzinfo is None`) (D6). `due` and date completed default to `None`, which has no `tzinfo`.
+- [x] Given the name `""` or `"   "`, when a task is created, then `ValueError` is raised.
+- [x] Add a CI workflow that runs `uv run pytest` on push and pull request, once the tests above exist: pytest exits with code 5 when it collects no tests ([pytest exit codes]), so an earlier workflow fails its first run.
+      Follow `super-linter.yml`, not `version-bump.yml`: top-level `permissions: {}`, job-level `contents: read` only (the bump job needs `contents: write`), `persist-credentials: false`, and SHA-pinned `actions/checkout` and `astral-sh/setup-uv`.
+- [x] Add a Tests badge for that workflow to `README.md`, next to the Lint badge, so "passing" means the tests passed.
 
 **Think about:**
 
 - In a dataclass, when does `created: datetime = datetime.now()` run? What does `default_factory` change? ([dataclasses])
-- Each `default_factory` call reads the clock separately, so `created` and `updated` on one new task can differ by microseconds. Should a new task share a single "now" across `created`, `updated`, `start`, and `stop`? Which test would show the difference? Pin whichever you choose.
-- Where does the empty-name check live so every path that builds a task hits it?
+- Each `default_factory` call reads the clock separately, so `created` and `updated` on one new task can differ by microseconds. Should a new task share a single "now" across `created`, `updated`, `start`, and `stop`? Which test would show the difference? Pin whichever you choose. Current code: separate `default_factory` calls, the simplest option; no test depends on the four being equal.
+- Where does the empty-name check live so every path that builds a task hits it? Current code: `__post_init__`, which covers construction. Assigning `task.name = ""` later skips it, so M5's `update` needs the same rule.
 - The ID is a required `int` (D5, decided 2026-10-31), so every M1 test passes one in. The next ID is computed by `add` in M3, never by the task.
 
 **Done when:** the tests pass locally and in CI.
