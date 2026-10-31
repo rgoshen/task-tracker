@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-10-31 14:42] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `docs/implementation-plan.md`, `TODO.md`)
+
+**Summary:**
+Recorded the owner's timestamp decisions of 2026-10-31 where the spec lives. `README.md` says `created` and `updated` are set by the tool and never given by the user, that `start` is never before `created`, and that `stop` is never after the date completed. The plan replaces the old shared-reading box with four, updates the defaults line, and gives M2 a new first box for `Task.restore()`.
+
+**Rationale:**
+The project `CLAUDE.md` says to keep the plan, the matching issue, and `README.md` in step. Issues #5 and #6 are updated from the plan after this commit.
+The M2 box matters most. Because the constructor no longer accepts `created` or `updated`, the M2 round trip cannot pass without a deliberate restore path, so the plan now says so before M2 starts, instead of leaving its implementer to find a wall.
+The shared-reading box now explains why a controlled clock is needed: whole-second timestamps make two real clock reads agree almost always, so a real-clock test cannot tell one reading from two.
+The two rules not enforced are written down in the plan so they are a recorded choice and not an omission: `stop` before `start`, and a date completed before `created`.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: system-stamped created and updated, and a consistent timeline, step 3
+- Issues: #5, #6
+- Pull request: #23
+
 ## [2026-10-31 14:41] Commit Summary
 
 **Change Type:** Feature

@@ -29,14 +29,14 @@
   - ID (auto gen: highest existing ID + 1) (required)
   - task name (string) (required)
   - task description (string, default empty)
-  - created date (datetime, default current)
-  - updated date (datetime, default current)
+  - created date (datetime, set by the tool when the task is added; never given by the user)
+  - updated date (datetime, set by the tool when the task is added and each time it changes; never given by the user)
   - due date (datetime, default null; tasks without one sort last)
   - date completed (datetime, default null; a done task defaults to the moment it was marked done and cannot be given a future date; cleared when a done task is reopened)
   - status (string enum default `TO_DO`)
   - priority (string enum default `LOW`)
-  - start time (datetime, default current)
-  - stop time (datetime, default current)
+  - start time (datetime, default current; never before the created date)
+  - stop time (datetime, default current, or the date completed for a done task; never after the date completed)
   - every datetime is local time with whole seconds and is stored and shown as `YYYY-MM-DDTHH:MM:SS`, however it is typed (a bare date such as `2026-11-02` means midnight)
 
 ## Features

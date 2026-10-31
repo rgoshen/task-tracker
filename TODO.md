@@ -20,7 +20,7 @@ All Given/When/Then with exact values are in the M1 section of the plan. In shor
 
 - Defaults from ID 1 and the name "Buy milk": status `Status.TO_DO`, priority `Priority.LOW`, description `""`, due `None`, date completed `None`.
 - `created`, `updated`, `start`, and `stop` each fall between a timestamp taken just before and just after creation, run under a non-UTC time zone so a UTC default fails. `due` is excluded (Q2).
-- A new task has `created`, `updated`, `start`, and `stop` equal; a value passed explicitly is kept.
+- A new task takes one clock reading for `created`, `updated`, `start`, and `stop` (proved with a controlled clock). `created` and `updated` cannot be given; `start` and `stop` can, within the rules in the entry below.
 - Every datetime field that is not `None` is naive, `tzinfo is None` (D6), and a timezone-aware value raises `ValueError`. `None` has no `tzinfo`.
 - A name of `""` or `"   "`, or one that is not a string, raises `ValueError`; a padded name is stored stripped.
 - `status` and `priority` given as strings become enum members; an unknown label raises `ValueError`.
