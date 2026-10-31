@@ -117,14 +117,14 @@ Coverage: `uv run pytest --cov=task_tracker --cov-report=term-missing --cov-fail
 
 Branch `feature/task-model`. Covers `README.md` "Task object".
 
-- [ ] Rename `Priority.MED` to `Priority.MEDIUM` in `src/task_tracker/priority.py` (Q1). The stored value is the enum value, so do this before any task file exists.
-- [ ] `uv add --dev pytest pytest-cov` ([uv dependencies]).
-- [ ] Add a CI workflow that runs `uv run pytest` on push and pull request. Follow `version-bump.yml`: top-level `permissions: {}`, SHA-pinned `actions/checkout` and `astral-sh/setup-uv`.
-- [ ] Add a Tests badge for that workflow to `README.md`, next to the Lint badge, so "passing" means the tests passed.
+- [ ] `uv add --dev pytest pytest-cov` ([uv dependencies]). First, so every later step can start with a failing test.
+- [ ] Rename `Priority.MED` to `Priority.MEDIUM` in `src/task_tracker/priority.py` (Q1). Red first: a test that `Priority.MEDIUM` exists and `Priority.MED` does not. The stored value is the enum value, so do this before any task file exists.
 - [ ] Given ID 1 and the name "Buy milk", when a task is created, then status is `Status.TO_DO`, priority is `Priority.LOW`, description is `""`, due is `None`, and date completed is `None`.
 - [ ] Given the time captured just before and just after creating a task, then its created timestamp falls between the two. Repeat for `updated`, `start`, and `stop`; `due` is excluded because it defaults to `None` (Q2).
 - [ ] Given a task is created, then every datetime field that is not `None` is naive (`tzinfo is None`) (D6). `due` and date completed default to `None`, which has no `tzinfo`.
 - [ ] Given the name `""` or `"   "`, when a task is created, then `ValueError` is raised.
+- [ ] Add a CI workflow that runs `uv run pytest` on push and pull request, once the tests above exist: pytest exits with code 5 when it collects no tests ([pytest exit codes]), so an earlier workflow fails its first run. Follow `version-bump.yml`: top-level `permissions: {}`, SHA-pinned `actions/checkout` and `astral-sh/setup-uv`.
+- [ ] Add a Tests badge for that workflow to `README.md`, next to the Lint badge, so "passing" means the tests passed.
 
 **Think about:**
 
@@ -272,6 +272,7 @@ Branch `release/0.2.0` from `develop`. Covers feature 1.
 [monkeypatch]: https://docs.pytest.org/en/stable/how-to/monkeypatch.html
 [capsys]: https://docs.pytest.org/en/stable/how-to/capture-stdout-stderr.html
 [pytest-cov]: https://pytest-cov.readthedocs.io/en/latest/config.html
+[pytest exit codes]: https://docs.pytest.org/en/stable/reference/exit-codes.html
 [uv dependencies]: https://docs.astral.sh/uv/concepts/projects/dependencies/
 [uv tools]: https://docs.astral.sh/uv/guides/tools/
 [entry points]: https://packaging.python.org/en/latest/specifications/entry-points/

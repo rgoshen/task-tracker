@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-10-31 12:33] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`)
+
+**Summary:**
+Reordered the M1 checklist to match `TODO.md`: pytest first, then the `MEDIUM` rename with a failing test, then the model tests, then the CI workflow and the Tests badge. Added the reason for the CI placement and a link to the pytest exit-code documentation.
+
+**Rationale:**
+Finding G12 of the Opus spec-gap audit: the plan and `TODO.md` disagreed on M1 step order, and the project `CLAUDE.md` says to keep the plan, the matching issue, and `README.md` in step.
+The order is not cosmetic. pytest exits with code 5 when it collects no tests, so a CI workflow merged before any test exists fails its first run. The rename now carries its own failing test so it follows the same red, green cycle as the model.
+The documentation URL returned HTTP 200 when checked earlier in this session.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5 (synced in the next step of this branch)
+- Pull request: pending
+
 ## [2026-10-31 12:32] Commit Summary
 
 **Change Type:** Docs
