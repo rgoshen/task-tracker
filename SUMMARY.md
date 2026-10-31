@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-10-31 14:40] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+`created` and `updated` are no longer constructor arguments. The model stamps both with the one clock reading it takes when the task is built. A small private `_now()` function supplies that reading, so tests can control the clock.
+
+**Rationale:**
+Decision from the project owner on 2026-10-31, chosen from three options: `created` and `updated` are the moment of creation or update and are never set by the user. Because the constructor no longer accepts them, a caller cannot pass a false history.
+The M2 loader will restore stored values through a deliberate `Task.restore()`, which the plan now assigns to M2. M5's `update` stamps `updated` through the model.
+Test-first: the new test for passing `created` or `updated` failed with `DID NOT RAISE TypeError`, then all 53 tests passed.
+A mutation check found a hole that I introduced earlier. The survivor "updated read from a second clock call" passed every test. Since the normalization commit truncates timestamps to whole seconds, two consecutive clock reads almost always land in the same second, so the loop-based "shared reading" tests could only fail at a second boundary. They had been weak since then.
+Fixed with a seam, not by repeating more: `_now()` is a named production function, and the tests replace it with a clock that hands out a new second on every call. The two loop tests became deterministic, and one asserts that the next reading is still unused, so the task took exactly one. All six clock and argument mutants now fail a test.
+This partly answers the reviewer's request to control the clock in the tests, which I had declined on 2026-10-31. A named seam avoids the objection I gave, that patching `datetime` ties the tests to the import style.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: system-stamped created and updated, and a consistent timeline, step 1
+- Issues: #5
+- Pull request: #23
+
 ## [2026-10-31 14:34] Commit Summary
 
 **Change Type:** Docs

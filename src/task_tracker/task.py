@@ -1,18 +1,27 @@
 """The task record."""
 
-from dataclasses import KW_ONLY, dataclass
+from dataclasses import KW_ONLY, dataclass, field
 from datetime import date, datetime, time
 
 from task_tracker.priority import Priority
 from task_tracker.status import Status
 
-# Stands in for "not given" so the four timestamps can share one clock reading
-# while the fields stay typed `datetime`. Always compared with `is`, never `==`,
-# so a caller who passes an equal date still has it kept. D6 chose naive local
-# time on purpose, so DTZ001 does not apply here.
+# Stands in for "not given" so a timestamp can default to the clock reading the
+# task already holds while the field stays typed `datetime`. Always compared with
+# `is`, never `==`, so a caller who passes an equal date still has it kept. D6
+# chose naive local time on purpose, so DTZ001 does not apply here.
 _UNSET = datetime(1, 1, 1)  # noqa: DTZ001
-_TIMESTAMPS = ("created", "updated", "start", "stop")
-_DATETIME_FIELDS = ("created", "updated", "due", "date_completed", "start", "stop")
+_DEFAULTED_TO_NOW = ("start", "stop")
+_GIVEN_DATETIMES = ("due", "date_completed", "start", "stop")
+
+
+def _now() -> datetime:
+    """The current local time to whole seconds.
+
+    A task reads this once and shares the result, so its timestamps agree.
+    Tests replace it to control the clock.
+    """
+    return datetime.now().replace(microsecond=0)  # noqa: DTZ005
 
 
 def _as_naive_datetime(name: str, value: object) -> datetime | None:
@@ -49,8 +58,10 @@ class Task:  # pylint: disable=too-many-instance-attributes
     # positional arguments would pass type checking.
     _: KW_ONLY
     description: str = ""
-    created: datetime = _UNSET
-    updated: datetime = _UNSET
+    # Stamped by the model, never given by a caller, so a history cannot be
+    # faked. Storage restores stored values through `Task.restore()` (M2).
+    created: datetime = field(init=False)
+    updated: datetime = field(init=False)
     due: datetime | None = None
     date_completed: datetime | None = None
     status: Status = Status.TO_DO
@@ -67,14 +78,16 @@ class Task:  # pylint: disable=too-many-instance-attributes
             raise ValueError("name must not be blank")
         self.status = Status(self.status)
         self.priority = Priority(self.priority)
-        now = datetime.now().replace(microsecond=0)  # noqa: DTZ005
+        now = _now()
+        self.created = now
+        self.updated = now
         self._fill_unset_timestamps(now)
-        for name in _DATETIME_FIELDS:
+        for name in _GIVEN_DATETIMES:
             setattr(self, name, _as_naive_datetime(name, getattr(self, name)))
         self._settle_date_completed(now)
 
     def _fill_unset_timestamps(self, now: datetime) -> None:
-        for name in _TIMESTAMPS:
+        for name in _DEFAULTED_TO_NOW:
             if getattr(self, name) is _UNSET:
                 setattr(self, name, now)
 

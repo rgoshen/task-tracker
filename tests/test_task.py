@@ -5,7 +5,8 @@
 
 import time
 from collections.abc import Iterator
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
+from itertools import count
 
 import pytest
 
@@ -19,9 +20,16 @@ NAIVE_DAY = datetime(2026, 11, 2)  # noqa: DTZ001
 PAST_DAY = datetime(2000, 1, 1)  # noqa: DTZ001
 FUTURE_DAY = datetime(2999, 1, 1)  # noqa: DTZ001
 AWARE_DAY = datetime(2026, 11, 2, tzinfo=UTC)
-# Separate clock reads differ in only about a quarter of constructions, so one
-# construction can pass by luck; repeating makes the check reliable.
-SKEW_REPEATS = 200
+FIRST_READING = datetime(2026, 10, 31, 9, 30, 0)  # noqa: DTZ001
+
+
+@pytest.fixture(name="readings")
+def _readings(monkeypatch: pytest.MonkeyPatch) -> Iterator[datetime]:
+    # Each call to the task's clock hands out the next second, so a task that
+    # reads the clock twice ends up holding two different times.
+    ticks = (FIRST_READING + timedelta(seconds=n) for n in count())
+    monkeypatch.setattr("task_tracker.task._now", lambda: next(ticks))
+    return ticks
 
 
 @pytest.fixture
@@ -77,20 +85,29 @@ def test_a_date_that_is_not_naive_local_time_is_rejected_naming_the_field(
         Task(id=1, name="x", due=given)  # type: ignore[arg-type]
 
 
-def test_new_task_shares_one_clock_reading_across_its_timestamps():
-    for _ in range(SKEW_REPEATS):
-        task = Task(id=1, name="Buy milk")
+def test_new_task_takes_a_single_clock_reading_for_all_its_timestamps(
+    readings: Iterator[datetime],
+):
+    task = Task(id=1, name="Buy milk")
 
-        assert task.created == task.updated == task.start == task.stop
+    assert task.created == task.updated == task.start == task.stop == FIRST_READING
+    # The next reading is still unused, so the task took exactly one.
+    assert next(readings) == FIRST_READING + timedelta(seconds=1)
 
 
-def test_timestamps_not_given_share_one_reading_and_given_ones_are_kept():
-    for _ in range(SKEW_REPEATS):
-        task = Task(id=1, name="Buy milk", updated=PAST_DAY)
+@pytest.mark.usefixtures("readings")
+def test_a_timestamp_given_is_kept_and_the_others_share_one_reading():
+    task = Task(id=1, name="Buy milk", stop=PAST_DAY)
 
-        assert task.updated == PAST_DAY
-        assert task.created == task.start == task.stop
-        assert task.created > PAST_DAY
+    assert task.stop == PAST_DAY
+    assert task.created == task.updated == task.start == FIRST_READING
+
+
+@pytest.mark.parametrize("field_name", ["created", "updated"])
+def test_created_and_updated_cannot_be_given(field_name: str):
+    # The model stamps them, so a caller cannot pass a false history.
+    with pytest.raises(TypeError, match=field_name):
+        Task(**{"id": 1, "name": "x", field_name: NAIVE_DAY})  # type: ignore[arg-type]
 
 
 @pytest.mark.usefixtures("kolkata_time")
@@ -148,8 +165,6 @@ def test_unknown_status_or_priority_label_is_rejected(field_name: str, label: st
 @pytest.mark.parametrize(
     ("field_name", "extra"),
     [
-        ("created", {}),
-        ("updated", {}),
         ("start", {}),
         ("stop", {}),
         ("due", {}),
