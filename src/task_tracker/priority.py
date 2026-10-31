@@ -8,5 +8,5 @@ class Priority(StrEnum):
 
     CRITICAL = "CRITICAL"
     HIGH = "HIGH"
-    MED = "MED"
+    MEDIUM = "MEDIUM"
     LOW = "LOW"

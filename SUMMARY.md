@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-10-31 12:55] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** priority (`src/task_tracker/priority.py`, `tests/test_priority.py`, `CLAUDE.md`)
+
+**Summary:**
+Renamed `Priority.MED` to `Priority.MEDIUM` (value `"MEDIUM"`), added the first test file, and removed the now-false "until M1 lands the rename" sentence from the project `CLAUDE.md`.
+
+**Rationale:**
+Q1: users type and see the enum names, and `README.md` says `MEDIUM`. The stored value is the enum value, so the rename had to land before any task file exists.
+Test-first: the new test failed with `ValueError: 'MEDIUM' is not a valid Priority` for exactly the `MEDIUM` case and passed for the other three; after the rename the whole suite, ruff, and pyright are clean.
+Deliberate departure from the plan's wording "a test that `Priority.MEDIUM` exists and `Priority.MED` does not": asserting that a removed symbol stays removed only fails on a redesign, never on a bug.
+The test instead parses each of the four names `README.md` promises users can type, with the expected values taken from the `README.md` literal list. That is the behavior the `--priority` option and the JSON loader will depend on.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model, step 2
+- Issues: #5
+- Pull request: pending
+
 ## [2026-10-31 12:54] Commit Summary
 
 **Change Type:** Feature
