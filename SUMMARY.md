@@ -1,5 +1,34 @@
 # Summary
 
+## [2026-10-31 13:26] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** lint (`.github/linters/.isort.cfg`, `src/task_tracker/task.py`, `tests/`, `CLAUDE.md`)
+
+**Summary:**
+Fixed the `Lint` failure on PR #23. Super-linter's `PYTHON_ISORT` rejected the two test files, and `PYTHON_PYLINT` scored the code 8.67 for a missing docstring in each test module and function, and for `Task` having 11 instance attributes against a limit of 7. The new `Tests` workflow itself passed on GitHub.
+
+**Rationale:**
+Both checks passed on earlier pull requests only because there was almost no Python. Local verification covered ruff, pyright, and the Markdown linters, but not the five Python linters super-linter runs separately (pylint, isort, black, flake8, mypy).
+Reproduced before fixing: pylint 4.0.6 and isort 8.0.1 with the super-linter v8.7.0 default configs gave the same score, the same eight messages, and the same two files as the CI log. After the fix all five linters pass at CI's versions, and pylint scores 10.00.
+isort: it does not see the `src` layout, so it treats `task_tracker` as a third-party package and rejects the usual empty line before project imports.
+Fixed at the cause with `known_first_party` in a repository-level config, `.github/linters/.isort.cfg`, which super-linter reads before its default.
+A controlled check confirmed it: the repository config exits 0 on the unchanged files, the default config still fails them. Rejected: deleting the empty lines to suit the default, which would recur in every later milestone.
+pylint: inline suppressions with the reason beside them, matching how `DTZ005` was handled.
+The test modules get a docstring and one file-level `missing-function-docstring` disable, since the test names already state the intent.
+`Task` gets a class-level `too-many-instance-attributes` disable, because `README.md` defines the 11 fields.
+Rejected: a docstring on every test that repeats its name, and raising pylint limits project-wide, which would also loosen future classes.
+
+**Bugfix Context:**
+Root cause: the verification routine omitted super-linter's Python linters. The project `CLAUDE.md` now lists them, and the saved lint-recipe memory covers them too.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #23
+
 ## [2026-10-31 13:03] Commit Summary
 
 **Change Type:** Docs

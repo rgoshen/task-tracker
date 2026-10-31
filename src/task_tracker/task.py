@@ -7,8 +7,9 @@ from task_tracker.priority import Priority
 from task_tracker.status import Status
 
 
+# README.md "Task object" defines 11 fields; pylint's default limit is 7.
 @dataclass
-class Task:
+class Task:  # pylint: disable=too-many-instance-attributes
     """A unit of work to track."""
 
     id: int

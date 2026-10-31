@@ -1,3 +1,8 @@
+"""Tests for the Task record."""
+
+# Test names state the intent, so per-test docstrings would only repeat them.
+# pylint: disable=missing-function-docstring
+
 from datetime import datetime
 
 import pytest
