@@ -1,6 +1,7 @@
 # Py Task Tracker
 
 [![Lint](https://github.com/rgoshen/task-tracker/actions/workflows/super-linter.yml/badge.svg?branch=main)](https://github.com/rgoshen/task-tracker/actions/workflows/super-linter.yml)
+[![Tests](https://github.com/rgoshen/task-tracker/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/rgoshen/task-tracker/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/github/license/rgoshen/task-tracker)](https://github.com/rgoshen/task-tracker/blob/main/LICENSE)
 [![Latest tag](https://img.shields.io/github/v/tag/rgoshen/task-tracker)](https://github.com/rgoshen/task-tracker/tags)
 [![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https://raw.githubusercontent.com/rgoshen/task-tracker/main/pyproject.toml)](https://github.com/rgoshen/task-tracker/blob/main/pyproject.toml)

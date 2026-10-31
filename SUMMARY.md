@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-10-31 13:01] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`)
+
+**Summary:**
+Added the Tests badge next to the Lint badge (M1 step 5). It points at the `Tests` workflow on `main` and links to the workflow page.
+
+**Rationale:**
+The Lint badge only reports linting, so without this one nothing on the page says the tests pass.
+Checked before adding it: the Lint badge returns HTTP 200 and reads "Lint - passing", while the Tests badge returns HTTP 404 today, because `tests.yml` exists only on this branch and GitHub serves a workflow badge only once the file is on the default branch.
+Consequence, accepted: the badge shows as a broken image when `README.md` is viewed on `develop`. After `develop` is promoted to `main` it should read "no status" until the first run on `main`, then "passing". `main` itself is unaffected until then, because its `README.md` does not contain the badge yet.
+Rejected: pointing the badge at `develop`, which would show a real status sooner but would not mirror the Lint badge or describe the branch users install from.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model, step 5
+- Issues: #5
+- Pull request: pending
+
 ## [2026-10-31 13:00] Commit Summary
 
 **Change Type:** Feature
