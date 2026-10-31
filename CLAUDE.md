@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-`task-tracker` is a Python 3.14 CLI for task management, currently an early scaffold. `README.md` is the product spec (task fields, status/priority enums, the seven features); the code implements almost none of it yet. What exists: a placeholder `main()` in `src/task_tracker/__init__.py` and the `Status` / `Priority` `StrEnum`s.
+`task-tracker` is a Python 3.14 CLI for task management, currently an early scaffold. `README.md` is the product spec (task fields, status/priority enums, the seven features); the code implements only the task model so far (M1), none of the seven features. What exists: a placeholder `main()` in `src/task_tracker/__init__.py`, the `Status` / `Priority` `StrEnum`s, and the `Task` dataclass in `src/task_tracker/task.py`.
 
 Labels are reconciled (Q1): users type and see the enum names (`TO_DO`, `IN_PROGRESS`, `DONE`; `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`), and `Priority.MED` was renamed `MEDIUM` to match `README.md` (M1).
 
@@ -21,11 +21,12 @@ uv run ruff check .                   # lint (add --fix to autofix)
 uv run ruff format .                  # format
 uv run pyright                        # type check
 uv run pre-commit run --all-files     # every hook: ruff, shellcheck, shfmt, whitespace/yaml
-./scripts/test_bump_version.sh        # the only test suite today (see below)
+uv run pytest                         # Python tests (see Testing)
+./scripts/test_bump_version.sh        # regression suite for bump-version.sh (see below)
 uv build                              # wheel + sdist into dist/
 ```
 
-Ruff and pyright have no config in `pyproject.toml`, so both run on defaults.
+Ruff and pyright have no config in `pyproject.toml`, so both run on defaults. Ruff 0.16's defaults include `DTZ005`, which flags `datetime.now()`. D6 chose naive local time, so suppress it per line with a comment saying why, not project-wide.
 
 Run the full lint workflow locally with [act](https://github.com/nektos/act) (from `README.md`):
 
@@ -35,9 +36,9 @@ act push -j build --container-architecture linux/amd64 --env RUN_LOCAL=true --en
 
 ## Testing
 
-No Python test framework is installed (no pytest in the dev group) and `tests/` is empty. Adding Python tests means adding a runner as a dev dependency first.
+Python tests use pytest with pytest-cov (D4) and live in `tests/`. Run them with `uv run pytest`; add `--cov=task_tracker --cov-report=term-missing --cov-fail-under=80` for coverage. Work test-first: watch each test fail for the expected reason before writing the code that passes it.
 
-The only tests are `scripts/test_bump_version.sh`, a dependency-free Bash self-check. It builds throwaway Git repos in `mktemp` dirs, seeds them with Conventional Commits, runs `bump-version.sh`, and asserts the bump level and `CHANGELOG.md` contents. It needs `uv` on `PATH`. There is no single-test flag; to run one case, comment out the other calls at the bottom of the file.
+The bump script has its own tests, `scripts/test_bump_version.sh`, a dependency-free Bash self-check. It builds throwaway Git repos in `mktemp` dirs, seeds them with Conventional Commits, runs `bump-version.sh`, and asserts the bump level and `CHANGELOG.md` contents. It needs `uv` on `PATH`. There is no single-test flag; to run one case, comment out the other calls at the bottom of the file.
 
 ## Release automation (spans three files)
 

@@ -1,0 +1,42 @@
+from datetime import datetime
+
+import pytest
+
+from task_tracker.priority import Priority
+from task_tracker.status import Status
+from task_tracker.task import Task
+
+TIMESTAMP_FIELDS = ["created", "updated", "start", "stop"]
+
+
+def test_new_task_has_the_documented_defaults():
+    task = Task(id=1, name="Buy milk")
+
+    assert task.status is Status.TO_DO
+    assert task.priority is Priority.LOW
+    assert task.description == ""
+    assert task.due is None
+    assert task.date_completed is None
+
+
+@pytest.mark.parametrize("field_name", TIMESTAMP_FIELDS)
+def test_timestamp_defaults_to_the_moment_the_task_is_created(field_name: str):
+    # D6 chose naive local time on purpose, so DTZ005 does not apply here.
+    before = datetime.now()  # noqa: DTZ005
+    task = Task(id=1, name="Buy milk")
+    after = datetime.now()  # noqa: DTZ005
+
+    assert before <= getattr(task, field_name) <= after
+
+
+@pytest.mark.parametrize("field_name", TIMESTAMP_FIELDS)
+def test_default_timestamps_are_naive_local_time(field_name: str):
+    task = Task(id=1, name="Buy milk")
+
+    assert getattr(task, field_name).tzinfo is None
+
+
+@pytest.mark.parametrize("name", ["", "   "])
+def test_blank_name_is_rejected(name: str):
+    with pytest.raises(ValueError, match="name"):
+        Task(id=1, name=name)
