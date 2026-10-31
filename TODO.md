@@ -79,6 +79,8 @@ Test-first on `feature/task-model`, in this order, one commit each.
 1. `created` and `updated` stop being constructor arguments. The model sets both to the shared clock reading when the task is built. The M2 loader restores stored values through a deliberate `Task.restore()`, which M2 adds; M5's `update` stamps `updated` through the model.
 2. `start` before `created` raises `ValueError`. `stop` after the date completed raises `ValueError`. A done task's default `stop` is its date completed, so a past date completed does not collide with a default of "now".
 3. Update `README.md`, the plan (M1 and M2), and issues #5 and #6.
+4. Amended the same day by the owner: the full timeline, `created <= start <= stop <= date completed`. This adds `stop` not before `start` or `created`, and `start` not after `stop` or the date completed. A new task can then only be done at the moment it is created, so step 2's done-task default for `stop` can never differ from "now" and is removed.
+   The default `stop` becomes the later of now and `start`, so a planned future `start` does not collide with it.
 
 **Tests:**
 
@@ -91,7 +93,8 @@ Test-first on `feature/task-model`, in this order, one commit each.
 **Risks & Trade-offs:**
 
 - Without a constructor path for `created` and `updated`, the M2 round trip needs `Task.restore()`. That is deliberate, but M2 must now build it, and the plan says so.
-- Only the two stated rules are enforced. `stop` before `start` is still allowed, and so is a date completed before `created`. Both can be added later in a few lines if the owner wants the full timeline.
+- The full timeline makes a past date completed unreachable through the constructor, because `created` is always now. A new task can only be done now. Past dates matter for a task that already existed, so M2's `Task.restore()` and M5's `update` carry the tests for them.
+- A planned future `start` needs `stop` to be at least that late, so the default `stop` follows `start`.
 - A `start` after `created` is allowed, including a date in the future, because only "not before created" was asked.
 
 [dataclasses]: https://docs.python.org/3/library/dataclasses.html#mutable-default-values

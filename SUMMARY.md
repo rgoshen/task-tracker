@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-10-31 14:48] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** planning (`TODO.md`)
+
+**Summary:**
+Amended the timeline entry in `TODO.md` for the owner's follow-up of 2026-10-31: the full timeline, `created <= start <= stop <= date completed`.
+
+**Rationale:**
+The project rules require the plan before any code. The owner chose "exactly your two rules" earlier and now asks for the full timeline, which was the other option offered. The entry records the cost that option carried: a new task can only be done at the moment it is created.
+So a past date completed is unreachable through the constructor, and its tests move to `Task.restore()` in M2 and `update` in M5.
+It also removes a default added earlier the same day. A done task's `stop` defaulting to its date completed can no longer differ from "now", so it would be dead code. The default becomes the later of now and `start`, so a planned future `start` does not collide with it.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: system-stamped created and updated, and a consistent timeline, step 4
+- Issues: #5, #6
+- Pull request: #23
+
 ## [2026-10-31 14:42] Commit Summary
 
 **Change Type:** Docs
