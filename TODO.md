@@ -19,20 +19,83 @@ Branch `feature/task-model` (from `develop`). Each step is one atomic commit wit
 All Given/When/Then with exact values are in the M1 section of the plan. In short:
 
 - Defaults from ID 1 and the name "Buy milk": status `Status.TO_DO`, priority `Priority.LOW`, description `""`, due `None`, date completed `None`.
-- `created`, `updated`, `start`, and `stop` each fall between a timestamp taken just before and just after creation. `due` is excluded (Q2).
-- Every datetime field that is not `None` is naive, `tzinfo is None` (D6). `None` has no `tzinfo`.
-- A name of `""` or `"   "` raises `ValueError`.
+- `created`, `updated`, `start`, and `stop` each fall between a timestamp taken just before and just after creation, run under a non-UTC time zone so a UTC default fails. `due` is excluded (Q2).
+- A new task takes one clock reading for `created`, `updated`, `start`, and `stop` (proved with a controlled clock). `created` and `updated` cannot be given; `start` and `stop` can, within the rules in the entry below.
+- Every datetime field that is not `None` is naive, `tzinfo is None` (D6), and a timezone-aware value raises `ValueError`. `None` has no `tzinfo`.
+- A name of `""` or `"   "`, or one that is not a string, raises `ValueError`; a padded name is stored stripped.
+- `status` and `priority` given as strings become enum members; an unknown label raises `ValueError`.
+- A date completed on a task that is not `DONE` raises `ValueError` (Q4). The rest of the `DONE` rules are in the entry below.
+- Fields after `id` and `name` are keyword-only.
 - Coverage: `uv run pytest --cov=task_tracker --cov-report=term-missing --cov-fail-under=80`.
 
 **Risks & Trade-offs:**
 
-- **Frozen timestamps.** `created: datetime = datetime.now()` raises no error. Checked on 2026-10-31: two instances created 0.2 s apart shared one object. The dataclass guard only rejects unhashable defaults ([dataclasses]), and a `datetime` passes. The "between before and after" test is the only thing that catches it; `default_factory` is the fix.
+- **Frozen timestamps.** `created: datetime = datetime.now()` raises no error. Checked on 2026-10-31: two instances created 0.2 s apart shared one object. The dataclass guard only rejects unhashable defaults ([dataclasses]), and a `datetime` passes. The "between before and after" test catches it. The code now reads the clock once in `__post_init__`.
 - **Empty test run fails CI.** pytest exits with code 5 when it collects no tests ([pytest exit codes]), so the workflow must not merge before step 3 has real tests.
 - **ID entry, decided 2026-10-31 (D5).** `id` is a required `int` and a task never assigns its own ID. `add` computes highest + 1 and passes it in (M3), so every M1 test passes an ID such as 1.
-- **Open: one "now" or four.** Separate `default_factory` calls make `created` and `updated` differ by microseconds on a new task. Whether they share one timestamp is your call (audit finding G13); a test can pin whichever you choose.
+- **One "now", decided 2026-10-31 in review of PR #23 (audit finding G13).** A new task shares a single clock reading across its four timestamps through a private sentinel default, so the fields stay typed `datetime`.
+- **`DONE` and its date, decided 2026-10-31 by the project owner.** A `DONE` task always has a date completed, defaulting to the moment it was marked done, and a date passed in cannot be in the future. M4's sort no longer has to cope with a `DONE` task that has none (audit finding G9). See the entry below.
+- **Known limit for M5.** The model validates at construction. Assigning `task.name = ""` later skips the check, so `update` must re-validate.
 - **`uv.lock` overlap.** `uv add --dev` rewrites `uv.lock`, and Dependabot PR #18 (base `main`) also changes it. Expect a possible conflict when `develop` is promoted to `main`.
 - **Tests badge starts empty.** The Lint badge points at `main`, so the Tests badge will probably show no status until the workflow has run there (unverified). Merge it anyway; check it after the next promotion.
 - **Scope held back.** `description` is a plain field with a default. Whether `add` and `update` expose it waits for M3 and M5, as Q3 did for `start` and `stop`.
+
+## [2026-10-31] Feature: DONE date and one date form
+
+**Objective:**
+Apply three decisions from the project owner on 2026-10-31. A `DONE` task always has a date completed, defaulting to the moment it is created or marked done. A date completed that is passed in cannot be in the future. Every datetime is held in one form, whatever way it is passed in.
+This answers the open half of the review thread on `task.py` line 21 of PR #23 and audit finding G9. Model only: no CLI and no storage.
+
+**Approach:**
+Test-first on `feature/task-model`, in this order, one commit each.
+
+1. Normalize every datetime field. An ISO 8601 string, a `date`, or a `datetime` all become a naive `datetime` with whole seconds, so `isoformat()` always reads `YYYY-MM-DDTHH:MM:SS`. A bare date is midnight (Q6).
+2. A `DONE` task with no date completed gets the shared clock reading. A date completed later than that reading raises `ValueError`.
+3. Update `README.md`, the plan (Q4, D6, M1), and issue #5.
+
+**Tests:**
+
+- Equivalent inputs (`"2026-11-02"`, `"2026-11-02T00:00:00"`, `"2026-11-02 00:00:00"`, a `date`, a `datetime` with microseconds) give the same `due`, and `isoformat()` reads `2026-11-02T00:00:00`.
+- Default timestamps carry no microseconds.
+- An invalid string, a string with a UTC offset, or a value of another type raises `ValueError` that names the field.
+- `Task(status=DONE)` has a date completed equal to `created`; a task that is not `DONE` has none.
+- A past date completed is kept, a future one raises `ValueError`, and `datetime.now()` itself is accepted.
+
+**Risks & Trade-offs:**
+
+- Dropping microseconds changes values silently. That is harmless for a task list, and it keeps the M2 round trip exact when dates are saved at whole seconds.
+- The model cannot tell "marked done now" from "loaded from a file", so a hand-edited `DONE` record with no date gets the load time. M2's loader must check the raw record if that matters.
+- Strings and dates are accepted next to `datetime`, as labels are accepted for the enums. The field types stay `datetime`.
+- Only the date completed is checked against the future. A due date may be in the future, and no other field was asked about.
+
+## [2026-10-31] Feature: system-stamped created and updated, and a consistent timeline
+
+**Objective:**
+Apply two decisions from the project owner on 2026-10-31. `created` and `updated` are always the moment the task was created or updated and are never set by the user. A task's `start` is never before its `created`, and its `stop` is never after its date completed. Model only: no CLI and no storage.
+
+**Approach:**
+Test-first on `feature/task-model`, in this order, one commit each.
+
+1. `created` and `updated` stop being constructor arguments. The model sets both to the shared clock reading when the task is built. The M2 loader restores stored values through a deliberate `Task.restore()`, which M2 adds; M5's `update` stamps `updated` through the model.
+2. `start` before `created` raises `ValueError`. `stop` after the date completed raises `ValueError`. A done task's default `stop` is its date completed, so a past date completed does not collide with a default of "now".
+3. Update `README.md`, the plan (M1 and M2), and issues #5 and #6.
+4. Amended the same day by the owner: the full timeline, `created <= start <= stop <= date completed`. This adds `stop` not before `start` or `created`, and `start` not after `stop` or the date completed. A new task can then only be done at the moment it is created, so step 2's done-task default for `stop` can never differ from "now" and is removed.
+   The default `stop` becomes the later of now and `start`, so a planned future `start` does not collide with it.
+
+**Tests:**
+
+- Passing `created` or `updated` raises `TypeError`.
+- A new task has `created`, `updated`, and `start` equal to the one clock reading.
+- A `start` before `created` raises `ValueError` naming the field; a later `start` is kept.
+- A `stop` after the date completed raises `ValueError`; a `stop` equal to it is accepted; a task that is not done has no limit on `stop`.
+- A done task given a past date completed has that date as its default `stop`.
+
+**Risks & Trade-offs:**
+
+- Without a constructor path for `created` and `updated`, the M2 round trip needs `Task.restore()`. That is deliberate, but M2 must now build it, and the plan says so.
+- The full timeline makes a past date completed unreachable through the constructor, because `created` is always now. A new task can only be done now. Past dates matter for a task that already existed, so M2's `Task.restore()` and M5's `update` carry the tests for them.
+- A planned future `start` needs `stop` to be at least that late, so the default `stop` follows `start`.
+- A `start` after `created` is allowed, including a date in the future, because only "not before created" was asked.
 
 [dataclasses]: https://docs.python.org/3/library/dataclasses.html#mutable-default-values
 [pytest exit codes]: https://docs.pytest.org/en/stable/reference/exit-codes.html

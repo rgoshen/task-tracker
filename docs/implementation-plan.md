@@ -15,7 +15,8 @@
 - Python: `.python-version` pins 3.14.7 for development; the floor is `>=3.14` in both `README.md` and `pyproject.toml` (decided 2026-10-23: a patch-level floor would block installs on older 3.14 releases for no code reason).
 - Runtime dependencies stay empty (`dependencies = []`).
 - `Status`: `TO_DO`, `IN_PROGRESS`, `DONE`. `Priority` by rank, highest first: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`.
-- Defaults (`README.md`, after Q1 to Q3): status `TO_DO`, priority `LOW`, description `""`, due `None`, date completed `None`; created, updated, start, and stop default to the current time. All datetimes are naive local time (D6).
+- Defaults (`README.md`, after Q1 to Q3): status `TO_DO`, priority `LOW`, description `""`, due `None`, date completed `None` (a `DONE` task defaults to the current time); created and updated are stamped by the model and cannot be given; start defaults to created and stop to the current time, or to start if that is later. All datetimes are naive local time (D6).
+- Timeline: `created <= start <= stop <= date completed`, with equality allowed at every link.
 - "Current" tasks are `TO_DO` plus `IN_PROGRESS`.
 - The project-level list in the current directory is the default; `--dir PATH` selects another directory and `--global` selects the home list. The two flags are mutually exclusive.
 - Every option has a long and a short form: `--dir`/`-d`, `--global`/`-g`, `--priority`/`-p`, `--due`/`-D`, `--status`/`-s`, `--name`/`-n`, `--all`/`-a`. `-d` and `-D` differ by one Shift, so a slip must fail safe (M7). A letter claimed twice in one parser raises `ArgumentError` when the parser is built.
@@ -73,12 +74,15 @@ The global list lives under the home directory, for example `~/.task-tracker/tas
 
 **Decision (2026-10-23): naive local** for a single-user local CLI. A bare `--due 2026-11-02` parses to midnight with `datetime.fromisoformat`.
 
+**Amended 2026-10-31 (project owner): one form for every datetime, however it is passed in.** `Task` turns an ISO 8601 string, a `date`, or a `datetime` into a naive local `datetime` with whole seconds, so `isoformat()` always reads `YYYY-MM-DDTHH:MM:SS`. M2 saves and M3 prints with that same call.
+Whole seconds because `created` carries microseconds while a typed date does not, and a save at second precision would otherwise lose them in the M2 round trip.
+
 ## Spec questions (answered in `README.md`)
 
 - Q1. **Decided:** users type and see the enum names (`TO_DO`, `IN_PROGRESS`, `DONE`; `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`). `Priority.MED` is renamed `MEDIUM` so the word matches `README.md`. Do it before any task file exists: the stored value is the enum value.
 - Q2. **Decided:** `due` is optional and defaults to `None`. Tasks without a due date sort after tasks with one, then by priority. (Defaulting to now made every new task overdue and ranked undated tasks ahead of future deadlines.)
 - Q3. **Decided:** `start` and `stop` are plain datetime fields that default to the current time, with no tracking logic. Still open: can `add` and `update` set them, and does `list` show them (decide in M3 and M5)?
-- Q4. **Decided:** yes. Moving a task out of `DONE` sets date completed to `None`, so `status != DONE` always means date completed is `None`.
+- Q4. **Decided:** yes. Moving a task out of `DONE` sets date completed to `None`, so `status != DONE` always means date completed is `None`. **Amended 2026-10-31 (project owner):** the converse holds too. A `DONE` task always has a date completed, defaulting to the moment it was marked done, and a date passed in cannot be in the future.
 - Q5. **Decided:** yes. `delete` shows the task's name and asks before deleting (see D5). A `--yes` flag for scripts is deferred.
 - Q6. **Decided:** a date and time. `due`, `created`, `updated`, and `date completed` are all datetimes; a bare date such as `2026-11-02` parses to midnight.
 
@@ -117,20 +121,34 @@ Coverage: `uv run pytest --cov=task_tracker --cov-report=term-missing --cov-fail
 
 Branch `feature/task-model`. Covers `README.md` "Task object".
 
-- [ ] `uv add --dev pytest pytest-cov` ([uv dependencies]). First, so every later step can start with a failing test.
-- [ ] Rename `Priority.MED` to `Priority.MEDIUM` in `src/task_tracker/priority.py` (Q1). Red first: a test that `Priority.MEDIUM` exists and `Priority.MED` does not. The stored value is the enum value, so do this before any task file exists.
-- [ ] Given ID 1 and the name "Buy milk", when a task is created, then status is `Status.TO_DO`, priority is `Priority.LOW`, description is `""`, due is `None`, and date completed is `None`.
-- [ ] Given the time captured just before and just after creating a task, then its created timestamp falls between the two. Repeat for `updated`, `start`, and `stop`; `due` is excluded because it defaults to `None` (Q2).
-- [ ] Given a task is created, then every datetime field that is not `None` is naive (`tzinfo is None`) (D6). `due` and date completed default to `None`, which has no `tzinfo`.
-- [ ] Given the name `""` or `"   "`, when a task is created, then `ValueError` is raised.
-- [ ] Add a CI workflow that runs `uv run pytest` on push and pull request, once the tests above exist: pytest exits with code 5 when it collects no tests ([pytest exit codes]), so an earlier workflow fails its first run. Follow `version-bump.yml`: top-level `permissions: {}`, SHA-pinned `actions/checkout` and `astral-sh/setup-uv`.
-- [ ] Add a Tests badge for that workflow to `README.md`, next to the Lint badge, so "passing" means the tests passed.
+- [x] `uv add --dev pytest pytest-cov` ([uv dependencies]). First, so every later step can start with a failing test.
+- [x] Rename `Priority.MED` to `Priority.MEDIUM` in `src/task_tracker/priority.py` (Q1). Red first: a test that parses each name `README.md` promises (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`) with `Priority(name)`; it fails only for `MEDIUM`. A test that `MED` no longer exists would fail only on a redesign, never on a bug. The stored value is the enum value, so do this before any task file exists.
+- [x] Given ID 1 and the name "Buy milk", when a task is created, then status is `Status.TO_DO`, priority is `Priority.LOW`, description is `""`, due is `None`, and date completed is `None`.
+- [x] Given the time captured just before and just after creating a task, with the process time zone set to a non-UTC zone such as `Asia/Kolkata`, then its created timestamp falls between the two. Repeat for `updated`, `start`, and `stop`; `due` is excluded because it defaults to `None` (Q2). A UTC default passes on a UTC machine such as the CI runner; the non-UTC zone pins "local" (D6).
+- [x] Given a task is created, then every datetime field that is not `None` is naive (`tzinfo is None`) (D6). `due` and date completed default to `None`, which has no `tzinfo`.
+- [x] Given the name `""` or `"   "`, when a task is created, then `ValueError` is raised.
+- [x] Given a name that is not a string, such as the `null` a hand-edited `tasks.json` can hold, then `ValueError` is raised, not `AttributeError`. Given `"  Buy milk  "`, then the stored name is `"Buy milk"`.
+- [x] Given `status="DONE"` and `priority="HIGH"` as plain strings, then the stored values are `Status.DONE` and `Priority.HIGH`, checked with `is`. Given an unknown label, then `ValueError` is raised. Equality alone would pass for plain strings, because the enums are `StrEnum`s.
+- [x] Given a timezone-aware value for any datetime field, then `ValueError` is raised, because sorting an aware and a naive task raises `TypeError` (D6).
+- [x] Given a status other than `DONE` and a date completed, then `ValueError` is raised (Q4).
+- [x] Given `Task(status=DONE)` with no date completed, then it equals `created` and so do `start` and `stop`. Given one in the future as an object or as text, then `ValueError` is raised. Given the clock's own reading with microseconds added, then it is accepted: microseconds are dropped before the comparison.
+- [x] Given the same day as `"2026-11-02"`, `"2026-11-02T00:00:00"`, `"2026-11-02 00:00:00"`, a `date`, or a `datetime` with microseconds, then `due` equals midnight and `isoformat()` reads `2026-11-02T00:00:00`. Default timestamps have no microseconds.
+- [x] Given an invalid string, a string with a UTC offset, or a value of another type for a datetime field, then `ValueError` is raised and names the field.
+- [x] Given positional arguments after `id` and `name`, then `TypeError` is raised, so swapped `datetime` arguments cannot type-check and run. `Task(1, "Buy milk")` still works.
+- [x] Given a clock that hands out a new second on every reading (the tests replace the model's `_now`), when a task is created, then `created`, `updated`, `start`, and `stop` all equal the first reading and the next reading is unused. Whole-second timestamps make two real clock reads agree almost always, so only a controlled clock can tell one reading from two.
+- [x] Given `created=` or `updated=` as an argument, then `TypeError` is raised: the model stamps both, so a caller cannot pass a false history (owner decision, 2026-10-31). Given `stop=` explicitly, then it is kept and the others still share one reading.
+- [x] Given the timeline `created <= start <= stop <= date completed`, then every broken link raises `ValueError` with its own message: a `start` before `created`; a `stop` before `start` (which includes before `created`); a `start` after the date completed; a `stop` after it; and a date completed before `created`. Every link accepts equality.
+- [x] Given a later `start`, including a future one, then it is kept, and the default `stop` is that `start`, not "now", which would be earlier.
+- [x] Given a new task, then it can only be done at the moment it is created: `created` is always now, so a past date completed is a broken link. A past completion belongs to a task that already existed, and is tested through `Task.restore()` in M2 and `update` in M5. An open task's `stop` has no upper limit.
+- [x] Add a CI workflow that runs `uv run pytest` on push and pull request, once the tests above exist: pytest exits with code 5 when it collects no tests ([pytest exit codes]), so an earlier workflow fails its first run.
+      Follow `super-linter.yml`, not `version-bump.yml`: top-level `permissions: {}`, job-level `contents: read` only (the bump job needs `contents: write`), `persist-credentials: false`, and SHA-pinned `actions/checkout` and `astral-sh/setup-uv`.
+- [x] Add a Tests badge for that workflow to `README.md`, next to the Lint badge, so "passing" means the tests passed.
 
 **Think about:**
 
 - In a dataclass, when does `created: datetime = datetime.now()` run? What does `default_factory` change? ([dataclasses])
-- Each `default_factory` call reads the clock separately, so `created` and `updated` on one new task can differ by microseconds. Should a new task share a single "now" across `created`, `updated`, `start`, and `stop`? Which test would show the difference? Pin whichever you choose.
-- Where does the empty-name check live so every path that builds a task hits it?
+- Why does `Task` read the clock once in `__post_init__` and not give each timestamp its own `default_factory`? Decided 2026-10-31 in review of PR #23: separate reads differed on about a quarter of new tasks, so a private sentinel default is replaced by one shared reading, and the fields stay typed `datetime` without `None` checks.
+- Where does the name check live so every path that builds a task hits it? In `__post_init__`, which also strips the name and requires a string. Assigning `task.name = ""` later skips it, so M5's `update` must re-validate, for example by building a new task with `dataclasses.replace` or through a validating setter.
 - The ID is a required `int` (D5, decided 2026-10-31), so every M1 test passes one in. The next ID is computed by `add` in M3, never by the task.
 
 **Done when:** the tests pass locally and in CI.
@@ -141,6 +159,8 @@ Branch `feature/task-storage`.
 
 Produces, for later milestones: load (path to list of tasks, empty when the file is missing) and save (list of tasks to path, atomic, creating parent directories).
 
+- [ ] Add `Task.restore(...)`. The constructor no longer accepts `created` or `updated` (M1, owner decision 2026-10-31), so the loader rebuilds a task through `restore`, which takes them and still enforces the other rules. Given a saved task, when loaded, then `created` and `updated` equal the stored values, not the load time.
+- [ ] Given a stored timeline out of order, then a clear error is raised. Given a task created on 2026-10-10 and completed on 2026-10-15, then it loads with both dates kept: this is where a past date completed is tested.
 - [ ] Given no file at `tmp_path / "tasks.json"`, when loading, then the result is `[]` and no file is created.
 - [ ] Given task 1 "Buy milk" (`HIGH`, due 2026-11-01 09:00) and task 2 "File taxes" (`DONE`, no due date, completed 2026-10-15 17:30), when saved then loaded, then both equal the originals, `loaded[0].priority is Priority.HIGH`, `loaded[1].status is Status.DONE`, `loaded[0]`'s date completed `is None`, and `loaded[1].due is None`.
 - [ ] Given an existing file and a save that fails partway (make serialization raise with `monkeypatch`), then the file's previous contents are unchanged.

@@ -1,5 +1,568 @@
 # Summary
 
+## [2026-10-31 14:51] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Recorded the full timeline where the spec lives. `README.md` now gives `start` and `stop` their complete limits. The plan replaces the two-rule boxes with one that lists every broken link, one that states a new task can only be done when it is created, and a corrected done-task box. M2's `restore` box now also covers a stored timeline out of order and the first place a past date completed can be tested.
+
+**Rationale:**
+The project `CLAUDE.md` says to keep the plan, the matching issue, and `README.md` in step. Issues #5 and #6 are regenerated from the plan after this commit.
+One plan box said a date completed in the past "is kept", which stopped being true for a new task once the timeline became enforced, so it is corrected here rather than left to contradict the code.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: system-stamped created and updated, and a consistent timeline, step 4
+- Issues: #5, #6
+- Pull request: #23
+
+## [2026-10-31 14:50] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+A task's timeline is now fully enforced: `created <= start <= stop <= date completed`, where the last link applies when the task has a date completed. Each broken link raises a `ValueError` with its own message. The default `stop` is the later of now and `start`.
+
+**Rationale:**
+Decision from the project owner on 2026-10-31, and the owner's remark that these rules should have been a given. The earlier "exactly the two stated rules" option left `stop` before `start` and a date completed before `created` possible, which are impossible histories. The model now checks every link, including the one that follows from the others.
+That way a date completed before `created` gets its own clear message and not a confusing complaint about `start`.
+Consequence the owner was told about: `created` is always the moment of creation, so a new task can only be done at that moment. A past date completed is rejected at construction. It belongs to a task that already existed, so those cases move to `Task.restore()` in M2 and `update` in M5.
+The done-task default for `stop` added earlier the same day could then never differ from "now", so it was removed as dead code. The default is now the later of now and `start`, which keeps a planned future `start` valid.
+Test-first: five tests failed (four `DID NOT RAISE`, one default), then all 63 passed. Four earlier tests could no longer be built through the constructor and were rewritten as rejections or removed, and the "this very moment" test now uses the controlled clock, because a real clock could cross a second boundary between two reads and make it flaky.
+Mutation check: eleven breaks fail a test, covering each of the five links being dropped, the default ignoring a future start, and each of the five boundaries being made exclusive. The file was verified identical to the green version afterwards.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: system-stamped created and updated, and a consistent timeline, step 4
+- Issues: #5, #6
+- Pull request: #23
+
+## [2026-10-31 14:48] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** planning (`TODO.md`)
+
+**Summary:**
+Amended the timeline entry in `TODO.md` for the owner's follow-up of 2026-10-31: the full timeline, `created <= start <= stop <= date completed`.
+
+**Rationale:**
+The project rules require the plan before any code. The owner chose "exactly your two rules" earlier and now asks for the full timeline, which was the other option offered. The entry records the cost that option carried: a new task can only be done at the moment it is created.
+So a past date completed is unreachable through the constructor, and its tests move to `Task.restore()` in M2 and `update` in M5.
+It also removes a default added earlier the same day. A done task's `stop` defaulting to its date completed can no longer differ from "now", so it would be dead code. The default becomes the later of now and `start`, so a planned future `start` does not collide with it.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: system-stamped created and updated, and a consistent timeline, step 4
+- Issues: #5, #6
+- Pull request: #23
+
+## [2026-10-31 14:42] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `docs/implementation-plan.md`, `TODO.md`)
+
+**Summary:**
+Recorded the owner's timestamp decisions of 2026-10-31 where the spec lives. `README.md` says `created` and `updated` are set by the tool and never given by the user, that `start` is never before `created`, and that `stop` is never after the date completed. The plan replaces the old shared-reading box with four, updates the defaults line, and gives M2 a new first box for `Task.restore()`.
+
+**Rationale:**
+The project `CLAUDE.md` says to keep the plan, the matching issue, and `README.md` in step. Issues #5 and #6 are updated from the plan after this commit.
+The M2 box matters most. Because the constructor no longer accepts `created` or `updated`, the M2 round trip cannot pass without a deliberate restore path, so the plan now says so before M2 starts, instead of leaving its implementer to find a wall.
+The shared-reading box now explains why a controlled clock is needed: whole-second timestamps make two real clock reads agree almost always, so a real-clock test cannot tell one reading from two.
+The two rules not enforced are written down in the plan so they are a recorded choice and not an omission: `stop` before `start`, and a date completed before `created`.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: system-stamped created and updated, and a consistent timeline, step 3
+- Issues: #5, #6
+- Pull request: #23
+
+## [2026-10-31 14:41] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+A task's `start` can no longer be before its `created`, and its `stop` can no longer be after its date completed. Both raise `ValueError` naming the field. A done task's default `stop` is its date completed.
+
+**Rationale:**
+Decision from the project owner on 2026-10-31: start is never before created, and stop is never after the done date. Only those two rules were enforced, as chosen from two options. `stop` before `start` and a date completed before `created` stay allowed, and are recorded as such in `TODO.md`.
+The default for `stop` matters: with a default of "now", a done task given a past date completed would have a `stop` after that date and be rejected by the new rule. So a done task stops when it was done. For a task that is not done, `stop` still defaults to now and has no upper limit.
+Both boundaries are inclusive: a `start` equal to `created` and a `stop` equal to the date completed are accepted, which is also what the defaults produce.
+Test-first: three tests failed (two `DID NOT RAISE`, and a default `stop` of now), then all 59 passed. Three guards pass before and after on purpose: a later `start`, a `stop` equal to the date completed, and an open task's unlimited `stop`.
+Mutation check: six breaks each fail a test, including both off-by-one comparisons and a limit wrongly applied to open tasks, and the file was verified identical to the green version afterwards.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: system-stamped created and updated, and a consistent timeline, step 2
+- Issues: #5
+- Pull request: #23
+
+## [2026-10-31 14:40] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+`created` and `updated` are no longer constructor arguments. The model stamps both with the one clock reading it takes when the task is built. A small private `_now()` function supplies that reading, so tests can control the clock.
+
+**Rationale:**
+Decision from the project owner on 2026-10-31, chosen from three options: `created` and `updated` are the moment of creation or update and are never set by the user. Because the constructor no longer accepts them, a caller cannot pass a false history.
+The M2 loader will restore stored values through a deliberate `Task.restore()`, which the plan now assigns to M2. M5's `update` stamps `updated` through the model.
+Test-first: the new test for passing `created` or `updated` failed with `DID NOT RAISE TypeError`, then all 53 tests passed.
+A mutation check found a hole that I introduced earlier. The survivor "updated read from a second clock call" passed every test. Since the normalization commit truncates timestamps to whole seconds, two consecutive clock reads almost always land in the same second, so the loop-based "shared reading" tests could only fail at a second boundary. They had been weak since then.
+Fixed with a seam, not by repeating more: `_now()` is a named production function, and the tests replace it with a clock that hands out a new second on every call. The two loop tests became deterministic, and one asserts that the next reading is still unused, so the task took exactly one. All six clock and argument mutants now fail a test.
+This partly answers the reviewer's request to control the clock in the tests, which I had declined on 2026-10-31. A named seam avoids the objection I gave, that patching `datetime` ties the tests to the import style.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: system-stamped created and updated, and a consistent timeline, step 1
+- Issues: #5
+- Pull request: #23
+
+## [2026-10-31 14:34] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** planning (`TODO.md`)
+
+**Summary:**
+Added the `TODO.md` entry for the project owner's decisions of 2026-10-31 on timestamps: the model stamps `created` and `updated`, `start` is never before `created`, and `stop` is never after the date completed.
+
+**Rationale:**
+The project rules require the plan before any code. Two choices were put to the owner with pros and cons.
+First, how to keep `created` and `updated` out of the user's hands: the model stamps them, with a deliberate `Task.restore()` for storage, over a convention that the CLI never exposes them, or an automatic bump on every change.
+Second, how strict the timeline should be: exactly the two stated rules, over also requiring `stop` not before `start`.
+The entry records what the choice costs: the M2 round trip needs `Task.restore()`, and `stop` before `start` and a date completed before `created` stay allowed.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: system-stamped created and updated, and a consistent timeline
+- Issues: #5, #6
+- Pull request: #23
+
+## [2026-10-31 14:25] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `docs/implementation-plan.md`, `TODO.md`)
+
+**Summary:**
+Recorded the project owner's decisions of 2026-10-31 where the spec lives.
+`README.md` now says a done task defaults its date completed to the moment it was marked done and cannot be given a future date, and that every datetime is stored and shown as `YYYY-MM-DDTHH:MM:SS`.
+The plan amends Q4 and D6 to match, replaces the open `DONE` box with three ticked ones, and `TODO.md` no longer lists the question as open.
+
+**Rationale:**
+The project `CLAUDE.md` says to keep the plan, the matching issue, and `README.md` in step, and issue #5 is regenerated from the plan after this commit.
+The amendments are marked with their date and source so the original 2026-10-23 decisions stay readable beside them. Q4 and D6 are amended in place and not given new numbers, because they are the same questions with a fuller answer.
+The M2 loader and the M3 `list` command are told which call to use for the canonical form, `isoformat()`, so neither invents a second format.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: DONE date and one date form, step 3
+- Issues: #5 (regenerated from the plan after this commit)
+- Pull request: #23
+
+## [2026-10-31 14:24] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+A `DONE` task now always has a date completed. If none is given it defaults to the same clock reading as the task's other timestamps. A date completed that is passed in, as an object or as text, cannot be later than that reading: it raises `ValueError`.
+
+**Rationale:**
+Decision from the project owner on 2026-10-31, answering the open half of the review thread on `task.py` line 21 and audit finding G9: if a task is marked done it gets the date it was marked done, a date passed in is allowed but cannot be in the future.
+Test-first: four tests failed (`None is not None`, and `DID NOT RAISE` for a future object and for two future strings), then all 53 passed. Three guards pass before and after on purpose, since they protect allowed paths: a past date is kept, a task that is not `DONE` still has none, and a date completed of this very moment is accepted.
+That last guard exists because of a subtlety: `datetime.now()` carries microseconds, so comparing it with the truncated reading would wrongly reject "now". The date is normalized to whole seconds before the comparison.
+Mutation check: a `DONE` task with no default, a future date accepted, `>=` instead of `>`, an open task allowed a date, and a second clock read for the default each fail a test, and the file was restored byte-for-byte.
+Two existing tests used 2026-11-02 as a completed date. With today at 2026-10-31 that is in the future, which the new rule rightly rejects, so they now use a fixed past date.
+Known trade-off, recorded in `TODO.md`: the model cannot tell "marked done now" from "loaded from a file", so a hand-edited `DONE` record with no date would receive the load time.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: DONE date and one date form, step 2
+- Issues: #5
+- Pull request: #23 (review thread on `task.py` line 21)
+
+## [2026-10-31 14:23] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+Every datetime field now ends up in one form however it is passed in. An ISO 8601 string, a `date`, or a `datetime` becomes a naive local `datetime` with whole seconds, so `isoformat()` always reads `YYYY-MM-DDTHH:MM:SS`. A bare date means midnight (Q6). An invalid string, a value with a UTC offset, or a value of another type raises `ValueError` that names the field.
+
+**Rationale:**
+Decision from the project owner on 2026-10-31: all dates are formatted the same whatever way the user passes them in. The model is the one place the CLI and the M2 loader both go through, so one normalizer covers both, as the enum coercion does for labels.
+Whole seconds is my reading of "the same": `created` carried microseconds while a typed date did not, and a save at second precision would then make the M2 round trip lose them. The reading is flagged in `TODO.md` for correction.
+Test-first: 13 new tests failed for the expected reasons (raw strings stored as text, a `date` not equal to a datetime, microseconds present, four bad inputs not rejected), then all 46 tests passed. The existing before/after clock test now truncates its lower bound to whole seconds, since the stored value is truncated the same way.
+Mutation check: keeping microseconds, not parsing strings, reading a bare date as noon, accepting a UTC offset, and leaving the field name out of the error each fail a test, and the file was restored byte-for-byte.
+The aware-datetime check moved into the normalizer, so a string such as `2026-11-02T09:00:00+00:00` is rejected after parsing. That also covers audit finding G6 at the model level. The `dataclasses.fields` loop it replaced is gone, because strings must be handled before a field can be recognized as a datetime.
+The field types stay `datetime`; strings and dates are accepted at the boundary, as labels are for the enums.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: DONE date and one date form, step 1
+- Issues: #5
+- Pull request: #23
+
+## [2026-10-31 14:21] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** planning (`TODO.md`)
+
+**Summary:**
+Added the `TODO.md` entry for the decisions the project owner gave on 2026-10-31: a `DONE` task gets a date completed by default, a date completed cannot be in the future, and all datetimes share one form.
+
+**Rationale:**
+The project rules require the plan before any code. The decisions answer the open half of the review thread on `task.py` line 21 of PR #23, and audit finding G9.
+One interpretation is mine and is flagged in the entry for correction: "formatted the same" is read as one canonical form, whole seconds in ISO 8601, with a bare date meaning midnight (Q6). Whole seconds, because `created` carries microseconds while a typed date does not, and a save at second precision would then break the M2 round trip.
+The entry records a trade-off the owner may want to revisit: the model cannot tell "marked done now" from "loaded from a file", so a hand-edited `DONE` record with no date would get the load time.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: DONE date and one date form
+- Issues: #5
+- Pull request: #23
+
+## [2026-10-31 14:13] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** lint (`.github/linters/.ruff.toml`, `CLAUDE.md`)
+
+**Summary:**
+Fixed the `Lint` failure on the review-fix push to PR #23: super-linter's `PYTHON_RUFF_FORMAT` reported that `tests/test_task.py` would be reformatted. Added a repository-level ruff config with `line-length = 88`.
+
+**Rationale:**
+Reproduced before changing anything, with CI's own ruff 0.15.17 and super-linter's template config: it wants a wrapped `parametrize` decorator joined onto one line. The same file passes `black`, local ruff, and the pre-commit hook, because the template sets `line-length = 120` while those three use 88.
+So the template contradicts itself, and any call between 89 and 120 characters passes one formatter and fails the other.
+Fixed at the cause, as with the isort config: super-linter reads `.github/linters/.ruff.toml` before its default, and the new file keeps the template's cache directory and `E203` ignore and changes only the width. Rejected: setting 120 project-wide, which would make `black` fail instead, and joining the decorator onto one line, which would break the local pre-commit hook.
+After the change, ruff 0.15.17 format and check pass on all six Python files, black and local ruff 0.16.6 still pass, and the full set of Python checks is green.
+My earlier verification missed this because it ran the lockfile's ruff with the default width, not CI's version with CI's config. The script now runs both CI-version ruff checks.
+
+**Bugfix Context:**
+Root cause: super-linter's default ruff width (120) differs from the width used by the other formatters here (88), and the earlier local check did not use CI's config.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #23
+
+## [2026-10-31 14:08] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `TODO.md`)
+
+**Summary:**
+Recorded the review-driven `Task` behavior in the plan's M1 section and in `TODO.md`: six new ticked boxes, a non-UTC time zone in the timestamp test, the answers to two "Think about" questions, and the open spec question about `DONE`.
+
+**Rationale:**
+The project `CLAUDE.md` says to keep the plan, the matching issue, and `README.md` in step. The five code commits before this one changed what `Task` accepts, so the plan's description of M1 would otherwise be out of date, and issue #5 is regenerated from it.
+The "Think about" answers now say what was decided and why, in the same place the question was asked, instead of leaving a question that the code already answers.
+Two things stay open on purpose and are written down so they are not lost: whether `DONE` requires a date completed (Q4 is silent, audit finding G9), and that `update` in M5 must re-validate because assigning an attribute skips `__post_init__`.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5 (regenerated from the plan after this commit)
+- Pull request: #23
+
+## [2026-10-31 14:07] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+A new `Task` now reads the clock once and shares that reading across `created`, `updated`, `start`, and `stop`, and the default-timestamp test runs under a non-UTC `TZ`.
+
+**Rationale:**
+Two review comments on PR #23. With four separate `datetime.now()` calls, `created != updated` on 568 of 2000 new tasks in my run (the reviewer saw 614). Anything that reads `updated > created` as "was modified" would misclassify an untouched task, and the audit had left this open as finding G13.
+Mechanism chosen with the user on 2026-10-31 from four options: a private sentinel default that `__post_init__` replaces with one shared reading. The fields stay typed `datetime`, so pyright needs no `None` checks in the M2 loader and the M3 `add`, and `Task(id=1, name="x")` keeps working. The cost is an unusual-looking default, which carries a comment.
+Rejected: `None` defaults (the fields would become `datetime | None`), a `Task.new()` factory (two construction paths), and keeping the skew.
+The sentinel is compared with `is`, so a caller who passes an equal date keeps it.
+Second comment: a default read from UTC but stored naive passed both timestamp tests on a UTC machine such as the CI runner, so the "local" half of D6 was not pinned. The test now sets `TZ=Asia/Kolkata`, which has no daylight saving and differs from UTC all year, so that mutant fails everywhere.
+Test-first: both shared-clock tests failed, showing `created` and `updated` one microsecond apart, then all 33 tests passed.
+Mutation check on the final `task.py`: eight breaks (naive-UTC default, separate clock reads, aware datetimes allowed, Q4 unenforced, positional fields, unstripped name, no enum coercion, null name) each fail at least one test, and the file was restored byte-for-byte.
+Not done: patching the clock inside the tests. The bracket pattern is the plan's own, patching would tie the tests to the module's import style, and the real gap was the missing non-UTC zone.
+
+**Bugfix Context:**
+Root cause: each timestamp field had its own `default_factory`, so every default was a separate clock read, and the tests could not tell a local default from a UTC one.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #23 (review threads on `task.py` line 18 and `test_task.py` line 38)
+
+## [2026-10-31 14:06] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+Every `Task` field after `id` and `name` is now keyword-only, using a `KW_ONLY` marker. `Task(1, "Buy milk")` still works.
+
+**Rationale:**
+Review comment on PR #23. All 11 fields could be passed positionally and six share the `datetime` type, so `Task(1, "n", "d", later, earlier)` stored `created=later, updated=earlier` and no type checker could object (reproduced). The M2 loader and the M3 `add` command are about to construct tasks in volume, so the class of bug is closed before they exist.
+Test-first: the positional-arguments test failed with `DID NOT RAISE TypeError`, then all 31 tests passed. A second test, that `id` and `name` still work positionally, passes before and after on purpose: it guards the shorthand the reviewer's suggestion kept.
+`id` and `name` stay positional-or-keyword because the reviewer's suggestion placed the marker after them, and they are the two required, differently typed fields. The marker is `dataclasses.KW_ONLY`, so no new dependency and no change to the generated field order.
+
+**Bugfix Context:**
+Root cause: a dataclass accepts every field positionally by default, and type checking cannot tell two `datetime` arguments apart.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #23 (review thread on `task.py` line 15)
+
+## [2026-10-31 14:05] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+`Task` now enforces two invariants that were only documented: no datetime field may be timezone-aware (D6), and only a `DONE` task may have a date completed (the half of Q4 that the spec states).
+
+**Rationale:**
+Two review comments on PR #23. D6 says naive local time, but `Task(due=<aware>)` was accepted, and sorting one aware task against a naive one raised `TypeError: can't compare offset-naive and offset-aware datetimes` (reproduced). The check loops over `dataclasses.fields`, so a field added later is covered without remembering to list it.
+Q4 says a task that is not `DONE` always has no date completed, but `Task(status=TO_DO, date_completed=<now>)` was accepted and would land in the wrong section of `list` and `list --all`. A loader reading a hand-edited file now gets a `ValueError` for it.
+Test-first: eight new tests failed with `DID NOT RAISE ValueError`, then all 29 passed. One more test, that a `DONE` task keeps its date, passes before and after on purpose: it guards the allowed path against the new rule.
+Deliberately not decided here: whether `DONE` requires a date completed. Q4 is silent, and `Task(status=DONE)` still has none. The review thread stays open for that spec question, and the audit's finding G9 (M4's sort must cope with it) is unchanged.
+
+**Bugfix Context:**
+Root cause: both rules lived only in the plan and `README.md`, and the model validated nothing but the name.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #23 (review threads on `task.py` lines 20 and 21)
+
+## [2026-10-31 14:04] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+`Task` now normalizes and validates its inputs at construction: a non-string name raises `ValueError`, the name is stored stripped, and `status` and `priority` are coerced to `Status` and `Priority` members, so an unknown label raises `ValueError`.
+
+**Rationale:**
+Three review comments on PR #23, reproduced before changing anything.
+`Task(id=1, name=None)` raised `AttributeError`, so a hand-edited `tasks.json` with a null name would surface a traceback and a caller catching `ValueError` would miss it.
+`Task(id=1, name="  Buy milk  ").name` kept its padding, so the delete prompt, any name filter and duplicate detection would see different text than the user meant.
+`Task(1, "x", priority="HIGH")` stored a plain `str`, so `t.priority is Priority.HIGH` was `False`. Because both are `StrEnum`s, an equality assertion in the M2 round-trip test would have passed anyway.
+Test-first: five new tests failed for the expected reasons (`AttributeError`, the padded name, `'DONE' is not Status.DONE`, two `DID NOT RAISE`), then all 20 tests passed.
+`ValueError` for a non-string name is a decision, not an oversight. Ruff's `TRY004` prefers `TypeError`, but the loader should catch one exception type for any bad field, which a bad enum label already raises. The suppression sits on that line with the reason beside it.
+Storing the stripped name in the model, not only at the command line, puts the rule in one place for the loader and for `add`.
+
+**Bugfix Context:**
+Root cause: `__post_init__` validated the name only after calling `.strip()` on it, and trusted the annotations for the enum fields, although the annotations are not checked at runtime.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #23 (review threads on `task.py` lines 22 and 28)
+
+## [2026-10-31 14:03] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** test (`tests/test_priority.py`)
+
+**Summary:**
+The priority test now asserts the member name as well as the value: `Priority[name].name == name` and `Priority(name) is Priority[name]`.
+
+**Rationale:**
+Review comment on PR #23. The old test checked only `Priority(name).value == name`, so an enum written as `MED = "MEDIUM"` passed while `Priority.MEDIUM` did not exist. Q1 says users type and see the enum names, and M3 will parse them with `Priority[name]`, so that break would have shipped with the test green.
+Red step for a test-only change: the new test fails against exactly that mutant with `KeyError: 'MEDIUM'` (3 other cases pass), and passes against the real enum. The mutated file was restored byte-for-byte.
+
+**Bugfix Context:**
+Root cause: the assertion covered the lookup by value but not the lookup by name, which are different enum operations.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #23 (review thread on `tests/test_priority.py`)
+
+## [2026-10-31 13:26] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** lint (`.github/linters/.isort.cfg`, `src/task_tracker/task.py`, `tests/`, `CLAUDE.md`)
+
+**Summary:**
+Fixed the `Lint` failure on PR #23. Super-linter's `PYTHON_ISORT` rejected the two test files, and `PYTHON_PYLINT` scored the code 8.67 for a missing docstring in each test module and function, and for `Task` having 11 instance attributes against a limit of 7. The new `Tests` workflow itself passed on GitHub.
+
+**Rationale:**
+Both checks passed on earlier pull requests only because there was almost no Python. Local verification covered ruff, pyright, and the Markdown linters, but not the five Python linters super-linter runs separately (pylint, isort, black, flake8, mypy).
+Reproduced before fixing: pylint 4.0.6 and isort 8.0.1 with the super-linter v8.7.0 default configs gave the same score, the same eight messages, and the same two files as the CI log. After the fix all five linters pass at CI's versions, and pylint scores 10.00.
+isort: it does not see the `src` layout, so it treats `task_tracker` as a third-party package and rejects the usual empty line before project imports.
+Fixed at the cause with `known_first_party` in a repository-level config, `.github/linters/.isort.cfg`, which super-linter reads before its default.
+A controlled check confirmed it: the repository config exits 0 on the unchanged files, the default config still fails them. Rejected: deleting the empty lines to suit the default, which would recur in every later milestone.
+pylint: inline suppressions with the reason beside them, matching how `DTZ005` was handled.
+The test modules get a docstring and one file-level `missing-function-docstring` disable, since the test names already state the intent.
+`Task` gets a class-level `too-many-instance-attributes` disable, because `README.md` defines the 11 fields.
+Rejected: a docstring on every test that repeats its name, and raising pylint limits project-wide, which would also loosen future classes.
+
+**Bugfix Context:**
+Root cause: the verification routine omitted super-linter's Python linters. The project `CLAUDE.md` now lists them, and the saved lint-recipe memory covers them too.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #23
+
+## [2026-10-31 13:03] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`)
+
+**Summary:**
+Ticked the eight M1 boxes and updated the plan to match what was built: the rename test wording, the CI template, and the outcomes of two "Think about" questions.
+
+**Rationale:**
+The rename bullet now describes the test that exists, which parses each name `README.md` promises, because a test that a removed name stays removed fails only on a redesign. The CI bullet now says to follow `super-linter.yml` and not `version-bump.yml`, which closes audit finding G11: the bump job needs `contents: write`, a test job should have `contents: read` only.
+The timestamp and empty-name questions keep their text and gain the current answer. The empty-name note records a known limit for M5: `__post_init__` covers construction, but assigning `task.name = ""` later skips it.
+Ticked after the full verification run: tests, coverage gate at 96.77%, ruff, pyright, all pre-commit hooks, and both Markdown linters. The Tests workflow itself is still unproven on GitHub, so issue #5 stays open and unticked until this pull request's CI result is in.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5 (boxes ticked after CI passes)
+- Pull request: pending
+
+## [2026-10-31 13:01] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`)
+
+**Summary:**
+Added the Tests badge next to the Lint badge (M1 step 5). It points at the `Tests` workflow on `main` and links to the workflow page.
+
+**Rationale:**
+The Lint badge only reports linting, so without this one nothing on the page says the tests pass.
+Checked before adding it: the Lint badge returns HTTP 200 and reads "Lint - passing", while the Tests badge returns HTTP 404 today, because `tests.yml` exists only on this branch and GitHub serves a workflow badge only once the file is on the default branch.
+Consequence, accepted: the badge shows as a broken image when `README.md` is viewed on `develop`. After `develop` is promoted to `main` it should read "no status" until the first run on `main`, then "passing". `main` itself is unaffected until then, because its `README.md` does not contain the badge yet.
+Rejected: pointing the badge at `develop`, which would show a real status sooner but would not mirror the Lint badge or describe the branch users install from.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model, step 5
+- Issues: #5
+- Pull request: pending
+
+## [2026-10-31 13:00] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** ci (`.github/workflows/tests.yml`, `CLAUDE.md`)
+
+**Summary:**
+Added the `Tests` workflow (M1 step 4). On every push and pull request it checks out the code, installs uv with caching, runs `uv sync --locked`, then `uv run pytest`. The project `CLAUDE.md` documents the workflow and the Markdown linting gap that failed PR #20.
+
+**Rationale:**
+Added after the model tests exist, because pytest exits with code 5 when it collects no tests and a workflow merged earlier would fail on its first run.
+The audit (G11) warned that copying `version-bump.yml` would also copy its `contents: write`. This workflow follows `super-linter.yml` instead: top-level `permissions: {}`, job-level `contents: read` only, and `persist-credentials: false`. Both pinned action SHAs are the ones already used in the other workflows.
+The step order and `--locked` follow the uv GitHub Actions guide, and `enable-cache` follows your CI rule to cache dependencies.
+Configuration is the one case where test-first does not apply, so it was validated with the tools super-linter runs. zizmor 1.31.1 (offline), actionlint, and Prettier report nothing, and yamllint reports only the line-length warning that `version-bump.yml` also has. Running the two `run` commands locally passed: the lockfile satisfies `--locked` and all 15 tests pass.
+Not verified: the first real run on GitHub, including uv downloading the Python version pinned in `.python-version` and the cache behavior. That is what this pull request's CI will show.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model, step 4
+- Issues: #5
+- Pull request: pending
+
+## [2026-10-31 12:59] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`, `CLAUDE.md`)
+
+**Summary:**
+Added the `Task` dataclass (M1 step 3): required `id` and `name`, `description` defaulting to `""`, four timestamps defaulting to the current local time, `due` and `date_completed` defaulting to `None`, `status` `TO_DO`, `priority` `LOW`. A blank or whitespace-only name raises `ValueError`.
+Fields follow the `README.md` "Task object" order. The project `CLAUDE.md` now describes the code and the test setup as they are.
+
+**Rationale:**
+Written in three red-green cycles, each test watched failing for the expected reason first: module missing, attribute missing, and `DID NOT RAISE`. The full suite then passed: 15 tests, 100% coverage on `task.py`, ruff and pyright clean.
+Mutation check, done by breaking a backed-up copy of `task.py` and restoring it byte-for-byte: a default frozen at import, a timezone-aware default, a wrong default priority, removed validation, and a name check without `strip()` each fail at least one test.
+The name check lives in `__post_init__`, so every way of constructing a task hits it. Updating an existing task's name later (M5) will need the same rule, because assigning an attribute skips `__post_init__`.
+Open question from the plan, defaulted: each timestamp has its own `default_factory`, so `created` and `updated` on one new task can differ by microseconds. This is the simplest option and no current test depends on equality; sharing one "now" would need a classmethod or a custom `__post_init__`.
+Ruff 0.16.6 enables `DTZ005` by default, which flags the test's `datetime.now()` calls. D6 chose naive local time, so the two lines carry `# noqa: DTZ005` with the reason beside them. No project-wide ignore was added.
+The required `id` has no dedicated test: a test that fails only when someone gives it a default would be a change detector. Every test passes an `id`, which keeps the decision exercised.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model, step 3
+- Issues: #5
+- Pull request: pending
+
+## [2026-10-31 12:55] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** priority (`src/task_tracker/priority.py`, `tests/test_priority.py`, `CLAUDE.md`)
+
+**Summary:**
+Renamed `Priority.MED` to `Priority.MEDIUM` (value `"MEDIUM"`), added the first test file, and removed the now-false "until M1 lands the rename" sentence from the project `CLAUDE.md`.
+
+**Rationale:**
+Q1: users type and see the enum names, and `README.md` says `MEDIUM`. The stored value is the enum value, so the rename had to land before any task file exists.
+Test-first: the new test failed with `ValueError: 'MEDIUM' is not a valid Priority` for exactly the `MEDIUM` case and passed for the other three; after the rename the whole suite, ruff, and pyright are clean.
+Deliberate departure from the plan's wording "a test that `Priority.MEDIUM` exists and `Priority.MED` does not": asserting that a removed symbol stays removed only fails on a redesign, never on a bug.
+The test instead parses each of the four names `README.md` promises users can type, with the expected values taken from the `README.md` literal list. That is the behavior the `--priority` option and the JSON loader will depend on.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model, step 2
+- Issues: #5
+- Pull request: pending
+
+## [2026-10-31 12:54] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** deps (`pyproject.toml`, `uv.lock`)
+
+**Summary:**
+Added `pytest` and `pytest-cov` to the `dev` dependency group (M1 step 1). The lockfile gained 147 lines and lost none.
+
+**Rationale:**
+Decision D4 chose pytest with pytest-cov: `tmp_path`, `monkeypatch`, and `capsys` cover what this CLI needs, and `--cov-fail-under` gates coverage with one flag. Done first so every later M1 step can start with a failing test.
+`uv add --dev` writes to `[dependency-groups]`, which `pyproject.toml` already used (checked against the uv documentation). The lock was taken after the `main` sync, so the earlier `virtualenv` bump is untouched.
+Also confirmed on this machine that `uv run pytest` exits with code 5 when it collects no tests, which is why the CI workflow waits until the model tests exist.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model, step 1
+- Issues: #5
+- Pull request: pending
+
 ## [2026-10-31 12:45] Commit Summary
 
 **Change Type:** Fix
