@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-10-31 12:54] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** deps (`pyproject.toml`, `uv.lock`)
+
+**Summary:**
+Added `pytest` and `pytest-cov` to the `dev` dependency group (M1 step 1). The lockfile gained 147 lines and lost none.
+
+**Rationale:**
+Decision D4 chose pytest with pytest-cov: `tmp_path`, `monkeypatch`, and `capsys` cover what this CLI needs, and `--cov-fail-under` gates coverage with one flag. Done first so every later M1 step can start with a failing test.
+`uv add --dev` writes to `[dependency-groups]`, which `pyproject.toml` already used (checked against the uv documentation). The lock was taken after the `main` sync, so the earlier `virtualenv` bump is untouched.
+Also confirmed on this machine that `uv run pytest` exits with code 5 when it collects no tests, which is why the CI workflow waits until the model tests exist.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model, step 1
+- Issues: #5
+- Pull request: pending
+
 ## [2026-10-31 12:45] Commit Summary
 
 **Change Type:** Fix
