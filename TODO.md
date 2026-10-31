@@ -68,5 +68,31 @@ Test-first on `feature/task-model`, in this order, one commit each.
 - Strings and dates are accepted next to `datetime`, as labels are accepted for the enums. The field types stay `datetime`.
 - Only the date completed is checked against the future. A due date may be in the future, and no other field was asked about.
 
+## [2026-10-31] Feature: system-stamped created and updated, and a consistent timeline
+
+**Objective:**
+Apply two decisions from the project owner on 2026-10-31. `created` and `updated` are always the moment the task was created or updated and are never set by the user. A task's `start` is never before its `created`, and its `stop` is never after its date completed. Model only: no CLI and no storage.
+
+**Approach:**
+Test-first on `feature/task-model`, in this order, one commit each.
+
+1. `created` and `updated` stop being constructor arguments. The model sets both to the shared clock reading when the task is built. The M2 loader restores stored values through a deliberate `Task.restore()`, which M2 adds; M5's `update` stamps `updated` through the model.
+2. `start` before `created` raises `ValueError`. `stop` after the date completed raises `ValueError`. A done task's default `stop` is its date completed, so a past date completed does not collide with a default of "now".
+3. Update `README.md`, the plan (M1 and M2), and issues #5 and #6.
+
+**Tests:**
+
+- Passing `created` or `updated` raises `TypeError`.
+- A new task has `created`, `updated`, and `start` equal to the one clock reading.
+- A `start` before `created` raises `ValueError` naming the field; a later `start` is kept.
+- A `stop` after the date completed raises `ValueError`; a `stop` equal to it is accepted; a task that is not done has no limit on `stop`.
+- A done task given a past date completed has that date as its default `stop`.
+
+**Risks & Trade-offs:**
+
+- Without a constructor path for `created` and `updated`, the M2 round trip needs `Task.restore()`. That is deliberate, but M2 must now build it, and the plan says so.
+- Only the two stated rules are enforced. `stop` before `start` is still allowed, and so is a date completed before `created`. Both can be added later in a few lines if the owner wants the full timeline.
+- A `start` after `created` is allowed, including a date in the future, because only "not before created" was asked.
+
 [dataclasses]: https://docs.python.org/3/library/dataclasses.html#mutable-default-values
 [pytest exit codes]: https://docs.pytest.org/en/stable/reference/exit-codes.html

@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-10-31 14:34] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** planning (`TODO.md`)
+
+**Summary:**
+Added the `TODO.md` entry for the project owner's decisions of 2026-10-31 on timestamps: the model stamps `created` and `updated`, `start` is never before `created`, and `stop` is never after the date completed.
+
+**Rationale:**
+The project rules require the plan before any code. Two choices were put to the owner with pros and cons.
+First, how to keep `created` and `updated` out of the user's hands: the model stamps them, with a deliberate `Task.restore()` for storage, over a convention that the CLI never exposes them, or an automatic bump on every change.
+Second, how strict the timeline should be: exactly the two stated rules, over also requiring `stop` not before `start`.
+The entry records what the choice costs: the M2 round trip needs `Task.restore()`, and `stop` before `start` and a date completed before `created` stay allowed.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: system-stamped created and updated, and a consistent timeline
+- Issues: #5, #6
+- Pull request: #23
+
 ## [2026-10-31 14:25] Commit Summary
 
 **Change Type:** Docs
