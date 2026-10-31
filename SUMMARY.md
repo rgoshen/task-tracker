@@ -1,5 +1,71 @@
 # Summary
 
+## [2026-10-31 12:30] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** docs (`SUMMARY.md`, `TODO.md`)
+
+**Summary:**
+Fixed the four linting errors that failed the `Lint` workflow on PR #20: two `SUMMARY.md` lines over 400 characters (MD013), one bare `README` in `SUMMARY.md`, and `Tradeoffs` in the `TODO.md` heading.
+
+**Rationale:**
+Edited the content instead of excluding files, matching the 2026-10-23 decision.
+The `TODO.md` heading now reads "Risks & Trade-offs". This is a deliberate change from the global template wording, because textlint's terminology rule rejects the unhyphenated form.
+
+**Bugfix Context:**
+Root cause: pre-commit runs ruff and the shell linters but not markdownlint or textlint, so the push went out unchecked. This is the same gap recorded on 2026-10-23.
+Reproduced the exact four findings locally with markdownlint-cli 0.49.0 and textlint 15.7.1, installed in the session scratchpad outside the repository, and confirmed all five Markdown files pass after the fix.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #20
+
+## [2026-10-31 12:07] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** planning (`TODO.md`)
+
+**Summary:**
+Created `TODO.md` with the M1 (Task model) entry: objective, a six-step commit-sized approach, the tests, and risks. No code changed.
+
+**Rationale:**
+The plan's "How to work each milestone" requires a `TODO.md` entry before coding starts, and the file did not exist.
+Two deliberate departures from the plan's M1 checklist order: pytest is added first (every later step is test-first, so a runner must exist), and the CI workflow moves after the model tests, because pytest exits with code 5 when it collects no tests and the first CI run would fail.
+Both facts were checked against current pytest documentation.
+The entry also records a trap verified by running it: `created: datetime = datetime.now()` raises no error and shares one frozen timestamp across instances, because the dataclass guard only rejects unhashable defaults. The ID-entry question from the plan's "Think about" is left open for the user to decide before the model is written.
+Both cited documentation URLs returned HTTP 200 and the dataclasses anchor exists.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5 (M1)
+- Pull request: pending
+
+## [2026-10-31 12:06] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Recorded that a task's `description` defaults to the empty string. `README.md` now reads "task description (string, default empty)", the plan's Global Constraints list it with the other defaults, and the first M1 test also asserts it.
+
+**Rationale:**
+`README.md` listed `description` with no default, which left M1's `Task` model underspecified.
+Chosen with the user on 2026-10-31 from three options. `""` keeps the field a plain `str`, so pyright and display code need no `None` checks, and "no description" has one representation.
+Rejected: `None` (consistent with `due`, but forces a `str | None` check everywhere it is printed) and leaving the field out of M1 (diverges from the `README.md` spec).
+Whether `add` and `update` expose `--description` stays deferred to M3 and M5, as Q3 did for `start` and `stop`.
+
+**References:**
+
+- `TODO.md`: none yet (the M1 entry follows in the next commit)
+- Issues: #5 needs the same one-line test change (pending, see Pull request)
+- Pull request: pending
+
 ## [2026-10-31 12:04] Commit Summary
 
 **Change Type:** Docs

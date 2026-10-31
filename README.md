@@ -27,7 +27,7 @@
 - Task object
   - ID (auto gen: highest existing ID + 1) (required)
   - task name (string) (required)
-  - task description (string)
+  - task description (string, default empty)
   - created date (datetime, default current)
   - updated date (datetime, default current)
   - due date (datetime, default null; tasks without one sort last)
