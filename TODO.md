@@ -24,7 +24,7 @@ All Given/When/Then with exact values are in the M1 section of the plan. In shor
 - A name of `""` or `"   "` raises `ValueError`.
 - Coverage: `uv run pytest --cov=task_tracker --cov-report=term-missing --cov-fail-under=80`.
 
-**Risks & Tradeoffs:**
+**Risks & Trade-offs:**
 
 - **Frozen timestamps.** `created: datetime = datetime.now()` raises no error. Checked on 2026-10-31: two instances created 0.2 s apart shared one object. The dataclass guard only rejects unhashable defaults ([dataclasses]), and a `datetime` passes. The "between before and after" test is the only thing that catches it; `default_factory` is the fix.
 - **Empty test run fails CI.** pytest exits with code 5 when it collects no tests ([pytest exit codes]), so the workflow must not merge before step 3 has real tests.
