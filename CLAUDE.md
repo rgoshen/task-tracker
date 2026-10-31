@@ -53,5 +53,7 @@ Versioning is driven entirely by Conventional Commit messages, so commit message
 ## Lint and CI conventions
 
 - `.github/workflows/super-linter.yml` (super-linter v8.7.0) runs on every push and PR and excludes `.serena/` and `.claude/`. Third-party actions are pinned to full commit SHAs with a version comment. Keep that when bumping them.
+- `.github/workflows/tests.yml` runs `uv sync --locked` and `uv run pytest` on every push and PR with read-only permissions. A `pytest` run that collects no tests exits with code 5 and fails the job.
+- Super-linter runs markdownlint (lines up to 400 characters) and textlint's terminology rule on every Markdown file, and pre-commit does not. Check Markdown locally before pushing, or the PR fails on wording such as `README` without its `.md` or the unhyphenated `Tradeoffs`.
 - Pre-commit runs `ruff-check --fix`, `ruff-format` (also on Markdown), `shellcheck`, and `shfmt`. Shell scripts are tab-indented because that is shfmt's default.
 - `# ponytail:` comments mark deliberate shortcuts and name their ceiling and upgrade path (see `bump-version.sh`). Read the note before "fixing" one.

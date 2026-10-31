@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-10-31 13:00] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** ci (`.github/workflows/tests.yml`, `CLAUDE.md`)
+
+**Summary:**
+Added the `Tests` workflow (M1 step 4). On every push and pull request it checks out the code, installs uv with caching, runs `uv sync --locked`, then `uv run pytest`. The project `CLAUDE.md` documents the workflow and the Markdown linting gap that failed PR #20.
+
+**Rationale:**
+Added after the model tests exist, because pytest exits with code 5 when it collects no tests and a workflow merged earlier would fail on its first run.
+The audit (G11) warned that copying `version-bump.yml` would also copy its `contents: write`. This workflow follows `super-linter.yml` instead: top-level `permissions: {}`, job-level `contents: read` only, and `persist-credentials: false`. Both pinned action SHAs are the ones already used in the other workflows.
+The step order and `--locked` follow the uv GitHub Actions guide, and `enable-cache` follows your CI rule to cache dependencies.
+Configuration is the one case where test-first does not apply, so it was validated with the tools super-linter runs. zizmor 1.31.1 (offline), actionlint, and Prettier report nothing, and yamllint reports only the line-length warning that `version-bump.yml` also has. Running the two `run` commands locally passed: the lockfile satisfies `--locked` and all 15 tests pass.
+Not verified: the first real run on GitHub, including uv downloading the Python version pinned in `.python-version` and the cache behavior. That is what this pull request's CI will show.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model, step 4
+- Issues: #5
+- Pull request: pending
+
 ## [2026-10-31 12:59] Commit Summary
 
 **Change Type:** Feature
