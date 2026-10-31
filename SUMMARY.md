@@ -1,5 +1,23 @@
 # Summary
 
+## [2026-10-31 12:06] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Recorded that a task's `description` defaults to the empty string. `README.md` now reads "task description (string, default empty)", the plan's Global Constraints list it with the other defaults, and the first M1 test also asserts it.
+
+**Rationale:**
+`README.md` listed `description` with no default, which left M1's `Task` model underspecified. Chosen with the user on 2026-10-31 from three options. `""` keeps the field a plain `str`, so pyright and display code need no `None` checks, and "no description" has one representation. Rejected: `None` (consistent with `due`, but forces a `str | None` check everywhere it is printed) and leaving the field out of M1 (diverges from the README spec). Whether `add` and `update` expose `--description` stays deferred to M3 and M5, as Q3 did for `start` and `stop`.
+
+**References:**
+
+- `TODO.md`: none yet (the M1 entry follows in the next commit)
+- Issues: #5 needs the same one-line test change (pending, see Pull request)
+- Pull request: pending
+
 ## [2026-10-31 12:04] Commit Summary
 
 **Change Type:** Docs

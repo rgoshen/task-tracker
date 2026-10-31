@@ -15,7 +15,7 @@
 - Python: `.python-version` pins 3.14.7 for development; the floor is `>=3.14` in both `README.md` and `pyproject.toml` (decided 2026-10-23: a patch-level floor would block installs on older 3.14 releases for no code reason).
 - Runtime dependencies stay empty (`dependencies = []`).
 - `Status`: `TO_DO`, `IN_PROGRESS`, `DONE`. `Priority` by rank, highest first: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`.
-- Defaults (`README.md`, after Q1 to Q3): status `TO_DO`, priority `LOW`, due `None`, date completed `None`; created, updated, start, and stop default to the current time. All datetimes are naive local time (D6).
+- Defaults (`README.md`, after Q1 to Q3): status `TO_DO`, priority `LOW`, description `""`, due `None`, date completed `None`; created, updated, start, and stop default to the current time. All datetimes are naive local time (D6).
 - "Current" tasks are `TO_DO` plus `IN_PROGRESS`.
 - The project-level list in the current directory is the default; `--dir PATH` selects another directory and `--global` selects the home list. The two flags are mutually exclusive.
 - Every option has a long and a short form: `--dir`/`-d`, `--global`/`-g`, `--priority`/`-p`, `--due`/`-D`, `--status`/`-s`, `--name`/`-n`, `--all`/`-a`. `-d` and `-D` differ by one Shift, so a slip must fail safe (M7). A letter claimed twice in one parser raises `ArgumentError` when the parser is built.
@@ -119,7 +119,7 @@ Branch `feature/task-model`. Covers `README.md` "Task object".
 - [ ] `uv add --dev pytest pytest-cov` ([uv dependencies]).
 - [ ] Add a CI workflow that runs `uv run pytest` on push and pull request. Follow `version-bump.yml`: top-level `permissions: {}`, SHA-pinned `actions/checkout` and `astral-sh/setup-uv`.
 - [ ] Add a Tests badge for that workflow to `README.md`, next to the Lint badge, so "passing" means the tests passed.
-- [ ] Given only the name "Buy milk", when a task is created, then status is `Status.TO_DO`, priority is `Priority.LOW`, due is `None`, and date completed is `None`.
+- [ ] Given only the name "Buy milk", when a task is created, then status is `Status.TO_DO`, priority is `Priority.LOW`, description is `""`, due is `None`, and date completed is `None`.
 - [ ] Given the time captured just before and just after creating a task, then its created timestamp falls between the two. Repeat for `updated`, `start`, and `stop`; `due` is excluded because it defaults to `None` (Q2).
 - [ ] Given a task is created, then every datetime field is naive (`tzinfo is None`) (D6).
 - [ ] Given the name `""` or `"   "`, when a task is created, then `ValueError` is raised.
