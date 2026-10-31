@@ -1,6 +1,6 @@
 """The task record."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import datetime
 
 from task_tracker.priority import Priority
@@ -33,3 +33,12 @@ class Task:  # pylint: disable=too-many-instance-attributes
             raise ValueError("name must not be blank")
         self.status = Status(self.status)
         self.priority = Priority(self.priority)
+        self._reject_aware_datetimes()
+        if self.status is not Status.DONE and self.date_completed is not None:
+            raise ValueError("only a DONE task can have a date completed")
+
+    def _reject_aware_datetimes(self) -> None:
+        for item in fields(self):
+            value = getattr(self, item.name)
+            if isinstance(value, datetime) and value.tzinfo is not None:
+                raise ValueError(f"{item.name} must be a naive local datetime")

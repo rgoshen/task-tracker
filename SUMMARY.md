@@ -1,5 +1,29 @@
 # Summary
 
+## [2026-10-31 14:05] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+`Task` now enforces two invariants that were only documented: no datetime field may be timezone-aware (D6), and only a `DONE` task may have a date completed (the half of Q4 that the spec states).
+
+**Rationale:**
+Two review comments on PR #23. D6 says naive local time, but `Task(due=<aware>)` was accepted, and sorting one aware task against a naive one raised `TypeError: can't compare offset-naive and offset-aware datetimes` (reproduced). The check loops over `dataclasses.fields`, so a field added later is covered without remembering to list it.
+Q4 says a task that is not `DONE` always has no date completed, but `Task(status=TO_DO, date_completed=<now>)` was accepted and would land in the wrong section of `list` and `list --all`. A loader reading a hand-edited file now gets a `ValueError` for it.
+Test-first: eight new tests failed with `DID NOT RAISE ValueError`, then all 29 passed. One more test, that a `DONE` task keeps its date, passes before and after on purpose: it guards the allowed path against the new rule.
+Deliberately not decided here: whether `DONE` requires a date completed. Q4 is silent, and `Task(status=DONE)` still has none. The review thread stays open for that spec question, and the audit's finding G9 (M4's sort must cope with it) is unchanged.
+
+**Bugfix Context:**
+Root cause: both rules lived only in the plan and `README.md`, and the model validated nothing but the name.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #23 (review threads on `task.py` lines 20 and 21)
+
 ## [2026-10-31 14:04] Commit Summary
 
 **Change Type:** Fix
