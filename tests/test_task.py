@@ -19,7 +19,7 @@ TIMESTAMP_FIELDS = ["created", "updated", "start", "stop"]
 NAIVE_DAY = datetime(2026, 11, 2)  # noqa: DTZ001
 PAST_DAY = datetime(2000, 1, 1)  # noqa: DTZ001
 FUTURE_DAY = datetime(2999, 1, 1)  # noqa: DTZ001
-EARLY_2001 = datetime(2001, 1, 1)  # noqa: DTZ001
+MIDDLE_DAY = datetime(2500, 1, 1)  # noqa: DTZ001
 AWARE_DAY = datetime(2026, 11, 2, tzinfo=UTC)
 FIRST_READING = datetime(2026, 10, 31, 9, 30, 0)  # noqa: DTZ001
 
@@ -98,9 +98,9 @@ def test_new_task_takes_a_single_clock_reading_for_all_its_timestamps(
 
 @pytest.mark.usefixtures("readings")
 def test_a_timestamp_given_is_kept_and_the_others_share_one_reading():
-    task = Task(id=1, name="Buy milk", stop=PAST_DAY)
+    task = Task(id=1, name="Buy milk", stop=FUTURE_DAY)
 
-    assert task.stop == PAST_DAY
+    assert task.stop == FUTURE_DAY
     assert task.created == task.updated == task.start == FIRST_READING
 
 
@@ -203,21 +203,21 @@ def test_a_task_that_is_not_done_has_no_date_completed_by_default(status: Status
     assert Task(id=1, name="x", status=status).date_completed is None
 
 
-def test_done_task_keeps_a_date_completed_in_the_past():
-    task = Task(id=1, name="x", status=Status.DONE, date_completed=PAST_DAY)
-
-    assert task.date_completed == PAST_DAY
+def test_a_new_task_cannot_be_done_before_it_was_created():
+    # A task that already existed can be done in the past; that is for restore (M2).
+    with pytest.raises(ValueError, match="date completed must not be before created"):
+        Task(id=1, name="x", status=Status.DONE, date_completed=PAST_DAY)
 
 
 def test_done_task_without_a_date_completed_gets_the_moment_it_was_created():
     task = Task(id=1, name="x", status=Status.DONE)
 
     assert task.date_completed is not None
-    assert task.date_completed == task.created
+    assert task.date_completed == task.created == task.start == task.stop
 
 
 def test_a_start_before_created_is_rejected():
-    with pytest.raises(ValueError, match="start"):
+    with pytest.raises(ValueError, match="start must not be before created"):
         Task(id=1, name="x", start=PAST_DAY)
 
 
@@ -226,30 +226,42 @@ def test_a_start_after_created_is_kept():
     assert Task(id=1, name="x", start=FUTURE_DAY).start == FUTURE_DAY
 
 
+def test_the_default_stop_follows_a_future_start():
+    # A default of "now" would be before the start and be rejected.
+    assert Task(id=1, name="x", start=FUTURE_DAY).stop == FUTURE_DAY
+
+
+def test_a_stop_before_start_is_rejected():
+    with pytest.raises(ValueError, match="stop must not be before start"):
+        Task(id=1, name="x", start=FUTURE_DAY, stop=MIDDLE_DAY)
+
+
+def test_a_stop_before_created_is_rejected():
+    with pytest.raises(ValueError, match="stop must not be before"):
+        Task(id=1, name="x", stop=PAST_DAY)
+
+
+def test_a_stop_equal_to_start_is_accepted():
+    task = Task(id=1, name="x", start=FUTURE_DAY, stop=FUTURE_DAY)
+
+    assert task.stop == task.start == FUTURE_DAY
+
+
+def test_a_start_after_the_date_completed_is_rejected():
+    with pytest.raises(ValueError, match="start must not be after the date completed"):
+        Task(id=1, name="x", status=Status.DONE, start=FUTURE_DAY)
+
+
 def test_a_stop_after_the_date_completed_is_rejected():
-    with pytest.raises(ValueError, match="stop"):
-        Task(
-            id=1,
-            name="x",
-            status=Status.DONE,
-            date_completed=PAST_DAY,
-            stop=EARLY_2001,
-        )
+    with pytest.raises(ValueError, match="stop must not be after the date completed"):
+        Task(id=1, name="x", status=Status.DONE, stop=FUTURE_DAY)
 
 
+@pytest.mark.usefixtures("readings")
 def test_a_stop_equal_to_the_date_completed_is_accepted():
-    task = Task(
-        id=1, name="x", status=Status.DONE, date_completed=PAST_DAY, stop=PAST_DAY
-    )
+    task = Task(id=1, name="x", status=Status.DONE, stop=FIRST_READING)
 
-    assert task.stop == PAST_DAY
-
-
-def test_a_done_tasks_default_stop_is_its_date_completed():
-    # A default of "now" would be after a past date completed.
-    task = Task(id=1, name="x", status=Status.DONE, date_completed=PAST_DAY)
-
-    assert task.stop == PAST_DAY
+    assert task.stop == task.date_completed == FIRST_READING
 
 
 def test_stop_has_no_limit_while_the_task_is_not_done():
@@ -262,10 +274,12 @@ def test_a_date_completed_in_the_future_is_rejected(future: object):
         Task(id=1, name="x", status=Status.DONE, date_completed=future)  # type: ignore[arg-type]
 
 
+@pytest.mark.usefixtures("readings")
 def test_a_date_completed_of_this_very_moment_is_accepted():
-    # datetime.now() carries microseconds, which are dropped before the comparison.
-    now = datetime.now()  # noqa: DTZ005
+    # A real clock reading carries microseconds. They are dropped before the
+    # comparison, or a date completed of "now" would count as in the future.
+    moment = FIRST_READING.replace(microsecond=500_000)
 
-    task = Task(id=1, name="x", status=Status.DONE, date_completed=now)
+    task = Task(id=1, name="x", status=Status.DONE, date_completed=moment)
 
-    assert task.date_completed == now.replace(microsecond=0)
+    assert task.date_completed == FIRST_READING

@@ -95,14 +95,22 @@ class Task:  # pylint: disable=too-many-instance-attributes
         if self.start is _UNSET:
             self.start = self.created
         if self.stop is _UNSET:
-            # A done task stopped when it was done, so a past date completed does
-            # not collide with a default of "now".
-            self.stop = now if self.date_completed is None else self.date_completed
+            # Now, unless the task is planned to start later: a stop before the
+            # start is impossible.
+            self.stop = max(now, self.start)
 
     def _check_timeline(self) -> None:
+        """Enforce created <= start <= stop <= date completed (when there is one)."""
+        done = self.date_completed
+        if done is not None and done < self.created:
+            raise ValueError("date completed must not be before created")
         if self.start < self.created:
             raise ValueError("start must not be before created")
-        if self.date_completed is not None and self.stop > self.date_completed:
+        if self.stop < self.start:
+            raise ValueError("stop must not be before start")
+        if done is not None and self.start > done:
+            raise ValueError("start must not be after the date completed")
+        if done is not None and self.stop > done:
             raise ValueError("stop must not be after the date completed")
 
     def _settle_date_completed(self, now: datetime) -> None:

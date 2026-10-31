@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-10-31 14:50] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+A task's timeline is now fully enforced: `created <= start <= stop <= date completed`, where the last link applies when the task has a date completed. Each broken link raises a `ValueError` with its own message. The default `stop` is the later of now and `start`.
+
+**Rationale:**
+Decision from the project owner on 2026-10-31, and the owner's remark that these rules should have been a given. The earlier "exactly the two stated rules" option left `stop` before `start` and a date completed before `created` possible, which are impossible histories. The model now checks every link, including the one that follows from the others.
+That way a date completed before `created` gets its own clear message and not a confusing complaint about `start`.
+Consequence the owner was told about: `created` is always the moment of creation, so a new task can only be done at that moment. A past date completed is rejected at construction. It belongs to a task that already existed, so those cases move to `Task.restore()` in M2 and `update` in M5.
+The done-task default for `stop` added earlier the same day could then never differ from "now", so it was removed as dead code. The default is now the later of now and `start`, which keeps a planned future `start` valid.
+Test-first: five tests failed (four `DID NOT RAISE`, one default), then all 63 passed. Four earlier tests could no longer be built through the constructor and were rewritten as rejections or removed, and the "this very moment" test now uses the controlled clock, because a real clock could cross a second boundary between two reads and make it flaky.
+Mutation check: eleven breaks fail a test, covering each of the five links being dropped, the default ignoring a future start, and each of the five boundaries being made exclusive. The file was verified identical to the green version afterwards.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: system-stamped created and updated, and a consistent timeline, step 4
+- Issues: #5, #6
+- Pull request: #23
+
 ## [2026-10-31 14:48] Commit Summary
 
 **Change Type:** Docs
