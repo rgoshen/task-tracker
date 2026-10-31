@@ -1,7 +1,7 @@
 """The task record."""
 
-from dataclasses import KW_ONLY, dataclass, fields
-from datetime import datetime
+from dataclasses import KW_ONLY, dataclass
+from datetime import date, datetime, time
 
 from task_tracker.priority import Priority
 from task_tracker.status import Status
@@ -12,6 +12,30 @@ from task_tracker.status import Status
 # time on purpose, so DTZ001 does not apply here.
 _UNSET = datetime(1, 1, 1)  # noqa: DTZ001
 _TIMESTAMPS = ("created", "updated", "start", "stop")
+_DATETIME_FIELDS = ("created", "updated", "due", "date_completed", "start", "stop")
+
+
+def _as_naive_datetime(name: str, value: object) -> datetime | None:
+    """Turn an ISO 8601 string, a date, or a datetime into one form.
+
+    The result is a naive local datetime with whole seconds, so `isoformat()`
+    always reads `YYYY-MM-DDTHH:MM:SS`. A bare date means midnight (Q6).
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except ValueError as error:
+            raise ValueError(f"{name}: {error}") from error
+    elif isinstance(value, date) and not isinstance(value, datetime):
+        value = datetime.combine(value, time.min)
+    if not isinstance(value, datetime):
+        # ValueError, not TypeError: the loader catches one type for any bad field.
+        raise ValueError(f"{name} must be a date or ISO 8601 text")  # noqa: TRY004
+    if value.tzinfo is not None:
+        raise ValueError(f"{name} must be a naive local datetime")
+    return value.replace(microsecond=0)
 
 
 # README.md "Task object" defines 11 fields; pylint's default limit is 7.
@@ -44,7 +68,8 @@ class Task:  # pylint: disable=too-many-instance-attributes
         self.status = Status(self.status)
         self.priority = Priority(self.priority)
         self._fill_unset_timestamps()
-        self._reject_aware_datetimes()
+        for name in _DATETIME_FIELDS:
+            setattr(self, name, _as_naive_datetime(name, getattr(self, name)))
         if self.status is not Status.DONE and self.date_completed is not None:
             raise ValueError("only a DONE task can have a date completed")
 
@@ -53,9 +78,3 @@ class Task:  # pylint: disable=too-many-instance-attributes
         for name in _TIMESTAMPS:
             if getattr(self, name) is _UNSET:
                 setattr(self, name, now)
-
-    def _reject_aware_datetimes(self) -> None:
-        for item in fields(self):
-            value = getattr(self, item.name)
-            if isinstance(value, datetime) and value.tzinfo is not None:
-                raise ValueError(f"{item.name} must be a naive local datetime")

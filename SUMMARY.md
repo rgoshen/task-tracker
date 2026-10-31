@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-10-31 14:23] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+Every datetime field now ends up in one form however it is passed in. An ISO 8601 string, a `date`, or a `datetime` becomes a naive local `datetime` with whole seconds, so `isoformat()` always reads `YYYY-MM-DDTHH:MM:SS`. A bare date means midnight (Q6). An invalid string, a value with a UTC offset, or a value of another type raises `ValueError` that names the field.
+
+**Rationale:**
+Decision from the project owner on 2026-10-31: all dates are formatted the same whatever way the user passes them in. The model is the one place the CLI and the M2 loader both go through, so one normalizer covers both, as the enum coercion does for labels.
+Whole seconds is my reading of "the same": `created` carried microseconds while a typed date did not, and a save at second precision would then make the M2 round trip lose them. The reading is flagged in `TODO.md` for correction.
+Test-first: 13 new tests failed for the expected reasons (raw strings stored as text, a `date` not equal to a datetime, microseconds present, four bad inputs not rejected), then all 46 tests passed. The existing before/after clock test now truncates its lower bound to whole seconds, since the stored value is truncated the same way.
+Mutation check: keeping microseconds, not parsing strings, reading a bare date as noon, accepting a UTC offset, and leaving the field name out of the error each fail a test, and the file was restored byte-for-byte.
+The aware-datetime check moved into the normalizer, so a string such as `2026-11-02T09:00:00+00:00` is rejected after parsing. That also covers audit finding G6 at the model level. The `dataclasses.fields` loop it replaced is gone, because strings must be handled before a field can be recognized as a datetime.
+The field types stay `datetime`; strings and dates are accepted at the boundary, as labels are for the enums.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: DONE date and one date form, step 1
+- Issues: #5
+- Pull request: #23
+
 ## [2026-10-31 14:21] Commit Summary
 
 **Change Type:** Docs

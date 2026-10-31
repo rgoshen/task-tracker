@@ -5,7 +5,7 @@
 
 import time
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -43,6 +43,39 @@ def test_new_task_has_the_documented_defaults():
     assert task.date_completed is None
 
 
+@pytest.mark.parametrize(
+    "given",
+    [
+        "2026-11-02",
+        "2026-11-02T00:00:00",
+        "2026-11-02 00:00:00",
+        date(2026, 11, 2),
+        datetime(2026, 11, 2, 0, 0, 0, 123456),  # noqa: DTZ001
+    ],
+)
+def test_every_way_of_giving_a_date_becomes_the_same_datetime(given: object):
+    task = Task(id=1, name="x", due=given)  # type: ignore[arg-type]
+
+    assert task.due is not None
+    assert task.due == NAIVE_DAY
+    assert task.due.isoformat() == "2026-11-02T00:00:00"
+
+
+@pytest.mark.parametrize("field_name", TIMESTAMP_FIELDS)
+def test_default_timestamps_have_whole_seconds(field_name: str):
+    assert getattr(Task(id=1, name="x"), field_name).microsecond == 0
+
+
+@pytest.mark.parametrize(
+    "given", ["2026-13-45", "not a date", 5, "2026-11-02T09:00:00+00:00"]
+)
+def test_a_date_that_is_not_naive_local_time_is_rejected_naming_the_field(
+    given: object,
+):
+    with pytest.raises(ValueError, match="due"):
+        Task(id=1, name="x", due=given)  # type: ignore[arg-type]
+
+
 def test_new_task_shares_one_clock_reading_across_its_timestamps():
     for _ in range(SKEW_REPEATS):
         task = Task(id=1, name="Buy milk")
@@ -65,7 +98,8 @@ def test_timestamp_defaults_to_the_moment_the_task_is_created(field_name: str):
     # Under a non-UTC zone this fails for a default read from UTC, which would
     # otherwise pass on a UTC machine such as the CI runner.
     # D6 chose naive local time on purpose, so DTZ005 does not apply here.
-    before = datetime.now()  # noqa: DTZ005
+    # The task keeps whole seconds, so the lower bound is truncated the same way.
+    before = datetime.now().replace(microsecond=0)  # noqa: DTZ005
     task = Task(id=1, name="Buy milk")
     after = datetime.now()  # noqa: DTZ005
 
