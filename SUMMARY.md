@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-10-31 12:07] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** planning (`TODO.md`)
+
+**Summary:**
+Created `TODO.md` with the M1 (Task model) entry: objective, a six-step commit-sized approach, the tests, and risks. No code changed.
+
+**Rationale:**
+The plan's "How to work each milestone" requires a `TODO.md` entry before coding starts, and the file did not exist. Two deliberate departures from the plan's M1 checklist order: pytest is added first (every later step is test-first, so a runner must exist), and the CI workflow moves after the model tests, because pytest exits with code 5 when it collects no tests and the first CI run would fail. Both facts were checked against current pytest documentation.
+The entry also records a trap verified by running it: `created: datetime = datetime.now()` raises no error and shares one frozen timestamp across instances, because the dataclass guard only rejects unhashable defaults. The ID-entry question from the plan's "Think about" is left open for the user to decide before the model is written.
+Both cited documentation URLs returned HTTP 200 and the dataclasses anchor exists.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5 (M1)
+- Pull request: pending
+
 ## [2026-10-31 12:06] Commit Summary
 
 **Change Type:** Docs
