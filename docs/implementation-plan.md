@@ -120,9 +120,15 @@ Branch `feature/task-model`. Covers `README.md` "Task object".
 - [x] `uv add --dev pytest pytest-cov` ([uv dependencies]). First, so every later step can start with a failing test.
 - [x] Rename `Priority.MED` to `Priority.MEDIUM` in `src/task_tracker/priority.py` (Q1). Red first: a test that parses each name `README.md` promises (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`) with `Priority(name)`; it fails only for `MEDIUM`. A test that `MED` no longer exists would fail only on a redesign, never on a bug. The stored value is the enum value, so do this before any task file exists.
 - [x] Given ID 1 and the name "Buy milk", when a task is created, then status is `Status.TO_DO`, priority is `Priority.LOW`, description is `""`, due is `None`, and date completed is `None`.
-- [x] Given the time captured just before and just after creating a task, then its created timestamp falls between the two. Repeat for `updated`, `start`, and `stop`; `due` is excluded because it defaults to `None` (Q2).
+- [x] Given the time captured just before and just after creating a task, with the process time zone set to a non-UTC zone such as `Asia/Kolkata`, then its created timestamp falls between the two. Repeat for `updated`, `start`, and `stop`; `due` is excluded because it defaults to `None` (Q2). A UTC default passes on a UTC machine such as the CI runner; the non-UTC zone pins "local" (D6).
 - [x] Given a task is created, then every datetime field that is not `None` is naive (`tzinfo is None`) (D6). `due` and date completed default to `None`, which has no `tzinfo`.
 - [x] Given the name `""` or `"   "`, when a task is created, then `ValueError` is raised.
+- [x] Given a name that is not a string, such as the `null` a hand-edited `tasks.json` can hold, then `ValueError` is raised, not `AttributeError`. Given `"  Buy milk  "`, then the stored name is `"Buy milk"`.
+- [x] Given `status="DONE"` and `priority="HIGH"` as plain strings, then the stored values are `Status.DONE` and `Priority.HIGH`, checked with `is`. Given an unknown label, then `ValueError` is raised. Equality alone would pass for plain strings, because the enums are `StrEnum`s.
+- [x] Given a timezone-aware value for any datetime field, then `ValueError` is raised, because sorting an aware and a naive task raises `TypeError` (D6).
+- [x] Given a status other than `DONE` and a date completed, then `ValueError` is raised (the first half of Q4). Still open: does `DONE` require a date completed? `Task(status=DONE)` has none today, and M4's sort must cope with that.
+- [x] Given positional arguments after `id` and `name`, then `TypeError` is raised, so swapped `datetime` arguments cannot type-check and run. `Task(1, "Buy milk")` still works.
+- [x] Given a new task, then `created`, `updated`, `start`, and `stop` are equal. Given one of them explicitly, then it is kept and the others still share one reading.
 - [x] Add a CI workflow that runs `uv run pytest` on push and pull request, once the tests above exist: pytest exits with code 5 when it collects no tests ([pytest exit codes]), so an earlier workflow fails its first run.
       Follow `super-linter.yml`, not `version-bump.yml`: top-level `permissions: {}`, job-level `contents: read` only (the bump job needs `contents: write`), `persist-credentials: false`, and SHA-pinned `actions/checkout` and `astral-sh/setup-uv`.
 - [x] Add a Tests badge for that workflow to `README.md`, next to the Lint badge, so "passing" means the tests passed.
@@ -130,8 +136,8 @@ Branch `feature/task-model`. Covers `README.md` "Task object".
 **Think about:**
 
 - In a dataclass, when does `created: datetime = datetime.now()` run? What does `default_factory` change? ([dataclasses])
-- Each `default_factory` call reads the clock separately, so `created` and `updated` on one new task can differ by microseconds. Should a new task share a single "now" across `created`, `updated`, `start`, and `stop`? Which test would show the difference? Pin whichever you choose. Current code: separate `default_factory` calls, the simplest option; no test depends on the four being equal.
-- Where does the empty-name check live so every path that builds a task hits it? Current code: `__post_init__`, which covers construction. Assigning `task.name = ""` later skips it, so M5's `update` needs the same rule.
+- Why does `Task` read the clock once in `__post_init__` and not give each timestamp its own `default_factory`? Decided 2026-10-31 in review of PR #23: separate reads differed on about a quarter of new tasks, so a private sentinel default is replaced by one shared reading, and the fields stay typed `datetime` without `None` checks.
+- Where does the name check live so every path that builds a task hits it? In `__post_init__`, which also strips the name and requires a string. Assigning `task.name = ""` later skips it, so M5's `update` must re-validate, for example by building a new task with `dataclasses.replace` or through a validating setter.
 - The ID is a required `int` (D5, decided 2026-10-31), so every M1 test passes one in. The next ID is computed by `add` in M3, never by the task.
 
 **Done when:** the tests pass locally and in CI.

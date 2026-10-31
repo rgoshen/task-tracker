@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-10-31 14:08] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `TODO.md`)
+
+**Summary:**
+Recorded the review-driven `Task` behavior in the plan's M1 section and in `TODO.md`: six new ticked boxes, a non-UTC time zone in the timestamp test, the answers to two "Think about" questions, and the open spec question about `DONE`.
+
+**Rationale:**
+The project `CLAUDE.md` says to keep the plan, the matching issue, and `README.md` in step. The five code commits before this one changed what `Task` accepts, so the plan's description of M1 would otherwise be out of date, and issue #5 is regenerated from it.
+The "Think about" answers now say what was decided and why, in the same place the question was asked, instead of leaving a question that the code already answers.
+Two things stay open on purpose and are written down so they are not lost: whether `DONE` requires a date completed (Q4 is silent, audit finding G9), and that `update` in M5 must re-validate because assigning an attribute skips `__post_init__`.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5 (regenerated from the plan after this commit)
+- Pull request: #23
+
 ## [2026-10-31 14:07] Commit Summary
 
 **Change Type:** Fix
