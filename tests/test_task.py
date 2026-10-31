@@ -94,6 +94,18 @@ def test_timezone_aware_datetime_is_rejected(field_name: str, extra: dict):
         Task(**fields)
 
 
+def test_id_and_name_can_be_given_positionally():
+    task = Task(1, "Buy milk")
+
+    assert (task.id, task.name) == (1, "Buy milk")
+
+
+def test_other_fields_cannot_be_given_positionally():
+    # Six fields share the datetime type, so swapped arguments would type-check.
+    with pytest.raises(TypeError):
+        Task(1, "x", "a description", NAIVE_DAY, NAIVE_DAY)  # type: ignore[misc]
+
+
 @pytest.mark.parametrize("status", [Status.TO_DO, Status.IN_PROGRESS])
 def test_only_a_done_task_can_have_a_date_completed(status: Status):
     with pytest.raises(ValueError, match="date completed"):

@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-10-31 14:06] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+Every `Task` field after `id` and `name` is now keyword-only, using a `KW_ONLY` marker. `Task(1, "Buy milk")` still works.
+
+**Rationale:**
+Review comment on PR #23. All 11 fields could be passed positionally and six share the `datetime` type, so `Task(1, "n", "d", later, earlier)` stored `created=later, updated=earlier` and no type checker could object (reproduced). The M2 loader and the M3 `add` command are about to construct tasks in volume, so the class of bug is closed before they exist.
+Test-first: the positional-arguments test failed with `DID NOT RAISE TypeError`, then all 31 tests passed. A second test, that `id` and `name` still work positionally, passes before and after on purpose: it guards the shorthand the reviewer's suggestion kept.
+`id` and `name` stay positional-or-keyword because the reviewer's suggestion placed the marker after them, and they are the two required, differently typed fields. The marker is `dataclasses.KW_ONLY`, so no new dependency and no change to the generated field order.
+
+**Bugfix Context:**
+Root cause: a dataclass accepts every field positionally by default, and type checking cannot tell two `datetime` arguments apart.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #23 (review thread on `task.py` line 15)
+
 ## [2026-10-31 14:05] Commit Summary
 
 **Change Type:** Fix

@@ -1,6 +1,6 @@
 """The task record."""
 
-from dataclasses import dataclass, field, fields
+from dataclasses import KW_ONLY, dataclass, field, fields
 from datetime import datetime
 
 from task_tracker.priority import Priority
@@ -14,6 +14,9 @@ class Task:  # pylint: disable=too-many-instance-attributes
 
     id: int
     name: str
+    # Everything below is keyword-only: six fields share a type, so swapped
+    # positional arguments would pass type checking.
+    _: KW_ONLY
     description: str = ""
     created: datetime = field(default_factory=datetime.now)
     updated: datetime = field(default_factory=datetime.now)
