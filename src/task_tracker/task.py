@@ -25,5 +25,11 @@ class Task:  # pylint: disable=too-many-instance-attributes
     stop: datetime = field(default_factory=datetime.now)
 
     def __post_init__(self) -> None:
-        if not self.name.strip():
+        if not isinstance(self.name, str):
+            # ValueError, not TypeError: the loader catches one type for any bad field.
+            raise ValueError("name must be a string")  # noqa: TRY004
+        self.name = self.name.strip()
+        if not self.name:
             raise ValueError("name must not be blank")
+        self.status = Status(self.status)
+        self.priority = Priority(self.priority)

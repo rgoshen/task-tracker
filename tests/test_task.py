@@ -45,3 +45,28 @@ def test_default_timestamps_are_naive_local_time(field_name: str):
 def test_blank_name_is_rejected(name: str):
     with pytest.raises(ValueError, match="name"):
         Task(id=1, name=name)
+
+
+def test_non_string_name_is_rejected_with_value_error():
+    # A hand-edited tasks.json can hold null, and the loader must see ValueError.
+    with pytest.raises(ValueError, match="name"):
+        Task(id=1, name=None)  # type: ignore[arg-type]
+
+
+def test_name_is_stored_without_surrounding_whitespace():
+    assert Task(id=1, name="  Buy milk  ").name == "Buy milk"
+
+
+def test_status_and_priority_labels_become_enum_members():
+    task = Task(id=1, name="x", status="DONE", priority="HIGH")  # type: ignore[arg-type]
+
+    assert task.status is Status.DONE
+    assert task.priority is Priority.HIGH
+
+
+@pytest.mark.parametrize(
+    ("field_name", "label"), [("status", "FINISHED"), ("priority", "URGENT")]
+)
+def test_unknown_status_or_priority_label_is_rejected(field_name: str, label: str):
+    with pytest.raises(ValueError, match=label):
+        Task(**{"id": 1, "name": "x", field_name: label})  # type: ignore[arg-type]

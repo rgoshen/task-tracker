@@ -1,5 +1,32 @@
 # Summary
 
+## [2026-10-31 14:04] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+`Task` now normalizes and validates its inputs at construction: a non-string name raises `ValueError`, the name is stored stripped, and `status` and `priority` are coerced to `Status` and `Priority` members, so an unknown label raises `ValueError`.
+
+**Rationale:**
+Three review comments on PR #23, reproduced before changing anything.
+`Task(id=1, name=None)` raised `AttributeError`, so a hand-edited `tasks.json` with a null name would surface a traceback and a caller catching `ValueError` would miss it.
+`Task(id=1, name="  Buy milk  ").name` kept its padding, so the delete prompt, any name filter and duplicate detection would see different text than the user meant.
+`Task(1, "x", priority="HIGH")` stored a plain `str`, so `t.priority is Priority.HIGH` was `False`. Because both are `StrEnum`s, an equality assertion in the M2 round-trip test would have passed anyway.
+Test-first: five new tests failed for the expected reasons (`AttributeError`, the padded name, `'DONE' is not Status.DONE`, two `DID NOT RAISE`), then all 20 tests passed.
+`ValueError` for a non-string name is a decision, not an oversight. Ruff's `TRY004` prefers `TypeError`, but the loader should catch one exception type for any bad field, which a bad enum label already raises. The suppression sits on that line with the reason beside it.
+Storing the stripped name in the model, not only at the command line, puts the rule in one place for the loader and for `add`.
+
+**Bugfix Context:**
+Root cause: `__post_init__` validated the name only after calling `.strip()` on it, and trusted the annotations for the enum fields, although the annotations are not checked at runtime.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #23 (review threads on `task.py` lines 22 and 28)
+
 ## [2026-10-31 14:03] Commit Summary
 
 **Change Type:** Fix
