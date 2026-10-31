@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-10-31 14:21] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** planning (`TODO.md`)
+
+**Summary:**
+Added the `TODO.md` entry for the decisions the project owner gave on 2026-10-31: a `DONE` task gets a date completed by default, a date completed cannot be in the future, and all datetimes share one form.
+
+**Rationale:**
+The project rules require the plan before any code. The decisions answer the open half of the review thread on `task.py` line 21 of PR #23, and audit finding G9.
+One interpretation is mine and is flagged in the entry for correction: "formatted the same" is read as one canonical form, whole seconds in ISO 8601, with a bare date meaning midnight (Q6). Whole seconds, because `created` carries microseconds while a typed date does not, and a save at second precision would then break the M2 round trip.
+The entry records a trade-off the owner may want to revisit: the model cannot tell "marked done now" from "loaded from a file", so a hand-edited `DONE` record with no date would get the load time.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: DONE date and one date form
+- Issues: #5
+- Pull request: #23
+
 ## [2026-10-31 14:13] Commit Summary
 
 **Change Type:** Fix

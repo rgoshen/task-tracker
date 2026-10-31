@@ -40,5 +40,33 @@ All Given/When/Then with exact values are in the M1 section of the plan. In shor
 - **Tests badge starts empty.** The Lint badge points at `main`, so the Tests badge will probably show no status until the workflow has run there (unverified). Merge it anyway; check it after the next promotion.
 - **Scope held back.** `description` is a plain field with a default. Whether `add` and `update` expose it waits for M3 and M5, as Q3 did for `start` and `stop`.
 
+## [2026-10-31] Feature: DONE date and one date form
+
+**Objective:**
+Apply three decisions from the project owner on 2026-10-31. A `DONE` task always has a date completed, defaulting to the moment it is created or marked done. A date completed that is passed in cannot be in the future. Every datetime is held in one form, whatever way it is passed in.
+This answers the open half of the review thread on `task.py` line 21 of PR #23 and audit finding G9. Model only: no CLI and no storage.
+
+**Approach:**
+Test-first on `feature/task-model`, in this order, one commit each.
+
+1. Normalize every datetime field. An ISO 8601 string, a `date`, or a `datetime` all become a naive `datetime` with whole seconds, so `isoformat()` always reads `YYYY-MM-DDTHH:MM:SS`. A bare date is midnight (Q6).
+2. A `DONE` task with no date completed gets the shared clock reading. A date completed later than that reading raises `ValueError`.
+3. Update `README.md`, the plan (Q4, D6, M1), and issue #5.
+
+**Tests:**
+
+- Equivalent inputs (`"2026-11-02"`, `"2026-11-02T00:00:00"`, `"2026-11-02 00:00:00"`, a `date`, a `datetime` with microseconds) give the same `due`, and `isoformat()` reads `2026-11-02T00:00:00`.
+- Default timestamps carry no microseconds.
+- An invalid string, a string with a UTC offset, or a value of another type raises `ValueError` that names the field.
+- `Task(status=DONE)` has a date completed equal to `created`; a task that is not `DONE` has none.
+- A past date completed is kept, a future one raises `ValueError`, and `datetime.now()` itself is accepted.
+
+**Risks & Trade-offs:**
+
+- Dropping microseconds changes values silently. That is harmless for a task list, and it keeps the M2 round trip exact when dates are saved at whole seconds.
+- The model cannot tell "marked done now" from "loaded from a file", so a hand-edited `DONE` record with no date gets the load time. M2's loader must check the raw record if that matters.
+- Strings and dates are accepted next to `datetime`, as labels are accepted for the enums. The field types stay `datetime`.
+- Only the date completed is checked against the future. A due date may be in the future, and no other field was asked about.
+
 [dataclasses]: https://docs.python.org/3/library/dataclasses.html#mutable-default-values
 [pytest exit codes]: https://docs.pytest.org/en/stable/reference/exit-codes.html
