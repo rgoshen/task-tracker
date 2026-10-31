@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-10-31 14:03] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** test (`tests/test_priority.py`)
+
+**Summary:**
+The priority test now asserts the member name as well as the value: `Priority[name].name == name` and `Priority(name) is Priority[name]`.
+
+**Rationale:**
+Review comment on PR #23. The old test checked only `Priority(name).value == name`, so an enum written as `MED = "MEDIUM"` passed while `Priority.MEDIUM` did not exist. Q1 says users type and see the enum names, and M3 will parse them with `Priority[name]`, so that break would have shipped with the test green.
+Red step for a test-only change: the new test fails against exactly that mutant with `KeyError: 'MEDIUM'` (3 other cases pass), and passes against the real enum. The mutated file was restored byte-for-byte.
+
+**Bugfix Context:**
+Root cause: the assertion covered the lookup by value but not the lookup by name, which are different enum operations.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #23 (review thread on `tests/test_priority.py`)
+
 ## [2026-10-31 13:26] Commit Summary
 
 **Change Type:** Fix
