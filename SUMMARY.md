@@ -1,5 +1,23 @@
 # Summary
 
+## [2026-10-31 12:04] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`)
+
+**Summary:**
+Ticked the M0 box "Tag `v0.1.0` on `main` and push the tag" in the plan.
+
+**Rationale:**
+The tag was pushed on 2026-10-23 but the box stayed unticked, so the plan contradicted M0's own "Done when" line. Checked before ticking: `git ls-remote --tags origin` lists `refs/tags/v0.1.0` at `9e974fb`. Issue #4 already shows 15 of 15 boxes ticked and is closed, so nothing else mirrors this line.
+
+**References:**
+
+- `TODO.md`: none (a one-character fix to a status box)
+- Issues: #4 (closed, already ticked)
+- Pull request: pending
+
 ## [2026-10-23 13:46] Commit Summary
 
 **Change Type:** Docs

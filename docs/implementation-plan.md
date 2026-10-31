@@ -106,7 +106,7 @@ Coverage: `uv run pytest --cov=task_tracker --cov-report=term-missing --cov-fail
 ### M0. Groundwork (no code)
 
 - [x] Create `develop` from `main` and push it. The version-bump workflow only runs when `release/*` or `hotfix/*` merges into `main`, so features land in `develop` first.
-- [ ] Tag `v0.1.0` on `main` and push the tag. With no tags, the first release scans all history and `7c90c7f fix: pin to specific shaw to fix linting error` lands in the first CHANGELOG.
+- [x] Tag `v0.1.0` on `main` and push the tag. With no tags, the first release scans all history and `7c90c7f fix: pin to specific shaw to fix linting error` lands in the first CHANGELOG.
 - [x] Decide D1 to D6, answer Q1 to Q6, and update `README.md`, including the Python floor. Decided on 2026-10-23: D1 to D6, Q1 to Q6, and the Python floor.
 
 **Done when:** `develop` and `v0.1.0` exist on origin and `README.md` reflects the answers.
