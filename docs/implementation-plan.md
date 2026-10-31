@@ -123,12 +123,13 @@ Branch `feature/task-model`. Covers `README.md` "Task object".
 - [ ] Add a Tests badge for that workflow to `README.md`, next to the Lint badge, so "passing" means the tests passed.
 - [ ] Given ID 1 and the name "Buy milk", when a task is created, then status is `Status.TO_DO`, priority is `Priority.LOW`, description is `""`, due is `None`, and date completed is `None`.
 - [ ] Given the time captured just before and just after creating a task, then its created timestamp falls between the two. Repeat for `updated`, `start`, and `stop`; `due` is excluded because it defaults to `None` (Q2).
-- [ ] Given a task is created, then every datetime field is naive (`tzinfo is None`) (D6).
+- [ ] Given a task is created, then every datetime field that is not `None` is naive (`tzinfo is None`) (D6). `due` and date completed default to `None`, which has no `tzinfo`.
 - [ ] Given the name `""` or `"   "`, when a task is created, then `ValueError` is raised.
 
 **Think about:**
 
 - In a dataclass, when does `created: datetime = datetime.now()` run? What does `default_factory` change? ([dataclasses])
+- Each `default_factory` call reads the clock separately, so `created` and `updated` on one new task can differ by microseconds. Should a new task share a single "now" across `created`, `updated`, `start`, and `stop`? Which test would show the difference? Pin whichever you choose.
 - Where does the empty-name check live so every path that builds a task hits it?
 - The ID is a required `int` (D5, decided 2026-10-31), so every M1 test passes one in. The next ID is computed by `add` in M3, never by the task.
 

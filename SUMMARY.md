@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-10-31 12:32] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `TODO.md`)
+
+**Summary:**
+Reworded the M1 naive-datetime test to cover only datetime fields that are not `None`, and added a "Think about" question on whether a new task shares one timestamp across `created`, `updated`, `start`, and `stop`. Mirrored both in `TODO.md`.
+
+**Rationale:**
+Findings G4 (naive-datetime part) and G13 of the Opus spec-gap audit.
+The old wording said every datetime field is naive, but `due` and date completed default to `None` and `None.tzinfo` raises, so the test could not be written as stated.
+The timestamp question is left open as a question, not decided: it is a design choice the implementer owns, and either answer passes the existing "between before and after" test.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5 (synced in a later step of this branch)
+- Pull request: pending
+
 ## [2026-10-31 12:31] Commit Summary
 
 **Change Type:** Docs
