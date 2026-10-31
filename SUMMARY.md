@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-10-31 12:45] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** deps (`uv.lock`)
+
+**Summary:**
+Merged `main` into `develop`. The only change that comes across is Dependabot PR #18, which bumps `virtualenv` from 21.7.13 to 21.14.13 in `uv.lock`.
+
+**Rationale:**
+Dependabot targets the default branch, so its pull request merged into `main` and left `develop` three commits behind (the bump, its merge, and the earlier promotion merge). M1 step 1, `uv add --dev pytest pytest-cov`, rewrites `uv.lock` on a branch cut from `develop`. Syncing first means that change starts from the current lockfile and cannot conflict with the bump when `develop` is promoted to `main`.
+Chosen with the user on 2026-10-31 over deferring the sync to promotion time. The merge was made without committing so this entry could go in the same commit, as the project rules require.
+Not addressed here: the repository has no `dependabot.yml`, so the divergence will recur on the next security bump. Redirecting Dependabot to `develop` was not part of this change and has not been checked against the Dependabot documentation.
+
+**Bugfix Context:**
+The bump is a dependency security update. Developing against the older `virtualenv` would leave `develop` behind the fix that `main` already has.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model (step 1 touches `uv.lock`)
+- Issues: none
+- Pull request: pending
+
 ## [2026-10-31 12:33] Commit Summary
 
 **Change Type:** Docs
