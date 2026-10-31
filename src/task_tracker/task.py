@@ -11,7 +11,6 @@ from task_tracker.status import Status
 # `is`, never `==`, so a caller who passes an equal date still has it kept. D6
 # chose naive local time on purpose, so DTZ001 does not apply here.
 _UNSET = datetime(1, 1, 1)  # noqa: DTZ001
-_DEFAULTED_TO_NOW = ("start", "stop")
 _GIVEN_DATETIMES = ("due", "date_completed", "start", "stop")
 
 
@@ -81,15 +80,30 @@ class Task:  # pylint: disable=too-many-instance-attributes
         now = _now()
         self.created = now
         self.updated = now
-        self._fill_unset_timestamps(now)
-        for name in _GIVEN_DATETIMES:
-            setattr(self, name, _as_naive_datetime(name, getattr(self, name)))
+        self._normalize_given_datetimes()
         self._settle_date_completed(now)
+        self._settle_start_and_stop(now)
+        self._check_timeline()
 
-    def _fill_unset_timestamps(self, now: datetime) -> None:
-        for name in _DEFAULTED_TO_NOW:
-            if getattr(self, name) is _UNSET:
-                setattr(self, name, now)
+    def _normalize_given_datetimes(self) -> None:
+        for name in _GIVEN_DATETIMES:
+            value = getattr(self, name)
+            if value is not _UNSET:
+                setattr(self, name, _as_naive_datetime(name, value))
+
+    def _settle_start_and_stop(self, now: datetime) -> None:
+        if self.start is _UNSET:
+            self.start = self.created
+        if self.stop is _UNSET:
+            # A done task stopped when it was done, so a past date completed does
+            # not collide with a default of "now".
+            self.stop = now if self.date_completed is None else self.date_completed
+
+    def _check_timeline(self) -> None:
+        if self.start < self.created:
+            raise ValueError("start must not be before created")
+        if self.date_completed is not None and self.stop > self.date_completed:
+            raise ValueError("stop must not be after the date completed")
 
     def _settle_date_completed(self, now: datetime) -> None:
         if self.status is not Status.DONE:

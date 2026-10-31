@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-10-31 14:41] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+A task's `start` can no longer be before its `created`, and its `stop` can no longer be after its date completed. Both raise `ValueError` naming the field. A done task's default `stop` is its date completed.
+
+**Rationale:**
+Decision from the project owner on 2026-10-31: start is never before created, and stop is never after the done date. Only those two rules were enforced, as chosen from two options. `stop` before `start` and a date completed before `created` stay allowed, and are recorded as such in `TODO.md`.
+The default for `stop` matters: with a default of "now", a done task given a past date completed would have a `stop` after that date and be rejected by the new rule. So a done task stops when it was done. For a task that is not done, `stop` still defaults to now and has no upper limit.
+Both boundaries are inclusive: a `start` equal to `created` and a `stop` equal to the date completed are accepted, which is also what the defaults produce.
+Test-first: three tests failed (two `DID NOT RAISE`, and a default `stop` of now), then all 59 passed. Three guards pass before and after on purpose: a later `start`, a `stop` equal to the date completed, and an open task's unlimited `stop`.
+Mutation check: six breaks each fail a test, including both off-by-one comparisons and a limit wrongly applied to open tasks, and the file was verified identical to the green version afterwards.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: system-stamped created and updated, and a consistent timeline, step 2
+- Issues: #5
+- Pull request: #23
+
 ## [2026-10-31 14:40] Commit Summary
 
 **Change Type:** Feature

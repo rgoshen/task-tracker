@@ -19,6 +19,7 @@ TIMESTAMP_FIELDS = ["created", "updated", "start", "stop"]
 NAIVE_DAY = datetime(2026, 11, 2)  # noqa: DTZ001
 PAST_DAY = datetime(2000, 1, 1)  # noqa: DTZ001
 FUTURE_DAY = datetime(2999, 1, 1)  # noqa: DTZ001
+EARLY_2001 = datetime(2001, 1, 1)  # noqa: DTZ001
 AWARE_DAY = datetime(2026, 11, 2, tzinfo=UTC)
 FIRST_READING = datetime(2026, 10, 31, 9, 30, 0)  # noqa: DTZ001
 
@@ -213,6 +214,46 @@ def test_done_task_without_a_date_completed_gets_the_moment_it_was_created():
 
     assert task.date_completed is not None
     assert task.date_completed == task.created
+
+
+def test_a_start_before_created_is_rejected():
+    with pytest.raises(ValueError, match="start"):
+        Task(id=1, name="x", start=PAST_DAY)
+
+
+def test_a_start_after_created_is_kept():
+    # Only "not before created" is ruled out, so a planned future start is fine.
+    assert Task(id=1, name="x", start=FUTURE_DAY).start == FUTURE_DAY
+
+
+def test_a_stop_after_the_date_completed_is_rejected():
+    with pytest.raises(ValueError, match="stop"):
+        Task(
+            id=1,
+            name="x",
+            status=Status.DONE,
+            date_completed=PAST_DAY,
+            stop=EARLY_2001,
+        )
+
+
+def test_a_stop_equal_to_the_date_completed_is_accepted():
+    task = Task(
+        id=1, name="x", status=Status.DONE, date_completed=PAST_DAY, stop=PAST_DAY
+    )
+
+    assert task.stop == PAST_DAY
+
+
+def test_a_done_tasks_default_stop_is_its_date_completed():
+    # A default of "now" would be after a past date completed.
+    task = Task(id=1, name="x", status=Status.DONE, date_completed=PAST_DAY)
+
+    assert task.stop == PAST_DAY
+
+
+def test_stop_has_no_limit_while_the_task_is_not_done():
+    assert Task(id=1, name="x", stop=FUTURE_DAY).stop == FUTURE_DAY
 
 
 @pytest.mark.parametrize("future", [FUTURE_DAY, "2999-01-01", "2999-01-01 09:30:00"])
