@@ -35,8 +35,8 @@
   - date completed (datetime, default null; a done task defaults to the moment it was marked done and cannot be given a future date; cleared when a done task is reopened)
   - status (string enum default `TO_DO`)
   - priority (string enum default `LOW`)
-  - start time (datetime, default current; never before the created date)
-  - stop time (datetime, default current, or the date completed for a done task; never after the date completed)
+  - start time (datetime, default current; never before the created date, never after the stop time or the date completed)
+  - stop time (datetime, default current, or the start time if that is later; never before the start time, never after the date completed)
   - every datetime is local time with whole seconds and is stored and shown as `YYYY-MM-DDTHH:MM:SS`, however it is typed (a bare date such as `2026-11-02` means midnight)
 
 ## Features

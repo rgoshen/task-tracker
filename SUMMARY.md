@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-10-31 14:51] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Recorded the full timeline where the spec lives. `README.md` now gives `start` and `stop` their complete limits. The plan replaces the two-rule boxes with one that lists every broken link, one that states a new task can only be done when it is created, and a corrected done-task box. M2's `restore` box now also covers a stored timeline out of order and the first place a past date completed can be tested.
+
+**Rationale:**
+The project `CLAUDE.md` says to keep the plan, the matching issue, and `README.md` in step. Issues #5 and #6 are regenerated from the plan after this commit.
+One plan box said a date completed in the past "is kept", which stopped being true for a new task once the timeline became enforced, so it is corrected here rather than left to contradict the code.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: system-stamped created and updated, and a consistent timeline, step 4
+- Issues: #5, #6
+- Pull request: #23
+
 ## [2026-10-31 14:50] Commit Summary
 
 **Change Type:** Feature
