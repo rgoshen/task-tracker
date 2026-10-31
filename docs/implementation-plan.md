@@ -64,6 +64,8 @@ The global list lives under the home directory, for example `~/.task-tracker/tas
 
 **Decision (2026-10-23): highest + 1, with a confirmation prompt on delete (Q5).** Deleting the highest task frees its ID, so a stale `delete 3` could hit a different task; the prompt shows the task name to catch that. M6 pins both behaviors.
 
+**Decision (2026-10-31, from the spec-gap audit): a task's `id` is a required `int`.** `README.md` marks the ID required, so a `Task` never exists without one. The `add` command computes highest + 1 from the other tasks and passes it in; a task never assigns its own ID. Rejected: an optional `id` set when the task is added, which leaves a `None` state that every save would have to guard against.
+
 ### D6. Dates and times
 
 - **Naive local time, stored as ISO 8601 strings** ([datetime] `isoformat` / `fromisoformat`). Pro: readable, matches what the user types. Con: ambiguous across DST changes and travel.
@@ -119,7 +121,7 @@ Branch `feature/task-model`. Covers `README.md` "Task object".
 - [ ] `uv add --dev pytest pytest-cov` ([uv dependencies]).
 - [ ] Add a CI workflow that runs `uv run pytest` on push and pull request. Follow `version-bump.yml`: top-level `permissions: {}`, SHA-pinned `actions/checkout` and `astral-sh/setup-uv`.
 - [ ] Add a Tests badge for that workflow to `README.md`, next to the Lint badge, so "passing" means the tests passed.
-- [ ] Given only the name "Buy milk", when a task is created, then status is `Status.TO_DO`, priority is `Priority.LOW`, description is `""`, due is `None`, and date completed is `None`.
+- [ ] Given ID 1 and the name "Buy milk", when a task is created, then status is `Status.TO_DO`, priority is `Priority.LOW`, description is `""`, due is `None`, and date completed is `None`.
 - [ ] Given the time captured just before and just after creating a task, then its created timestamp falls between the two. Repeat for `updated`, `start`, and `stop`; `due` is excluded because it defaults to `None` (Q2).
 - [ ] Given a task is created, then every datetime field is naive (`tzinfo is None`) (D6).
 - [ ] Given the name `""` or `"   "`, when a task is created, then `ValueError` is raised.
@@ -128,7 +130,7 @@ Branch `feature/task-model`. Covers `README.md` "Task object".
 
 - In a dataclass, when does `created: datetime = datetime.now()` run? What does `default_factory` change? ([dataclasses])
 - Where does the empty-name check live so every path that builds a task hits it?
-- Highest + 1 (D5) needs the other tasks, so a task cannot assign its own ID. How does the ID enter a task: a constructor argument, or an optional field set when the task is added to a list?
+- The ID is a required `int` (D5, decided 2026-10-31), so every M1 test passes one in. The next ID is computed by `add` in M3, never by the task.
 
 **Done when:** the tests pass locally and in CI.
 

@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-10-31 12:31] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `TODO.md`)
+
+**Summary:**
+Decided that a task's `id` is a required `int`. Added the decision to D5 in the plan, reworded the first M1 test to start from ID 1, replaced the open ID question in M1's "Think about" and in `TODO.md` with the decision.
+
+**Rationale:**
+Finding G1 of the Opus spec-gap audit: `README.md` marks the ID required, but the first M1 test built a task from only its name, so the open ID question had to be answered one way before that test could be written.
+Chosen with the user on 2026-10-31. A required `int` leaves no `None` state, so no save has to guard against a task without an ID, and it matches the reasoning used to default `description` to the empty string.
+Rejected: an optional `id` set when the task is added. It makes the first test work as written, but contradicts "required" and needs an extra M2 test that rejects an unsaved ID.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5 (synced in a later step of this branch)
+- Pull request: pending
+
 ## [2026-10-31 12:30] Commit Summary
 
 **Change Type:** Fix
