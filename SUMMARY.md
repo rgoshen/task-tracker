@@ -1,5 +1,30 @@
 # Summary
 
+## [2026-10-31 14:13] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** lint (`.github/linters/.ruff.toml`, `CLAUDE.md`)
+
+**Summary:**
+Fixed the `Lint` failure on the review-fix push to PR #23: super-linter's `PYTHON_RUFF_FORMAT` reported that `tests/test_task.py` would be reformatted. Added a repository-level ruff config with `line-length = 88`.
+
+**Rationale:**
+Reproduced before changing anything, with CI's own ruff 0.15.17 and super-linter's template config: it wants a wrapped `parametrize` decorator joined onto one line. The same file passes `black`, local ruff, and the pre-commit hook, because the template sets `line-length = 120` while those three use 88.
+So the template contradicts itself, and any call between 89 and 120 characters passes one formatter and fails the other.
+Fixed at the cause, as with the isort config: super-linter reads `.github/linters/.ruff.toml` before its default, and the new file keeps the template's cache directory and `E203` ignore and changes only the width. Rejected: setting 120 project-wide, which would make `black` fail instead, and joining the decorator onto one line, which would break the local pre-commit hook.
+After the change, ruff 0.15.17 format and check pass on all six Python files, black and local ruff 0.16.6 still pass, and the full set of Python checks is green.
+My earlier verification missed this because it ran the lockfile's ruff with the default width, not CI's version with CI's config. The script now runs both CI-version ruff checks.
+
+**Bugfix Context:**
+Root cause: super-linter's default ruff width (120) differs from the width used by the other formatters here (88), and the earlier local check did not use CI's config.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #23
+
 ## [2026-10-31 14:08] Commit Summary
 
 **Change Type:** Docs

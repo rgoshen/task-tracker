@@ -1,0 +1,9 @@
+# Store the cache in a temporary location
+cache-dir = "/tmp/.ruff_cache"
+# The super-linter template sets 120, but local ruff and the black check both
+# use 88, so any call between 89 and 120 characters passed one formatter and
+# failed the other. One width everywhere.
+line-length = 88
+
+[lint]
+ignore = ["E203"]
