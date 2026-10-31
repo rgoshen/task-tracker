@@ -1,5 +1,33 @@
 # Summary
 
+## [2026-10-31 14:07] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+A new `Task` now reads the clock once and shares that reading across `created`, `updated`, `start`, and `stop`, and the default-timestamp test runs under a non-UTC `TZ`.
+
+**Rationale:**
+Two review comments on PR #23. With four separate `datetime.now()` calls, `created != updated` on 568 of 2000 new tasks in my run (the reviewer saw 614). Anything that reads `updated > created` as "was modified" would misclassify an untouched task, and the audit had left this open as finding G13.
+Mechanism chosen with the user on 2026-10-31 from four options: a private sentinel default that `__post_init__` replaces with one shared reading. The fields stay typed `datetime`, so pyright needs no `None` checks in the M2 loader and the M3 `add`, and `Task(id=1, name="x")` keeps working. The cost is an unusual-looking default, which carries a comment.
+Rejected: `None` defaults (the fields would become `datetime | None`), a `Task.new()` factory (two construction paths), and keeping the skew.
+The sentinel is compared with `is`, so a caller who passes an equal date keeps it.
+Second comment: a default read from UTC but stored naive passed both timestamp tests on a UTC machine such as the CI runner, so the "local" half of D6 was not pinned. The test now sets `TZ=Asia/Kolkata`, which has no daylight saving and differs from UTC all year, so that mutant fails everywhere.
+Test-first: both shared-clock tests failed, showing `created` and `updated` one microsecond apart, then all 33 tests passed.
+Mutation check on the final `task.py`: eight breaks (naive-UTC default, separate clock reads, aware datetimes allowed, Q4 unenforced, positional fields, unstripped name, no enum coercion, null name) each fail at least one test, and the file was restored byte-for-byte.
+Not done: patching the clock inside the tests. The bracket pattern is the plan's own, patching would tie the tests to the module's import style, and the real gap was the missing non-UTC zone.
+
+**Bugfix Context:**
+Root cause: each timestamp field had its own `default_factory`, so every default was a separate clock read, and the tests could not tell a local default from a UTC one.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: M1 Task model
+- Issues: #5
+- Pull request: #23 (review threads on `task.py` line 18 and `test_task.py` line 38)
+
 ## [2026-10-31 14:06] Commit Summary
 
 **Change Type:** Fix

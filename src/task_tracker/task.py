@@ -1,10 +1,17 @@
 """The task record."""
 
-from dataclasses import KW_ONLY, dataclass, field, fields
+from dataclasses import KW_ONLY, dataclass, fields
 from datetime import datetime
 
 from task_tracker.priority import Priority
 from task_tracker.status import Status
+
+# Stands in for "not given" so the four timestamps can share one clock reading
+# while the fields stay typed `datetime`. Always compared with `is`, never `==`,
+# so a caller who passes an equal date still has it kept. D6 chose naive local
+# time on purpose, so DTZ001 does not apply here.
+_UNSET = datetime(1, 1, 1)  # noqa: DTZ001
+_TIMESTAMPS = ("created", "updated", "start", "stop")
 
 
 # README.md "Task object" defines 11 fields; pylint's default limit is 7.
@@ -18,14 +25,14 @@ class Task:  # pylint: disable=too-many-instance-attributes
     # positional arguments would pass type checking.
     _: KW_ONLY
     description: str = ""
-    created: datetime = field(default_factory=datetime.now)
-    updated: datetime = field(default_factory=datetime.now)
+    created: datetime = _UNSET
+    updated: datetime = _UNSET
     due: datetime | None = None
     date_completed: datetime | None = None
     status: Status = Status.TO_DO
     priority: Priority = Priority.LOW
-    start: datetime = field(default_factory=datetime.now)
-    stop: datetime = field(default_factory=datetime.now)
+    start: datetime = _UNSET
+    stop: datetime = _UNSET
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str):
@@ -36,9 +43,16 @@ class Task:  # pylint: disable=too-many-instance-attributes
             raise ValueError("name must not be blank")
         self.status = Status(self.status)
         self.priority = Priority(self.priority)
+        self._fill_unset_timestamps()
         self._reject_aware_datetimes()
         if self.status is not Status.DONE and self.date_completed is not None:
             raise ValueError("only a DONE task can have a date completed")
+
+    def _fill_unset_timestamps(self) -> None:
+        now = datetime.now()  # noqa: DTZ005
+        for name in _TIMESTAMPS:
+            if getattr(self, name) is _UNSET:
+                setattr(self, name, now)
 
     def _reject_aware_datetimes(self) -> None:
         for item in fields(self):

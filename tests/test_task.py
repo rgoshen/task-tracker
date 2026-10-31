@@ -3,6 +3,8 @@
 # Test names state the intent, so per-test docstrings would only repeat them.
 # pylint: disable=missing-function-docstring
 
+import time
+from collections.abc import Iterator
 from datetime import UTC, datetime
 
 import pytest
@@ -12,9 +14,23 @@ from task_tracker.status import Status
 from task_tracker.task import Task
 
 TIMESTAMP_FIELDS = ["created", "updated", "start", "stop"]
-# D6 chose naive local time on purpose, so DTZ001 does not apply to this value.
+# D6 chose naive local time on purpose, so DTZ001 does not apply to these values.
 NAIVE_DAY = datetime(2026, 11, 2)  # noqa: DTZ001
+PAST_DAY = datetime(2000, 1, 1)  # noqa: DTZ001
 AWARE_DAY = datetime(2026, 11, 2, tzinfo=UTC)
+# Separate clock reads differ in only about a quarter of constructions, so one
+# construction can pass by luck; repeating makes the check reliable.
+SKEW_REPEATS = 200
+
+
+@pytest.fixture
+def kolkata_time(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    # UTC+5:30 with no daylight saving, so it differs from UTC all year round.
+    monkeypatch.setenv("TZ", "Asia/Kolkata")
+    time.tzset()
+    yield
+    monkeypatch.undo()
+    time.tzset()
 
 
 def test_new_task_has_the_documented_defaults():
@@ -27,8 +43,27 @@ def test_new_task_has_the_documented_defaults():
     assert task.date_completed is None
 
 
+def test_new_task_shares_one_clock_reading_across_its_timestamps():
+    for _ in range(SKEW_REPEATS):
+        task = Task(id=1, name="Buy milk")
+
+        assert task.created == task.updated == task.start == task.stop
+
+
+def test_timestamps_not_given_share_one_reading_and_given_ones_are_kept():
+    for _ in range(SKEW_REPEATS):
+        task = Task(id=1, name="Buy milk", updated=PAST_DAY)
+
+        assert task.updated == PAST_DAY
+        assert task.created == task.start == task.stop
+        assert task.created > PAST_DAY
+
+
+@pytest.mark.usefixtures("kolkata_time")
 @pytest.mark.parametrize("field_name", TIMESTAMP_FIELDS)
 def test_timestamp_defaults_to_the_moment_the_task_is_created(field_name: str):
+    # Under a non-UTC zone this fails for a default read from UTC, which would
+    # otherwise pass on a UTC machine such as the CI runner.
     # D6 chose naive local time on purpose, so DTZ005 does not apply here.
     before = datetime.now()  # noqa: DTZ005
     task = Task(id=1, name="Buy milk")
