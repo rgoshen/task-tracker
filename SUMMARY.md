@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-10-31 14:24] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+A `DONE` task now always has a date completed. If none is given it defaults to the same clock reading as the task's other timestamps. A date completed that is passed in, as an object or as text, cannot be later than that reading: it raises `ValueError`.
+
+**Rationale:**
+Decision from the project owner on 2026-10-31, answering the open half of the review thread on `task.py` line 21 and audit finding G9: if a task is marked done it gets the date it was marked done, a date passed in is allowed but cannot be in the future.
+Test-first: four tests failed (`None is not None`, and `DID NOT RAISE` for a future object and for two future strings), then all 53 passed. Three guards pass before and after on purpose, since they protect allowed paths: a past date is kept, a task that is not `DONE` still has none, and a date completed of this very moment is accepted.
+That last guard exists because of a subtlety: `datetime.now()` carries microseconds, so comparing it with the truncated reading would wrongly reject "now". The date is normalized to whole seconds before the comparison.
+Mutation check: a `DONE` task with no default, a future date accepted, `>=` instead of `>`, an open task allowed a date, and a second clock read for the default each fail a test, and the file was restored byte-for-byte.
+Two existing tests used 2026-11-02 as a completed date. With today at 2026-10-31 that is in the future, which the new rule rightly rejects, so they now use a fixed past date.
+Known trade-off, recorded in `TODO.md`: the model cannot tell "marked done now" from "loaded from a file", so a hand-edited `DONE` record with no date would receive the load time.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: DONE date and one date form, step 2
+- Issues: #5
+- Pull request: #23 (review thread on `task.py` line 21)
+
 ## [2026-10-31 14:23] Commit Summary
 
 **Change Type:** Feature

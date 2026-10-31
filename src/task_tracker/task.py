@@ -67,14 +67,22 @@ class Task:  # pylint: disable=too-many-instance-attributes
             raise ValueError("name must not be blank")
         self.status = Status(self.status)
         self.priority = Priority(self.priority)
-        self._fill_unset_timestamps()
+        now = datetime.now().replace(microsecond=0)  # noqa: DTZ005
+        self._fill_unset_timestamps(now)
         for name in _DATETIME_FIELDS:
             setattr(self, name, _as_naive_datetime(name, getattr(self, name)))
-        if self.status is not Status.DONE and self.date_completed is not None:
-            raise ValueError("only a DONE task can have a date completed")
+        self._settle_date_completed(now)
 
-    def _fill_unset_timestamps(self) -> None:
-        now = datetime.now()  # noqa: DTZ005
+    def _fill_unset_timestamps(self, now: datetime) -> None:
         for name in _TIMESTAMPS:
             if getattr(self, name) is _UNSET:
                 setattr(self, name, now)
+
+    def _settle_date_completed(self, now: datetime) -> None:
+        if self.status is not Status.DONE:
+            if self.date_completed is not None:
+                raise ValueError("only a DONE task can have a date completed")
+        elif self.date_completed is None:
+            self.date_completed = now
+        elif self.date_completed > now:
+            raise ValueError("date completed must not be in the future")

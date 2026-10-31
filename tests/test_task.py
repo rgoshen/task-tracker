@@ -17,6 +17,7 @@ TIMESTAMP_FIELDS = ["created", "updated", "start", "stop"]
 # D6 chose naive local time on purpose, so DTZ001 does not apply to these values.
 NAIVE_DAY = datetime(2026, 11, 2)  # noqa: DTZ001
 PAST_DAY = datetime(2000, 1, 1)  # noqa: DTZ001
+FUTURE_DAY = datetime(2999, 1, 1)  # noqa: DTZ001
 AWARE_DAY = datetime(2026, 11, 2, tzinfo=UTC)
 # Separate clock reads differ in only about a quarter of constructions, so one
 # construction can pass by luck; repeating makes the check reliable.
@@ -178,10 +179,37 @@ def test_other_fields_cannot_be_given_positionally():
 @pytest.mark.parametrize("status", [Status.TO_DO, Status.IN_PROGRESS])
 def test_only_a_done_task_can_have_a_date_completed(status: Status):
     with pytest.raises(ValueError, match="date completed"):
-        Task(id=1, name="x", status=status, date_completed=NAIVE_DAY)
+        Task(id=1, name="x", status=status, date_completed=PAST_DAY)
 
 
-def test_done_task_keeps_its_date_completed():
-    task = Task(id=1, name="x", status=Status.DONE, date_completed=NAIVE_DAY)
+@pytest.mark.parametrize("status", [Status.TO_DO, Status.IN_PROGRESS])
+def test_a_task_that_is_not_done_has_no_date_completed_by_default(status: Status):
+    assert Task(id=1, name="x", status=status).date_completed is None
 
-    assert task.date_completed == NAIVE_DAY
+
+def test_done_task_keeps_a_date_completed_in_the_past():
+    task = Task(id=1, name="x", status=Status.DONE, date_completed=PAST_DAY)
+
+    assert task.date_completed == PAST_DAY
+
+
+def test_done_task_without_a_date_completed_gets_the_moment_it_was_created():
+    task = Task(id=1, name="x", status=Status.DONE)
+
+    assert task.date_completed is not None
+    assert task.date_completed == task.created
+
+
+@pytest.mark.parametrize("future", [FUTURE_DAY, "2999-01-01", "2999-01-01 09:30:00"])
+def test_a_date_completed_in_the_future_is_rejected(future: object):
+    with pytest.raises(ValueError, match="future"):
+        Task(id=1, name="x", status=Status.DONE, date_completed=future)  # type: ignore[arg-type]
+
+
+def test_a_date_completed_of_this_very_moment_is_accepted():
+    # datetime.now() carries microseconds, which are dropped before the comparison.
+    now = datetime.now()  # noqa: DTZ005
+
+    task = Task(id=1, name="x", status=Status.DONE, date_completed=now)
+
+    assert task.date_completed == now.replace(microsecond=0)
