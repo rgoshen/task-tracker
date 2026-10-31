@@ -64,6 +64,8 @@ The global list lives under the home directory, for example `~/.task-tracker/tas
 
 **Decision (2026-10-23): highest + 1, with a confirmation prompt on delete (Q5).** Deleting the highest task frees its ID, so a stale `delete 3` could hit a different task; the prompt shows the task name to catch that. M6 pins both behaviors.
 
+**Decision (2026-10-31, from the spec-gap audit): a task's `id` is a required `int`.** `README.md` marks the ID required, so a `Task` never exists without one. The `add` command computes highest + 1 from the other tasks and passes it in; a task never assigns its own ID. Rejected: an optional `id` set when the task is added, which leaves a `None` state that every save would have to guard against.
+
 ### D6. Dates and times
 
 - **Naive local time, stored as ISO 8601 strings** ([datetime] `isoformat` / `fromisoformat`). Pro: readable, matches what the user types. Con: ambiguous across DST changes and travel.
@@ -115,20 +117,21 @@ Coverage: `uv run pytest --cov=task_tracker --cov-report=term-missing --cov-fail
 
 Branch `feature/task-model`. Covers `README.md` "Task object".
 
-- [ ] Rename `Priority.MED` to `Priority.MEDIUM` in `src/task_tracker/priority.py` (Q1). The stored value is the enum value, so do this before any task file exists.
-- [ ] `uv add --dev pytest pytest-cov` ([uv dependencies]).
-- [ ] Add a CI workflow that runs `uv run pytest` on push and pull request. Follow `version-bump.yml`: top-level `permissions: {}`, SHA-pinned `actions/checkout` and `astral-sh/setup-uv`.
-- [ ] Add a Tests badge for that workflow to `README.md`, next to the Lint badge, so "passing" means the tests passed.
-- [ ] Given only the name "Buy milk", when a task is created, then status is `Status.TO_DO`, priority is `Priority.LOW`, description is `""`, due is `None`, and date completed is `None`.
+- [ ] `uv add --dev pytest pytest-cov` ([uv dependencies]). First, so every later step can start with a failing test.
+- [ ] Rename `Priority.MED` to `Priority.MEDIUM` in `src/task_tracker/priority.py` (Q1). Red first: a test that `Priority.MEDIUM` exists and `Priority.MED` does not. The stored value is the enum value, so do this before any task file exists.
+- [ ] Given ID 1 and the name "Buy milk", when a task is created, then status is `Status.TO_DO`, priority is `Priority.LOW`, description is `""`, due is `None`, and date completed is `None`.
 - [ ] Given the time captured just before and just after creating a task, then its created timestamp falls between the two. Repeat for `updated`, `start`, and `stop`; `due` is excluded because it defaults to `None` (Q2).
-- [ ] Given a task is created, then every datetime field is naive (`tzinfo is None`) (D6).
+- [ ] Given a task is created, then every datetime field that is not `None` is naive (`tzinfo is None`) (D6). `due` and date completed default to `None`, which has no `tzinfo`.
 - [ ] Given the name `""` or `"   "`, when a task is created, then `ValueError` is raised.
+- [ ] Add a CI workflow that runs `uv run pytest` on push and pull request, once the tests above exist: pytest exits with code 5 when it collects no tests ([pytest exit codes]), so an earlier workflow fails its first run. Follow `version-bump.yml`: top-level `permissions: {}`, SHA-pinned `actions/checkout` and `astral-sh/setup-uv`.
+- [ ] Add a Tests badge for that workflow to `README.md`, next to the Lint badge, so "passing" means the tests passed.
 
 **Think about:**
 
 - In a dataclass, when does `created: datetime = datetime.now()` run? What does `default_factory` change? ([dataclasses])
+- Each `default_factory` call reads the clock separately, so `created` and `updated` on one new task can differ by microseconds. Should a new task share a single "now" across `created`, `updated`, `start`, and `stop`? Which test would show the difference? Pin whichever you choose.
 - Where does the empty-name check live so every path that builds a task hits it?
-- Highest + 1 (D5) needs the other tasks, so a task cannot assign its own ID. How does the ID enter a task: a constructor argument, or an optional field set when the task is added to a list?
+- The ID is a required `int` (D5, decided 2026-10-31), so every M1 test passes one in. The next ID is computed by `add` in M3, never by the task.
 
 **Done when:** the tests pass locally and in CI.
 
@@ -269,6 +272,7 @@ Branch `release/0.2.0` from `develop`. Covers feature 1.
 [monkeypatch]: https://docs.pytest.org/en/stable/how-to/monkeypatch.html
 [capsys]: https://docs.pytest.org/en/stable/how-to/capture-stdout-stderr.html
 [pytest-cov]: https://pytest-cov.readthedocs.io/en/latest/config.html
+[pytest exit codes]: https://docs.pytest.org/en/stable/reference/exit-codes.html
 [uv dependencies]: https://docs.astral.sh/uv/concepts/projects/dependencies/
 [uv tools]: https://docs.astral.sh/uv/guides/tools/
 [entry points]: https://packaging.python.org/en/latest/specifications/entry-points/
