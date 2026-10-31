@@ -15,7 +15,7 @@
 - Python: `.python-version` pins 3.14.7 for development; the floor is `>=3.14` in both `README.md` and `pyproject.toml` (decided 2026-10-23: a patch-level floor would block installs on older 3.14 releases for no code reason).
 - Runtime dependencies stay empty (`dependencies = []`).
 - `Status`: `TO_DO`, `IN_PROGRESS`, `DONE`. `Priority` by rank, highest first: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`.
-- Defaults (`README.md`, after Q1 to Q3): status `TO_DO`, priority `LOW`, description `""`, due `None`, date completed `None`; created, updated, start, and stop default to the current time. All datetimes are naive local time (D6).
+- Defaults (`README.md`, after Q1 to Q3): status `TO_DO`, priority `LOW`, description `""`, due `None`, date completed `None` (a `DONE` task defaults to the current time); created, updated, start, and stop default to the current time. All datetimes are naive local time (D6).
 - "Current" tasks are `TO_DO` plus `IN_PROGRESS`.
 - The project-level list in the current directory is the default; `--dir PATH` selects another directory and `--global` selects the home list. The two flags are mutually exclusive.
 - Every option has a long and a short form: `--dir`/`-d`, `--global`/`-g`, `--priority`/`-p`, `--due`/`-D`, `--status`/`-s`, `--name`/`-n`, `--all`/`-a`. `-d` and `-D` differ by one Shift, so a slip must fail safe (M7). A letter claimed twice in one parser raises `ArgumentError` when the parser is built.
@@ -73,12 +73,15 @@ The global list lives under the home directory, for example `~/.task-tracker/tas
 
 **Decision (2026-10-23): naive local** for a single-user local CLI. A bare `--due 2026-11-02` parses to midnight with `datetime.fromisoformat`.
 
+**Amended 2026-10-31 (project owner): one form for every datetime, however it is passed in.** `Task` turns an ISO 8601 string, a `date`, or a `datetime` into a naive local `datetime` with whole seconds, so `isoformat()` always reads `YYYY-MM-DDTHH:MM:SS`. M2 saves and M3 prints with that same call.
+Whole seconds because `created` carries microseconds while a typed date does not, and a save at second precision would otherwise lose them in the M2 round trip.
+
 ## Spec questions (answered in `README.md`)
 
 - Q1. **Decided:** users type and see the enum names (`TO_DO`, `IN_PROGRESS`, `DONE`; `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`). `Priority.MED` is renamed `MEDIUM` so the word matches `README.md`. Do it before any task file exists: the stored value is the enum value.
 - Q2. **Decided:** `due` is optional and defaults to `None`. Tasks without a due date sort after tasks with one, then by priority. (Defaulting to now made every new task overdue and ranked undated tasks ahead of future deadlines.)
 - Q3. **Decided:** `start` and `stop` are plain datetime fields that default to the current time, with no tracking logic. Still open: can `add` and `update` set them, and does `list` show them (decide in M3 and M5)?
-- Q4. **Decided:** yes. Moving a task out of `DONE` sets date completed to `None`, so `status != DONE` always means date completed is `None`.
+- Q4. **Decided:** yes. Moving a task out of `DONE` sets date completed to `None`, so `status != DONE` always means date completed is `None`. **Amended 2026-10-31 (project owner):** the converse holds too. A `DONE` task always has a date completed, defaulting to the moment it was marked done, and a date passed in cannot be in the future.
 - Q5. **Decided:** yes. `delete` shows the task's name and asks before deleting (see D5). A `--yes` flag for scripts is deferred.
 - Q6. **Decided:** a date and time. `due`, `created`, `updated`, and `date completed` are all datetimes; a bare date such as `2026-11-02` parses to midnight.
 
@@ -126,7 +129,10 @@ Branch `feature/task-model`. Covers `README.md` "Task object".
 - [x] Given a name that is not a string, such as the `null` a hand-edited `tasks.json` can hold, then `ValueError` is raised, not `AttributeError`. Given `"  Buy milk  "`, then the stored name is `"Buy milk"`.
 - [x] Given `status="DONE"` and `priority="HIGH"` as plain strings, then the stored values are `Status.DONE` and `Priority.HIGH`, checked with `is`. Given an unknown label, then `ValueError` is raised. Equality alone would pass for plain strings, because the enums are `StrEnum`s.
 - [x] Given a timezone-aware value for any datetime field, then `ValueError` is raised, because sorting an aware and a naive task raises `TypeError` (D6).
-- [x] Given a status other than `DONE` and a date completed, then `ValueError` is raised (the first half of Q4). Still open: does `DONE` require a date completed? `Task(status=DONE)` has none today, and M4's sort must cope with that.
+- [x] Given a status other than `DONE` and a date completed, then `ValueError` is raised (Q4).
+- [x] Given `Task(status=DONE)` with no date completed, then it equals `created`, the same clock reading. Given a date completed in the past, then it is kept. Given one in the future as an object or as text, then `ValueError` is raised. Given `datetime.now()` itself, then it is accepted: microseconds are dropped before the comparison.
+- [x] Given the same day as `"2026-11-02"`, `"2026-11-02T00:00:00"`, `"2026-11-02 00:00:00"`, a `date`, or a `datetime` with microseconds, then `due` equals midnight and `isoformat()` reads `2026-11-02T00:00:00`. Default timestamps have no microseconds.
+- [x] Given an invalid string, a string with a UTC offset, or a value of another type for a datetime field, then `ValueError` is raised and names the field.
 - [x] Given positional arguments after `id` and `name`, then `TypeError` is raised, so swapped `datetime` arguments cannot type-check and run. `Task(1, "Buy milk")` still works.
 - [x] Given a new task, then `created`, `updated`, `start`, and `stop` are equal. Given one of them explicitly, then it is kept and the others still share one reading.
 - [x] Add a CI workflow that runs `uv run pytest` on push and pull request, once the tests above exist: pytest exits with code 5 when it collects no tests ([pytest exit codes]), so an earlier workflow fails its first run.

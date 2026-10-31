@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-10-31 14:25] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `docs/implementation-plan.md`, `TODO.md`)
+
+**Summary:**
+Recorded the project owner's decisions of 2026-10-31 where the spec lives.
+`README.md` now says a done task defaults its date completed to the moment it was marked done and cannot be given a future date, and that every datetime is stored and shown as `YYYY-MM-DDTHH:MM:SS`.
+The plan amends Q4 and D6 to match, replaces the open `DONE` box with three ticked ones, and `TODO.md` no longer lists the question as open.
+
+**Rationale:**
+The project `CLAUDE.md` says to keep the plan, the matching issue, and `README.md` in step, and issue #5 is regenerated from the plan after this commit.
+The amendments are marked with their date and source so the original 2026-10-23 decisions stay readable beside them. Q4 and D6 are amended in place and not given new numbers, because they are the same questions with a fuller answer.
+The M2 loader and the M3 `list` command are told which call to use for the canonical form, `isoformat()`, so neither invents a second format.
+
+**References:**
+
+- `TODO.md`: 2026-10-31 Feature: DONE date and one date form, step 3
+- Issues: #5 (regenerated from the plan after this commit)
+- Pull request: #23
+
 ## [2026-10-31 14:24] Commit Summary
 
 **Change Type:** Feature
