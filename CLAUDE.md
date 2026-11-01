@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-`task-tracker` is a Python 3.14 CLI for task management, currently an early scaffold. `README.md` is the product spec (task fields, status/priority enums, the seven features); the code implements only the task model so far (M1), none of the seven features. What exists: a placeholder `main()` in `src/task_tracker/__init__.py`, the `Status` / `Priority` `StrEnum`s, and the `Task` dataclass in `src/task_tracker/task.py`.
+`task-tracker` is a Python 3.14 CLI for task management, currently an early scaffold.
+`README.md` is the product spec (task fields, status/priority enums, the seven features); the code implements only the task model and storage so far (M1, M2), none of the seven features.
+What exists: a placeholder `main()` in `src/task_tracker/__init__.py`, the `Status` / `Priority` `StrEnum`s, the `Task` dataclass in `src/task_tracker/task.py` (with `Task.restore` for rebuilding a stored task), and `load` / `save` in `src/task_tracker/storage.py`.
 
 Labels are reconciled (Q1): users type and see the enum names (`TO_DO`, `IN_PROGRESS`, `DONE`; `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`), and `Priority.MED` was renamed `MEDIUM` to match `README.md` (M1).
 

@@ -159,19 +159,34 @@ Branch `feature/task-storage`.
 
 Produces, for later milestones: load (path to list of tasks, empty when the file is missing) and save (list of tasks to path, atomic, creating parent directories).
 
-- [ ] Add `Task.restore(...)`. The constructor no longer accepts `created` or `updated` (M1, owner decision 2026-10-31), so the loader rebuilds a task through `restore`, which takes them and still enforces the other rules. Given a saved task, when loaded, then `created` and `updated` equal the stored values, not the load time.
-- [ ] Given a stored timeline out of order, then a clear error is raised. Given a task created on 2026-10-10 and completed on 2026-10-15, then it loads with both dates kept: this is where a past date completed is tested.
-- [ ] Given no file at `tmp_path / "tasks.json"`, when loading, then the result is `[]` and no file is created.
-- [ ] Given task 1 "Buy milk" (`HIGH`, due 2026-11-01 09:00) and task 2 "File taxes" (`DONE`, no due date, completed 2026-10-15 17:30), when saved then loaded, then both equal the originals, `loaded[0].priority is Priority.HIGH`, `loaded[1].status is Status.DONE`, `loaded[0]`'s date completed `is None`, and `loaded[1].due is None`.
-- [ ] Given an existing file and a save that fails partway (make serialization raise with `monkeypatch`), then the file's previous contents are unchanged.
-- [ ] Given a file containing `not json`, when loading, then a clear error is raised and the file is unchanged.
-- [ ] Given `tmp_path / "nested" / "dir" / "tasks.json"` whose directories don't exist, when saving, then the directories are created.
+- [x] Add `Task.restore(...)`. The constructor no longer accepts `created` or `updated` (M1, owner decision 2026-10-31), so the loader rebuilds a task through `restore`, which takes them and still enforces the other rules. Given a saved task, when loaded, then `created` and `updated` equal the stored values, not the load time.
+- [x] Given a stored timeline out of order, then a clear error is raised. Given a task created on 2026-10-10 and completed on 2026-10-15, then it loads with both dates kept: this is where a past date completed is tested.
+- [x] Given no file at `tmp_path / "tasks.json"`, when loading, then the result is `[]` and no file is created.
+- [x] Given task 1 "Buy milk" (`HIGH`, due 2026-11-01 09:00) and task 2 "File taxes" (`DONE`, no due date, completed 2026-10-15 17:30), when saved then loaded, then both equal the originals, `loaded[0].priority is Priority.HIGH`, `loaded[1].status is Status.DONE`, `loaded[0]`'s date completed `is None`, and `loaded[1].due is None`.
+- [x] Given an existing file and a save that fails partway (make serialization raise with `monkeypatch`), then the file's previous contents are unchanged.
+- [x] Given a file containing `not json`, when loading, then a clear error is raised and the file is unchanged.
+- [x] Given `tmp_path / "nested" / "dir" / "tasks.json"` whose directories don't exist, when saving, then the directories are created.
+- [x] Given a stored record that cannot be real, then a `ValueError` names the file and the record's position, such as `tasks.json: record 2: name must not be blank`, and the file is unchanged.
+      That covers: a record that is not an object, a missing or an unknown field, an `id` that is not an `int` (text, `true`), a `description` that is not text, a value `Task.restore` refuses, `updated` before `created`, `created` or `updated` later than now, a `DONE` task without a date completed, and two records with the same `id`.
+      Unknown fields are rejected, not ignored, because `save` rewrites the whole file and would delete them.
+- [x] Given an empty file, binary content, or JSON that is not a list, then a `ValueError` names the file. Given a directory where the file should be, then the `OSError` is not reported as a corrupt file. Given no file, or a directory that does not exist, then `load` returns `[]` and creates nothing.
+- [x] Given a save that fails partway, then a first-time save leaves no file, a failed `os.replace` leaves the old file and no temporary file, and the temporary file is created in the same directory as the target.
+      The failure must come after bytes are written (audit finding G2): the test makes `json.dump` write `[{` into the open file and then raise, and was seen failing against a plain overwrite first.
 
 **Think about:**
 
 - Write a temp file, then [os.replace] it over the real one. Where must the temp file live? (The docs say the replace may fail across filesystems.)
 - What happens to the temp file when the write fails?
 - One place that converts a task to and from plain data, or inline in save and load? Either is fine for now; M8 revisits it.
+
+**Decided (2026-11-01):**
+
+- `Task.restore` shares one validation with the constructor: `__post_init__` is split into stamping, `_normalize`, `_fill_in_defaults`, and `_validate`, and `restore` builds the object without `__init__`, then runs `_normalize` and `_validate`. Rejected: hidden `_created` and `_updated` init parameters and a second copy of the rules.
+- The temporary file lives next to the target, because `os.replace` is atomic only within one filesystem, and a `finally` removes it after a failure.
+- The task-to-data conversion is two private functions in `storage.py`, with the field names taken from `dataclasses.fields(Task)`. M8 revisits.
+- One error type: every corrupt-file failure is a `ValueError` (`JSONDecodeError` and `UnicodeDecodeError` are subclasses), so M3's CLI catches one type. No custom exception class until M3 needs to tell the cases apart.
+- Known limit: no `fsync` before the replace (a `ponytail:` comment in `storage.py` names the upgrade).
+- Audit findings addressed: G2 (a test that passes against a non-atomic save) and G3 (corrupt file handling).
 
 ### M3. First slice: add and list
 

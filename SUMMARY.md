@@ -1,5 +1,23 @@
 # Summary
 
+## [2026-11-01 13:48] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `CLAUDE.md`)
+
+**Summary:**
+Ticked the seven M2 boxes in the plan and added three that record what was built beyond them: the rules a stored record must meet, the handling of a file that is empty, binary, or not a list, and the failure cases for the atomic save. Added a "Decided" list for M2 and noted that audit findings G2 and G3 are addressed. The project `CLAUDE.md` "Project state" now names `Task.restore` and `storage.py`.
+
+**Rationale:**
+The project `CLAUDE.md` says to keep the plan, the matching issue, and `README.md` in step. `README.md` needs no change: it already names JSON and the file locations, and M2 changed neither. Issue #6 is regenerated from the plan separately, because it is a change on GitHub.
+The plan now says why the fails-partway test writes `[{` into the open file before raising, so the next reader does not "simplify" it into the version that passes against a plain overwrite (G2).
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load, step 6
+- Issue: #6
+
 ## [2026-11-01 13:31] Commit Summary
 
 **Change Type:** Feature
