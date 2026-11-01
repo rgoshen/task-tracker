@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-01 13:31] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** storage (`src/task_tracker/storage.py`, `tests/test_storage.py`)
+
+**Summary:**
+`save` is now atomic. It writes the new content to a temporary file in the same directory as the target and moves it over the target with `os.replace`. A failure at any point leaves the previous file exactly as it was, and the temporary file is removed.
+
+**Rationale:**
+A plain overwrite truncates the file first, so a crash or a full disk partway through destroys every task, and `save` rewrites the whole file on every change (D1).
+The temporary file sits next to the target because `os.replace` is atomic only within one filesystem and may fail across two. `tempfile.mkstemp` creates it readable and writable only by its owner, so the saved file takes that mode.
+Audit finding G2 was a test that passes against a non-atomic save. The cause is a test that makes serialization fail before any byte is written. Here the fake serializer writes `[{` into the open file and then raises.
+The test was run against the plain write from the previous commit first: it failed because the old contents had been replaced with `[{`, and a first failed save left a stray `tasks.json`. A second test makes `os.replace` raise, and a third checks that the temporary file is built beside the target.
+A `ponytail:` comment marks the one corner cut: no `flush` and `fsync` before the replace, so a power cut right after a save can still leave the old or an empty file. The upgrade path is in the comment.
+Test-first: four of five new tests failed against the plain write, then all 127 passed. Mutation check: eight breaks (temporary file in the system temp directory, never removed, `unlink` insisting it exists, `rename` instead of `os.replace`, writing straight to the target, no `mkdir`, no trailing newline, the replace skipped) each fail a test, and the file was verified identical afterwards.
+Coverage of `storage.py` is 100%, and `ruff`, `pyright`, and the CI-version Python linters are clean.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load, step 5
+- Issue: #6
+
 ## [2026-11-01 13:12] Commit Summary
 
 **Change Type:** Feature

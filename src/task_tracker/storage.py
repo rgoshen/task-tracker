@@ -1,6 +1,8 @@
 """Saving tasks to a JSON file and loading them back."""
 
 import json
+import os
+import tempfile
 from dataclasses import fields
 from datetime import datetime
 from pathlib import Path
@@ -73,8 +75,26 @@ def load(path: Path) -> list[Task]:
 
 
 def save(tasks: list[Task], path: Path) -> None:
-    """Write `tasks` to `path`, creating the directories above it."""
+    """Write `tasks` to `path`, creating the directories above it.
+
+    The file is replaced in one step, so a failure partway leaves the previous
+    file as it was and no temporary file behind.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as file:
-        json.dump([_to_record(task) for task in tasks], file, indent=2)
-        file.write("\n")
+    # Next to the target, not in the system temp directory: os.replace is atomic
+    # only within one filesystem and may fail across two.
+    file_descriptor, name = tempfile.mkstemp(
+        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
+    )
+    temp_path = Path(name)
+    try:
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as file:
+            json.dump([_to_record(task) for task in tasks], file, indent=2)
+            file.write("\n")
+            # ponytail: no flush and fsync before the replace, so a power cut right
+            # after a save can still leave the old or an empty file. Add
+            # file.flush() and os.fsync(file.fileno()) if that ever matters.
+        os.replace(temp_path, path)
+    finally:
+        # Gone already after a successful replace; this removes it after a failure.
+        temp_path.unlink(missing_ok=True)

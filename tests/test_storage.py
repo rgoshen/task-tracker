@@ -5,9 +5,11 @@
 # pylint: disable=missing-function-docstring,use-implicit-booleaness-not-comparison
 
 import json
+import os
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -228,3 +230,91 @@ def test_a_file_that_cannot_be_read_is_not_reported_as_corrupt(tmp_path: Path):
     # problem with the disk, and the caller sees the operating system's error.
     with pytest.raises(OSError, match="directory"):
         load(tmp_path)
+
+
+def files_in(directory: Path) -> list[str]:
+    return sorted(entry.name for entry in directory.iterdir())
+
+
+def write_part_then_fail(_records: object, file: Any, **_options: object) -> None:
+    # The destination (or temp file) already holds a half-written document when
+    # the failure comes. A failure that raised before any byte was written would
+    # pass against a plain overwrite too, and prove nothing about atomicity.
+    file.write("[{")
+    raise OSError("no space left on device")
+
+
+def test_a_save_that_fails_partway_leaves_the_old_file_unchanged(
+    tmp_path: Path, two_tasks: list[Task], monkeypatch: pytest.MonkeyPatch
+):
+    path = tmp_path / "tasks.json"
+    save(two_tasks, path)
+    before = path.read_bytes()
+    monkeypatch.setattr(json, "dump", write_part_then_fail)
+
+    with pytest.raises(OSError, match="no space"):
+        save([Task(3, "Walk the dog")], path)
+
+    assert path.read_bytes() == before
+    assert files_in(tmp_path) == ["tasks.json"]
+
+
+def test_a_first_save_that_fails_partway_leaves_nothing_behind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    path = tmp_path / "tasks.json"
+    monkeypatch.setattr(json, "dump", write_part_then_fail)
+
+    with pytest.raises(OSError, match="no space"):
+        save([Task(1, "Buy milk")], path)
+
+    assert files_in(tmp_path) == []
+
+
+def test_a_save_that_cannot_replace_the_file_leaves_the_old_file_and_no_temp_file(
+    tmp_path: Path, two_tasks: list[Task], monkeypatch: pytest.MonkeyPatch
+):
+    path = tmp_path / "tasks.json"
+    save(two_tasks, path)
+    before = path.read_bytes()
+
+    def refuse(_source: object, _destination: object) -> None:
+        raise OSError("operation not permitted")
+
+    monkeypatch.setattr(os, "replace", refuse)
+
+    with pytest.raises(OSError, match="not permitted"):
+        save([Task(3, "Walk the dog")], path)
+
+    assert path.read_bytes() == before
+    assert files_in(tmp_path) == ["tasks.json"]
+
+
+def test_the_new_file_is_built_next_to_the_target_before_it_replaces_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    # os.replace is atomic only within one filesystem, and the system temp
+    # directory is often on another.
+    path = tmp_path / "tasks.json"
+    moves: list[tuple[Path, Path]] = []
+    real_replace = os.replace
+
+    def spy(source: Any, destination: Any) -> None:
+        moves.append((Path(source), Path(destination)))
+        real_replace(source, destination)
+
+    monkeypatch.setattr(os, "replace", spy)
+
+    save([], path)
+
+    assert len(moves) == 1
+    source, destination = moves[0]
+    assert destination == path
+    assert source.parent == path.parent
+    assert source != destination
+
+
+def test_a_save_that_succeeds_leaves_no_temp_file(tmp_path: Path):
+    save([Task(1, "Buy milk")], tmp_path / "tasks.json")
+
+    assert files_in(tmp_path) == ["tasks.json"]
