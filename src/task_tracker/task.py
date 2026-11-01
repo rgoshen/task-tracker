@@ -69,6 +69,14 @@ class Task:  # pylint: disable=too-many-instance-attributes
     stop: datetime = _UNSET
 
     def __post_init__(self) -> None:
+        now = _now()
+        self.created = now
+        self.updated = now
+        self._normalize()
+        self._fill_in_defaults(now)
+        self._validate(now)
+
+    def _normalize(self) -> None:
         if not isinstance(self.name, str):
             # ValueError, not TypeError: the loader catches one type for any bad field.
             raise ValueError("name must be a string")  # noqa: TRY004
@@ -77,27 +85,29 @@ class Task:  # pylint: disable=too-many-instance-attributes
             raise ValueError("name must not be blank")
         self.status = Status(self.status)
         self.priority = Priority(self.priority)
-        now = _now()
-        self.created = now
-        self.updated = now
-        self._normalize_given_datetimes()
-        self._settle_date_completed(now)
-        self._settle_start_and_stop(now)
-        self._check_timeline()
-
-    def _normalize_given_datetimes(self) -> None:
         for name in _GIVEN_DATETIMES:
             value = getattr(self, name)
             if value is not _UNSET:
                 setattr(self, name, _as_naive_datetime(name, value))
 
-    def _settle_start_and_stop(self, now: datetime) -> None:
+    def _fill_in_defaults(self, now: datetime) -> None:
+        if self.status is Status.DONE and self.date_completed is None:
+            self.date_completed = now
         if self.start is _UNSET:
             self.start = self.created
         if self.stop is _UNSET:
             # Now, unless the task is planned to start later: a stop before the
             # start is impossible.
             self.stop = max(now, self.start)
+
+    def _validate(self, now: datetime) -> None:
+        done = self.date_completed
+        if done is not None:
+            if self.status is not Status.DONE:
+                raise ValueError("only a DONE task can have a date completed")
+            if done > now:
+                raise ValueError("date completed must not be in the future")
+        self._check_timeline()
 
     def _check_timeline(self) -> None:
         """Enforce created <= start <= stop <= date completed (when there is one)."""
@@ -112,12 +122,3 @@ class Task:  # pylint: disable=too-many-instance-attributes
             raise ValueError("start must not be after the date completed")
         if done is not None and self.stop > done:
             raise ValueError("stop must not be after the date completed")
-
-    def _settle_date_completed(self, now: datetime) -> None:
-        if self.status is not Status.DONE:
-            if self.date_completed is not None:
-                raise ValueError("only a DONE task can have a date completed")
-        elif self.date_completed is None:
-            self.date_completed = now
-        elif self.date_completed > now:
-            raise ValueError("date completed must not be in the future")

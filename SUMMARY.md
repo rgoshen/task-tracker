@@ -1,5 +1,23 @@
 # Summary
 
+## [2026-11-01 12:24] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** task (`src/task_tracker/task.py`)
+
+**Summary:**
+Split `Task.__post_init__` into four steps: stamp `created` and `updated`, `_normalize`, `_fill_in_defaults`, and `_validate`. Behavior is unchanged.
+
+**Rationale:**
+`Task.restore` (next commit) must run the same rules as the constructor, but with stored `created` and `updated` instead of the clock. Before this change the rules were interleaved with the defaults: `_settle_date_completed` both filled in a missing date and checked it. Now filling in is separate from checking, so `restore` can skip the defaults (a stored record is complete) and still run every check.
+Proof of no change: the 63 existing tests pass unmodified, and `ruff`, `pyright`, and the CI-version Python linters (pylint, isort, black, flake8, mypy) are clean.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load, step 1
+- Issue: #6
+
 ## [2026-11-01 12:20] Commit Summary
 
 **Change Type:** Docs
