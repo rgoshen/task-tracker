@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-01 14:26] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`task-tracker list` prints the current tasks (everything but `DONE`) sorted by due date with undated tasks last, then by priority rank from `CRITICAL` down, then by ID. One line per task: ID, status, priority, due date (`-` when there is none), name. With nothing current it prints `No current tasks in <path>`.
+
+**Rationale:**
+The sort key is `(due or datetime.max, priority rank, id)`. `datetime.max` stands in for a missing due date, which sorts undated tasks last without a separate flag. A stored date always has whole seconds, so it can never equal `max`. Rejected: a leading `due is None` item, which the tests showed was redundant.
+The rank is the enum's definition order, not the string value, which sorts `MEDIUM` after `LOW` (Review Focus 1). The ID settles ties, and a test stores the pair in the opposite order to prove it is the ID and not the file order.
+The empty message names the file so a second list started from a subdirectory explains itself (D2). `start` and `stop` are not shown (Q3).
+Eight tests, written first and seen failing on `invalid choice: 'list'`. Seven mutations are each caught: rank by the raw string, no ID tie-break, including `DONE` tasks, undated first, a different empty message, reversed order, and no due column. Ruff 0.16 flags `datetime.max` (DTZ901) where CI's 0.15.17 does not, so the line carries a `noqa` with the D6 reason, as `task.py` does for its sentinel.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M3 First slice, add and list
+- Issue: #7
+
 ## [2026-11-01 14:25] Commit Summary
 
 **Change Type:** Feature

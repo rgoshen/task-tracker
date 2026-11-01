@@ -10,12 +10,15 @@ import pytest
 
 from task_tracker import main
 from task_tracker.priority import Priority
+from task_tracker.status import Status
 from task_tracker.storage import load, save
 from task_tracker.task import Task
 
 # D6 chose naive local time on purpose, so DTZ001 does not apply to these values.
 CLOCK = datetime(2026, 10, 31, 9, 30, 0)  # noqa: DTZ001
-DUE_DAY = datetime(2026, 11, 2)  # noqa: DTZ001
+NOV_1 = datetime(2026, 11, 1)  # noqa: DTZ001
+NOV_2 = datetime(2026, 11, 2)  # noqa: DTZ001
+NOV_3 = datetime(2026, 11, 3)  # noqa: DTZ001
 
 
 @pytest.fixture(name="project")
@@ -90,5 +93,143 @@ def test_short_flags_store_the_same_task_as_the_long_flags(project: Path):
     # equal, so pin what the long form stored.
     assert len(long_form) == 1
     assert long_form[0].priority is Priority.HIGH
-    assert long_form[0].due == DUE_DAY
+    assert long_form[0].due == NOV_2
     assert load(project) == long_form
+
+
+def _listed_names(capsys: pytest.CaptureFixture[str]) -> list[str]:
+    # Each line ends with the task's name, and the names used here are one word.
+    return [line.split()[-1] for line in capsys.readouterr().out.splitlines()]
+
+
+def test_list_shows_current_tasks_by_due_date_then_priority(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    save(
+        [
+            Task(1, "A", due=NOV_2, priority=Priority.LOW),
+            Task(2, "B", due=NOV_1, priority=Priority.LOW),
+            Task(3, "C", due=NOV_1, priority=Priority.CRITICAL),
+            Task(4, "D", status=Status.DONE),
+            Task(5, "E", due=NOV_3, status=Status.IN_PROGRESS),
+        ],
+        project,
+    )
+
+    exit_code = main(["list"])
+
+    assert exit_code == 0
+    assert _listed_names(capsys) == ["C", "B", "A", "E"]
+
+
+def test_list_puts_the_highest_priority_first_not_the_alphabetical_one(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    # As strings these sort CRITICAL, HIGH, LOW, MEDIUM, and they are stored in
+    # the opposite of the order expected.
+    save(
+        [
+            Task(1, "LOW", due=NOV_1, priority=Priority.LOW),
+            Task(2, "MEDIUM", due=NOV_1, priority=Priority.MEDIUM),
+            Task(3, "HIGH", due=NOV_1, priority=Priority.HIGH),
+            Task(4, "CRITICAL", due=NOV_1, priority=Priority.CRITICAL),
+        ],
+        project,
+    )
+
+    main(["list"])
+
+    assert _listed_names(capsys) == ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+
+
+def test_list_puts_a_task_with_no_due_date_after_one_that_has_one(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    save(
+        [
+            Task(1, "undated", priority=Priority.MEDIUM),
+            Task(2, "dated", due=NOV_1, priority=Priority.LOW),
+        ],
+        project,
+    )
+
+    main(["list"])
+
+    assert _listed_names(capsys) == ["dated", "undated"]
+
+
+def test_list_orders_tasks_with_no_due_date_by_priority(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    save(
+        [
+            Task(1, "low", priority=Priority.LOW),
+            Task(2, "high", priority=Priority.HIGH),
+        ],
+        project,
+    )
+
+    main(["list"])
+
+    assert _listed_names(capsys) == ["high", "low"]
+
+
+def test_list_orders_equal_tasks_by_id_whatever_order_the_file_holds_them(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    save(
+        [
+            Task(2, "second", due=NOV_1, priority=Priority.HIGH),
+            Task(1, "first", due=NOV_1, priority=Priority.HIGH),
+        ],
+        project,
+    )
+
+    main(["list"])
+
+    assert _listed_names(capsys) == ["first", "second"]
+
+
+def test_list_prints_one_line_per_task_with_id_status_priority_due_and_name(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    save(
+        [
+            Task(3, "Walk dog"),
+            Task(
+                7,
+                "Pay rent",
+                due=NOV_2,
+                priority=Priority.HIGH,
+                status=Status.IN_PROGRESS,
+            ),
+        ],
+        project,
+    )
+
+    main(["list"])
+
+    assert [line.split() for line in capsys.readouterr().out.splitlines()] == [
+        ["7", "IN_PROGRESS", "HIGH", "2026-11-02T00:00:00", "Pay", "rent"],
+        ["3", "TO_DO", "LOW", "-", "Walk", "dog"],
+    ]
+
+
+@pytest.mark.parametrize(
+    "stored",
+    [[], [Task(1, "done", status=Status.DONE)]],
+    ids=["no file", "only done tasks"],
+)
+def test_list_with_nothing_current_says_so_and_names_the_file_it_read(
+    project: Path, capsys: pytest.CaptureFixture[str], stored: list[Task]
+):
+    # A second list started from a subdirectory explains itself (D2).
+    if stored:
+        save(stored, project)
+
+    exit_code = main(["list"])
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "No current tasks" in out
+    assert str(project) in out
