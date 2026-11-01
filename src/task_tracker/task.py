@@ -2,6 +2,7 @@
 
 from dataclasses import KW_ONLY, dataclass, field
 from datetime import date, datetime, time
+from typing import Self
 
 from task_tracker.priority import Priority
 from task_tracker.status import Status
@@ -11,7 +12,7 @@ from task_tracker.status import Status
 # `is`, never `==`, so a caller who passes an equal date still has it kept. D6
 # chose naive local time on purpose, so DTZ001 does not apply here.
 _UNSET = datetime(1, 1, 1)  # noqa: DTZ001
-_GIVEN_DATETIMES = ("due", "date_completed", "start", "stop")
+_DATETIME_FIELDS = ("created", "updated", "due", "date_completed", "start", "stop")
 
 
 def _now() -> datetime:
@@ -76,16 +77,61 @@ class Task:  # pylint: disable=too-many-instance-attributes
         self._fill_in_defaults(now)
         self._validate(now)
 
+    @classmethod
+    # `id` is the field's name, so `restore(**record)` needs the parameter to match.
+    # A stored record is complete, so every field is required and none has a default.
+    def restore(  # pylint: disable=redefined-builtin,too-many-arguments
+        cls,
+        id: int,
+        name: str,
+        *,
+        description: str,
+        created: datetime,
+        updated: datetime,
+        due: datetime | None,
+        date_completed: datetime | None,
+        status: Status,
+        priority: Priority,
+        start: datetime,
+        stop: datetime,
+    ) -> Self:
+        """Rebuild a task from a stored record, keeping its stored stamps.
+
+        The constructor stamps `created` and `updated` with the clock, so it cannot
+        build a task that already existed. This runs every other rule the
+        constructor does, and fills nothing in: a record without a value is invalid.
+        """
+        task = cls.__new__(cls)
+        task.id = id
+        task.name = name
+        task.description = description
+        task.created = created
+        task.updated = updated
+        task.due = due
+        task.date_completed = date_completed
+        task.status = status
+        task.priority = priority
+        task.start = start
+        task.stop = stop
+        task._normalize()  # pylint: disable=protected-access
+        task._validate(_now())  # pylint: disable=protected-access
+        return task
+
     def _normalize(self) -> None:
+        # ValueError, not TypeError: the loader catches one type for any bad field.
+        # bool is an int in Python, and JSON `true` must not pass for an ID.
+        if isinstance(self.id, bool) or not isinstance(self.id, int):
+            raise ValueError("id must be an int")  # noqa: TRY004
         if not isinstance(self.name, str):
-            # ValueError, not TypeError: the loader catches one type for any bad field.
             raise ValueError("name must be a string")  # noqa: TRY004
         self.name = self.name.strip()
         if not self.name:
             raise ValueError("name must not be blank")
+        if not isinstance(self.description, str):
+            raise ValueError("description must be a string")  # noqa: TRY004
         self.status = Status(self.status)
         self.priority = Priority(self.priority)
-        for name in _GIVEN_DATETIMES:
+        for name in _DATETIME_FIELDS:
             value = getattr(self, name)
             if value is not _UNSET:
                 setattr(self, name, _as_naive_datetime(name, value))
@@ -101,12 +147,19 @@ class Task:  # pylint: disable=too-many-instance-attributes
             self.stop = max(now, self.start)
 
     def _validate(self, now: datetime) -> None:
+        for name in ("created", "updated"):
+            if getattr(self, name) > now:
+                raise ValueError(f"{name} must not be in the future")
+        if self.updated < self.created:
+            raise ValueError("updated must not be before created")
         done = self.date_completed
-        if done is not None:
-            if self.status is not Status.DONE:
-                raise ValueError("only a DONE task can have a date completed")
+        if self.status is Status.DONE:
+            if done is None:
+                raise ValueError("a DONE task must have a date completed")
             if done > now:
                 raise ValueError("date completed must not be in the future")
+        elif done is not None:
+            raise ValueError("only a DONE task can have a date completed")
         self._check_timeline()
 
     def _check_timeline(self) -> None:

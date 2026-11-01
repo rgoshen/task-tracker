@@ -1,5 +1,30 @@
 # Summary
 
+## [2026-11-01 12:41] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+Added `Task.restore(...)`, the one way to rebuild a task that already existed. It keeps the stored `created` and `updated`, runs the same rules as the constructor, and fills nothing in.
+The model also gained rules that a stored record needs and the constructor now shares: `updated` is not before `created`, neither is later than now, a `DONE` task has a date completed, `id` is an `int` and not a `bool`, and `description` is a string.
+`restore` rejects a `DONE` record without a date completed; the constructor still fills in "now".
+
+**Rationale:**
+M1 closed the constructor to `created` and `updated`, so the M2 loader needs a deliberate door. `restore` builds the object without calling `__init__`, assigns the stored fields, then runs `_normalize` and `_validate`, the same two steps the constructor uses. That keeps one rule set.
+Alternatives rejected: hidden `_created` and `_updated` init parameters (a back door for a false history), and a second copy of the rules inside `restore` (they drift apart when M5 changes one).
+The `id` and `description` checks close two gaps from M1 that a hand-edited `tasks.json` could reach: `"id": "1"` or `"id": true` would load and then break `highest + 1`, and `"description": null` would load as `None`. They raise `ValueError`, like the other fields, so the loader catches one type.
+Because the checks sit in the shared step, `Task(id="1", ...)` now fails too; that is intended (D5: `id` is a required `int`).
+Test-first: 35 new tests failed (28 because `restore` did not exist, 7 `DID NOT RAISE`), then all 98 passed.
+Mutation check: 14 breaks each fail a test (each new rule dropped, `restore` skipping `_normalize` or `_validate`, stored stamps replaced by the clock, a boundary made exclusive), and the file was verified identical to the green version afterwards.
+Coverage of `task.py` is 100%. `ruff`, `pyright`, and the CI-version Python linters are clean.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load, step 2
+- Issue: #6
+
 ## [2026-11-01 12:24] Commit Summary
 
 **Change Type:** Refactor
