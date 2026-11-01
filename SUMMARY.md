@@ -1,5 +1,30 @@
 # Summary
 
+## [2026-11-01 13:35] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+`Task.restore` no longer compares `created`, `updated`, or `date_completed` with the clock. A stored task is checked for order only: `updated` not before `created`, and the timeline `created <= start <= stop <= date completed`. A new task is still held to the clock for its date completed: one in the future raises `ValueError` at construction, as in M1.
+
+**Rationale:**
+Review of PR #25, thread 2, a design call confirmed by the project owner. Times are naive local time (D6). A task saved at 01:30 on the night daylight saving ends could not be loaded when the clock read 01:01: `load` raised `created must not be in the future`.
+A changed time zone or a fixed clock does the same for hours, and every command that loads first is then locked out of all tasks, with an error that blames a file that was valid when written.
+M1 applied the future check once, at creation, and that is where it stays.
+Trade-off accepted: a hand-edited far-future date now loads without complaint. Alternatives rejected: a 24-hour margin (an arbitrary constant that a long clock skew still defeats) and keeping the check (the lockout).
+This reverses a rule I added in this pull request and listed as open to veto: `created` and `updated` not later than now. `_validate` no longer takes the clock, and the constructor's check moved into `__post_init__`, where the one clock reading lives.
+Three "rejects a future date" restore tests became two "accepts a later stamp" tests. The restore tests no longer pin the clock, because restore no longer reads it.
+Test-first: the two new tests failed, then all 142 passed. Mutation check: eight breaks (restore comparing each of `created`, `updated`, and `date_completed` with the clock again, the constructor check dropped or made exclusive, and the three other ordering rules dropped) each fail a test. The file was verified identical afterwards.
+Tooling note: my mutation script restored the original within the same second as a same-length mutant, so Python could run a cached `.pyc` of the mutant (it briefly made valid IDs fail). It now clears the cache before every run, and I re-ran all five earlier mutation sets with it: the results are unchanged (38 of 39 caught, the one survivor being the equivalent mutant already reported).
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review thread 2
+
 ## [2026-11-01 13:32] Commit Summary
 
 **Change Type:** Fix

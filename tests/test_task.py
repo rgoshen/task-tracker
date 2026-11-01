@@ -290,9 +290,6 @@ def test_a_date_completed_of_this_very_moment_is_accepted():
 
 STORED_CREATED = datetime(2026, 10, 10, 9, 0, 0)  # noqa: DTZ001
 STORED_DONE = datetime(2026, 10, 15, 17, 30, 0)  # noqa: DTZ001
-# The restore checks that compare with "now" use the controlled clock, so they
-# hold whatever day the tests run on.
-with_fixed_clock = pytest.mark.usefixtures("readings")
 
 
 def stored(**overrides: Any) -> dict[str, Any]:
@@ -313,7 +310,6 @@ def stored(**overrides: Any) -> dict[str, Any]:
     return record | overrides
 
 
-@with_fixed_clock
 def test_restore_keeps_the_stored_created_and_updated():
     updated = STORED_CREATED + timedelta(days=1)
 
@@ -323,7 +319,6 @@ def test_restore_keeps_the_stored_created_and_updated():
     assert task.updated == updated
 
 
-@with_fixed_clock
 def test_restore_accepts_a_task_that_was_done_in_the_past():
     # The constructor cannot build this: its created is always now.
     task = Task.restore(
@@ -345,7 +340,6 @@ def test_restore_needs_every_field_and_fills_none_in():
         Task.restore(1, "Buy milk")  # type: ignore[call-arg]  # pylint: disable=missing-kwoa
 
 
-@with_fixed_clock
 def test_restore_turns_iso_text_into_the_one_datetime_form():
     task = Task.restore(
         **stored(
@@ -361,7 +355,6 @@ def test_restore_turns_iso_text_into_the_one_datetime_form():
     assert task.due == NAIVE_DAY
 
 
-@with_fixed_clock
 def test_restore_turns_labels_into_enum_members():
     task = Task.restore(
         **stored(
@@ -377,21 +370,18 @@ def test_restore_turns_labels_into_enum_members():
     assert task.priority is Priority.HIGH
 
 
-@with_fixed_clock
 @pytest.mark.parametrize("field_name", ["created", "updated"])
 def test_restore_rejects_bad_stamp_text_naming_the_field(field_name: str):
     with pytest.raises(ValueError, match=field_name):
         Task.restore(**stored(**{field_name: "not a date"}))
 
 
-@with_fixed_clock
 @pytest.mark.parametrize("field_name", ["created", "updated"])
 def test_restore_rejects_a_timezone_aware_stamp(field_name: str):
     with pytest.raises(ValueError, match=field_name):
         Task.restore(**stored(**{field_name: AWARE_DAY}))
 
 
-@with_fixed_clock
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [
@@ -453,26 +443,26 @@ def test_restore_rejects_each_broken_timeline_link(
         Task.restore(**stored(**overrides))
 
 
-@with_fixed_clock
-def test_restore_rejects_a_created_in_the_future():
-    record = stored(
-        created=FUTURE_DAY, updated=FUTURE_DAY, start=FUTURE_DAY, stop=FUTURE_DAY
+@pytest.mark.usefixtures("readings")
+def test_restore_accepts_stamps_later_than_the_clock():
+    # The clock can move back: daylight saving ends, the time zone changes, or a
+    # skewed clock is fixed. A file that was valid when it was saved must still load.
+    later = FIRST_READING + timedelta(hours=1)
+
+    task = Task.restore(**stored(created=later, updated=later, start=later, stop=later))
+
+    assert task.created == task.updated == later
+
+
+@pytest.mark.usefixtures("readings")
+def test_restore_accepts_a_date_completed_later_than_the_clock():
+    later = FIRST_READING + timedelta(hours=1)
+
+    task = Task.restore(
+        **stored(status=Status.DONE, updated=later, date_completed=later)
     )
 
-    with pytest.raises(ValueError, match="created must not be in the future"):
-        Task.restore(**record)
-
-
-@with_fixed_clock
-def test_restore_rejects_an_updated_in_the_future():
-    with pytest.raises(ValueError, match="updated must not be in the future"):
-        Task.restore(**stored(updated=FUTURE_DAY))
-
-
-@with_fixed_clock
-def test_restore_rejects_a_date_completed_in_the_future():
-    with pytest.raises(ValueError, match="future"):
-        Task.restore(**stored(status=Status.DONE, date_completed=FUTURE_DAY))
+    assert task.date_completed == later
 
 
 def test_restore_rejects_a_done_task_without_a_date_completed():

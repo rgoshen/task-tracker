@@ -77,7 +77,11 @@ class Task:  # pylint: disable=too-many-instance-attributes
         self.updated = now
         self._normalize()
         self._fill_in_defaults(now)
-        self._validate(now)
+        self._validate()
+        # Only a new task is held to the clock. A stored one was valid when it was
+        # saved, and the clock can move back (daylight saving, a changed time zone).
+        if self.date_completed is not None and self.date_completed > now:
+            raise ValueError("date completed must not be in the future")
 
     @classmethod
     # `id` is the field's name, so `restore(**record)` needs the parameter to match.
@@ -116,7 +120,7 @@ class Task:  # pylint: disable=too-many-instance-attributes
         task.start = start
         task.stop = stop
         task._normalize()  # pylint: disable=protected-access
-        task._validate(_now())  # pylint: disable=protected-access
+        task._validate()  # pylint: disable=protected-access
         return task
 
     def _normalize(self) -> None:
@@ -154,19 +158,13 @@ class Task:  # pylint: disable=too-many-instance-attributes
             # start is impossible.
             self.stop = max(now, self.start)
 
-    def _validate(self, now: datetime) -> None:
-        for name in ("created", "updated"):
-            if getattr(self, name) > now:
-                raise ValueError(f"{name} must not be in the future")
+    def _validate(self) -> None:
         if self.updated < self.created:
             raise ValueError("updated must not be before created")
         done = self.date_completed
-        if self.status is Status.DONE:
-            if done is None:
-                raise ValueError("a DONE task must have a date completed")
-            if done > now:
-                raise ValueError("date completed must not be in the future")
-        elif done is not None:
+        if self.status is Status.DONE and done is None:
+            raise ValueError("a DONE task must have a date completed")
+        if self.status is not Status.DONE and done is not None:
             raise ValueError("only a DONE task can have a date completed")
         self._check_timeline()
 
