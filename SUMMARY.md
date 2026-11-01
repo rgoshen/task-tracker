@@ -1,5 +1,354 @@
 # Summary
 
+## [2026-11-01 14:30] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_storage.py`)
+
+**Summary:**
+Two tests each carried the same ten-line `os.replace` spy. It is now one fixture, `replacements`, that records every call as (source, destination) and still performs it. No product code changed, and the number of tests is the same (165).
+
+**Rationale:**
+The `Lint` job on PR #25 failed after the review fixes were pushed. Only one linter failed: JSCPD, the duplicate-code detector in super-linter, with threshold 0, reported the duplicated spy (`tests/test_storage.py` lines 318 to 327 and 474 to 483). I introduced the copy in the symlink commit by pasting the spy from the earlier temporary-file test.
+My local mirror of the CI linters covered ruff, black, isort, flake8, pylint, mypy, markdownlint, textlint, and Prettier, but not JSCPD, so this was invisible until CI ran. `jscpd` 5.0.10 with super-linter's own config is now part of the local checks. Run against the pushed version it reports exactly what CI did (1 clone, 9 duplicated lines, 71 tokens), and against this change it reports 0 clones.
+One consequence of sharing the fixture: it patches `os.replace` before the test body runs, so the setup `save` in the symlink test is recorded too. That test clears the list before the call it checks.
+Tests: 165 pass before and after; the spy tests were run in both shapes.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, failed `Lint` check after the review fixes
+
+## [2026-11-01 14:20] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `docs/implementation-plan.md`, `TODO.md`)
+
+**Summary:**
+Brought the plan, the `TODO.md` entry, and `README.md` in step with the review of PR #25. The plan gains three boxes (a refused save, stored dates not compared with the clock, the saved file's format) and four decisions.
+`TODO.md` drops the rule that stored `created` and `updated` are not later than now, and records the new ones. `README.md` documents the hidden `.tasks.json.*.tmp` file that a killed save can leave and the `.gitignore` pattern for it.
+
+**Rationale:**
+The project `CLAUDE.md` says to keep the plan, the matching issue, and `README.md` together when a decision changes. The earlier docs still listed a rule that the code no longer enforces, which would send the next reader back to the wrong behavior.
+Review of PR #25, thread 11: a process killed between creating the temporary file and the replace leaves a hidden file beside the list, which `git add .` would commit when the list lives in a repository.
+I took the reviewer's minimum option, documenting the pattern. The other option, deleting stale temporary files at the start of `save`, could remove another process's file in the middle of its save, and adds work to every save for a window of milliseconds.
+Issue #6 is regenerated from the plan separately, because it is a change on GitHub.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review thread 11
+
+## [2026-11-01 14:12] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_storage.py`)
+
+**Summary:**
+The test that a directory in place of the file is not reported as a corrupt file no longer matches the operating system's error text. It asserts an `OSError` and that the error is not a `ValueError`.
+
+**Rationale:**
+Review of PR #25, thread 10. `open()` on a directory raises `IsADirectoryError: ... Is a directory` on macOS and Linux and `PermissionError: ... Permission denied` on Windows, so `match="directory"` failed there although `load` behaved correctly. I confirmed it by simulating the Windows wording: the old assertion failed on the text alone, and the new one passed.
+The `ValueError` check is the part of the old test that mattered: `pytest.raises(OSError)` alone would already fail for a `ValueError`, but the explicit assertion states the intent, that a disk problem is not reported as a corrupt file. A targeted mutation check (an `OSError` reported as corrupt, an `OSError` treated as "no file") fails the test, and the file was verified identical afterwards.
+No product code changed.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review thread 10
+
+## [2026-11-01 14:05] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** storage (`src/task_tracker/storage.py`, `tests/test_storage.py`)
+
+**Summary:**
+`save` now follows a symbolic link and replaces the file it points to, so a list kept in a synced folder or a dotfiles repository stays linked. It also copies the mode of the file it replaces onto the new one. A file that did not exist is still created readable and writable by its owner only.
+
+**Rationale:**
+Review of PR #25, thread 5. `os.replace` on a symlink replaces the link itself: after a save the link was a regular file and the real file kept stale content (reproduced). A 0644 file became 0600 because `tempfile.mkstemp` creates owner-only files, so a list someone shared quietly became private.
+The fix resolves the path after validation, so errors still name the path the caller gave, and builds the temporary file beside the real file, because `os.replace` is atomic only within one filesystem and a link can point to another one. The mode comes from `shutil.copymode`; for a file that does not exist yet the copy is skipped.
+Not done: the review also notes that an atomic save needs write permission on the directory, where a plain write needs it only on the file. That cost comes with replacing by rename and cannot be removed without giving up atomicity, so it is documented in the plan instead.
+Test-first: the symlink test and the mode test failed (the link became a regular file, 0644 became 0600); the owner-only test for a new file already passed and now pins the behavior. The mutation check found two gaps in my first tests, a temporary file built beside the link instead of the real file and directories created beside the link, and two more tests close them.
+Mutation check: seven breaks (link not followed, mode not kept, a new file treated as an error, the link replaced, the temporary file or the directories beside the link, the mode copied from the wrong file) each fail a test. The file was verified identical afterwards. The mode tests skip on Windows, which has no owner, group, and other bits.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review thread 5
+
+## [2026-11-01 13:58] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** storage (`src/task_tracker/storage.py`, `tests/test_storage.py`)
+
+**Summary:**
+`save` now writes non-ASCII text as text (`"Café ☕"`, not `"Café ☕"`) and every date in whole seconds (`2026-11-01T09:00:00`), whatever was assigned to a field after the task was built.
+Text that cannot be written as UTF-8 (a lone surrogate) now fails the save with `UnicodeEncodeError`, leaves the previous file as it was, and leaves no temporary file.
+
+**Rationale:**
+Review of PR #25, threads 4 and 6. The file is meant to be read and edited by a person (D1) and is opened as UTF-8, but `json.dump` defaults to `ensure_ascii=True`, so the encoding never mattered and a name in any other script was unreadable.
+The `README.md` promises every date as `YYYY-MM-DDTHH:MM:SS`, but the model drops microseconds only when it builds or restores a task, so `task.due = datetime.now()` (likely in M5's `update`) wrote `…:00.123456`, and `load` then truncated it: the round trip did not hold.
+`timespec="seconds"` in the writer closes the file-format half. The in-memory task still holds the microseconds until M5's `update` normalizes what it assigns, which is the known limit already recorded for M5; the loaded copy equals what was saved.
+Side effect worth knowing: a command-line argument that is not valid UTF-8 reaches Python as a lone surrogate. Before this change it was written as an escape. Now the write fails (`UnicodeEncodeError` is a `ValueError`, so M3's single catch handles it) and nothing on disk changes. A test pins this.
+Test-first: three tests failed (escapes in the file, microseconds in the file, nothing raised for the surrogate), then all 160 passed. Mutation check: five breaks (escapes back on, microseconds kept, minutes only, microseconds padded, no conversion) each fail a test; a sixth was skipped because its pattern matched twice and duplicated the first. The file was verified identical afterwards.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review threads 4 and 6
+
+## [2026-11-01 13:50] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** storage (`src/task_tracker/storage.py`, `tests/test_storage.py`)
+
+**Summary:**
+`save` now refuses a list of tasks that `load` would reject, with the same `ValueError` naming the file and the record (for example `record 3: duplicate id 1`), before it creates a directory or a temporary file. The previous file is left as it was.
+`load` and `save` share one helper, `_restore_all`, so both apply the same rules from one place.
+
+**Rationale:**
+Review of PR #25, thread 3. `save([Task(1, "a"), Task(1, "b")], path)` succeeded and the next `load` raised, and the same happened after `task.name = "   "` (the dataclass is mutable, and M5's `update` will assign to fields).
+Because `save` replaces the previous good file, the user lost their last valid state and had to repair JSON by hand. The atomic replace protects against a crash partway through a write, but not against writing something unreadable.
+The check runs each record through the loader's own path (`_from_record`, which is `Task.restore`), so the rules cannot drift apart, and it needs no clock because the stored-date check was removed in the previous commits. A task the constructor accepts always passes.
+Alternative rejected: checking only for duplicate IDs in `save` and leaving per-task rules to M5's `update`. That would cover the case in this review, but not the next bug that assigns a bad value; the extra cost is one pass over the records.
+Test-first: three tests failed with `DID NOT RAISE`, then all 157 passed. Mutation check: eight breaks (validation skipped, run after the directory is created, duplicates not detected or never remembered, position or filename wrong, `load` bypassing the helper, a record dropped on write) each fail a test, and the file was verified identical afterwards.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review thread 3
+
+## [2026-11-01 13:42] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** task, storage (`src/task_tracker/task.py`, `src/task_tracker/storage.py`, tests)
+
+**Summary:**
+`Task.restore` now takes the stored record as keyword arguments (`restore(**record)`) and reads the field list from the dataclass, so the 11-parameter copy of it is gone. It raises `ValueError` for a missing field and for an unknown one, and `storage._from_record` defers to it, so `_FIELD_NAMES` is gone too. Behavior is unchanged except that the two errors are now raised by the model.
+The remaining pylint suppressions now have their reason beside them.
+
+**Rationale:**
+Review of PR #25, threads 8 and 9. Adding a `Task` field needed three edits (the dataclass, the `restore` signature, and `_FIELD_NAMES`); it now needs one. The old shape also let a forgotten parameter surface as `TypeError: unexpected keyword`, which the loader does not catch.
+Cost accepted: `restore` no longer documents its fields in its signature, and pyright cannot check a misspelled keyword at a call site. Every caller already passes a dictionary, and the dataclass is the one list.
+The two `# pylint: disable=protected-access` lines call `_normalize` and `_validate` from a classmethod of the same class. The reason sits in the comment directly above them, the way `DTZ001` is explained in `task.py`. The `redefined-builtin` and `too-many-arguments` suppressions disappeared with the old signature. One new `disable-next` in a test carries its reason on the line above it.
+Test-first: three tests failed with the raw `TypeError`s, then all 143 passed. The first mutation check found a real gap: a record without `description` would have been filled in with a default and no test noticed, because the test only dropped `stop` and `due`. A test now drops each of the eleven fields in turn.
+Mutation check: eight breaks (each check dropped, an unknown field ignored, a field never assigned, `_normalize` or `_validate` skipped, one dataclass field ignored, a default filled in for a missing field) each fail a test (154 tests), and the file was verified identical afterwards.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review threads 8 and 9
+
+## [2026-11-01 13:35] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+`Task.restore` no longer compares `created`, `updated`, or `date_completed` with the clock. A stored task is checked for order only: `updated` not before `created`, and the timeline `created <= start <= stop <= date completed`. A new task is still held to the clock for its date completed: one in the future raises `ValueError` at construction, as in M1.
+
+**Rationale:**
+Review of PR #25, thread 2, a design call confirmed by the project owner. Times are naive local time (D6). A task saved at 01:30 on the night daylight saving ends could not be loaded when the clock read 01:01: `load` raised `created must not be in the future`.
+A changed time zone or a fixed clock does the same for hours, and every command that loads first is then locked out of all tasks, with an error that blames a file that was valid when written.
+M1 applied the future check once, at creation, and that is where it stays.
+Trade-off accepted: a hand-edited far-future date now loads without complaint. Alternatives rejected: a 24-hour margin (an arbitrary constant that a long clock skew still defeats) and keeping the check (the lockout).
+This reverses a rule I added in this pull request and listed as open to veto: `created` and `updated` not later than now. `_validate` no longer takes the clock, and the constructor's check moved into `__post_init__`, where the one clock reading lives.
+Three "rejects a future date" restore tests became two "accepts a later stamp" tests. The restore tests no longer pin the clock, because restore no longer reads it.
+Test-first: the two new tests failed, then all 142 passed. Mutation check: eight breaks (restore comparing each of `created`, `updated`, and `date_completed` with the clock again, the constructor check dropped or made exclusive, and the three other ordering rules dropped) each fail a test. The file was verified identical afterwards.
+Tooling note: my mutation script restored the original within the same second as a same-length mutant, so Python could run a cached `.pyc` of the mutant (it briefly made valid IDs fail). It now clears the cache before every run, and I re-ran all five earlier mutation sets with it: the results are unchanged (38 of 39 caught, the one survivor being the equivalent mutant already reported).
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review thread 2
+
+## [2026-11-01 13:32] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`, `tests/test_storage.py`)
+
+**Summary:**
+A `null` in `created`, `updated`, `start`, or `stop` now raises `ValueError: <field> must be a date or ISO 8601 text`, and an `id` below 1 raises `ValueError: id must be 1 or more`. Only `due` and `date_completed` may be empty.
+
+**Rationale:**
+Review of PR #25, threads 1 and 7. A hand-edited `tasks.json` with `"created": null` made `load` fail with a raw `TypeError` from a comparison, not the `ValueError` naming the file and record, and M3's CLI catches only `ValueError`. `Task(start=None)` did the same. An `id` of 0 or -5 loaded without complaint, although IDs are "highest existing ID + 1" (D5) and the first is 1.
+No upper bound on `id` was added: Python integers are unbounded, `highest + 1` works for any size, and the JSON parser already raises a `ValueError` for an integer over 4300 digits.
+My earlier mutation check never dropped the `None` handling, so it could not have found the first gap; the new one drops each field from the allowed-empty list in turn.
+Test-first: 16 new tests failed (10 raw `TypeError`s, 6 `DID NOT RAISE`), then all 143 passed. Mutation check: ten breaks (each of the four stamps allowed to be null, `due` and `date_completed` no longer allowed, the ID bound dropped, off-by-one in each direction) each fail a test. The file was verified identical afterwards.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review threads 1 and 7
+
+## [2026-11-01 13:48] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `CLAUDE.md`)
+
+**Summary:**
+Ticked the seven M2 boxes in the plan and added three that record what was built beyond them: the rules a stored record must meet, the handling of a file that is empty, binary, or not a list, and the failure cases for the atomic save. Added a "Decided" list for M2 and noted that audit findings G2 and G3 are addressed. The project `CLAUDE.md` "Project state" now names `Task.restore` and `storage.py`.
+
+**Rationale:**
+The project `CLAUDE.md` says to keep the plan, the matching issue, and `README.md` in step. `README.md` needs no change: it already names JSON and the file locations, and M2 changed neither. Issue #6 is regenerated from the plan separately, because it is a change on GitHub.
+The plan now says why the fails-partway test writes `[{` into the open file before raising, so the next reader does not "simplify" it into the version that passes against a plain overwrite (G2).
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load, step 6
+- Issue: #6
+
+## [2026-11-01 13:31] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** storage (`src/task_tracker/storage.py`, `tests/test_storage.py`)
+
+**Summary:**
+`save` is now atomic. It writes the new content to a temporary file in the same directory as the target and moves it over the target with `os.replace`. A failure at any point leaves the previous file exactly as it was, and the temporary file is removed.
+
+**Rationale:**
+A plain overwrite truncates the file first, so a crash or a full disk partway through destroys every task, and `save` rewrites the whole file on every change (D1).
+The temporary file sits next to the target because `os.replace` is atomic only within one filesystem and may fail across two. `tempfile.mkstemp` creates it readable and writable only by its owner, so the saved file takes that mode.
+Audit finding G2 was a test that passes against a non-atomic save. The cause is a test that makes serialization fail before any byte is written. Here the fake serializer writes `[{` into the open file and then raises.
+The test was run against the plain write from the previous commit first: it failed because the old contents had been replaced with `[{`, and a first failed save left a stray `tasks.json`. A second test makes `os.replace` raise, and a third checks that the temporary file is built beside the target.
+A `ponytail:` comment marks the one corner cut: no `flush` and `fsync` before the replace, so a power cut right after a save can still leave the old or an empty file. The upgrade path is in the comment.
+Test-first: four of five new tests failed against the plain write, then all 127 passed. Mutation check: eight breaks (temporary file in the system temp directory, never removed, `unlink` insisting it exists, `rename` instead of `os.replace`, writing straight to the target, no `mkdir`, no trailing newline, the replace skipped) each fail a test, and the file was verified identical afterwards.
+Coverage of `storage.py` is 100%, and `ruff`, `pyright`, and the CI-version Python linters are clean.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load, step 5
+- Issue: #6
+
+## [2026-11-01 13:12] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** storage (`src/task_tracker/storage.py`, `tests/test_storage.py`)
+
+**Summary:**
+`load` now rejects a corrupt file with a `ValueError` that names the file and, for a bad task, its position, such as `tasks.json: record 2: name must not be blank`.
+It rejects content that is not JSON (an empty file and binary garbage included), JSON that is not a list, a record that is not an object, a missing field, an unknown field, any value `Task.restore` refuses, and two records with the same `id`. The file is never touched.
+
+**Rationale:**
+A hand-edited `tasks.json` is the realistic source of bad data, and the next `add` would build its ID from it. Every rule is enforced, not only the one the plan names (`not json`), because each describes an impossible file.
+Unknown fields are rejected, not ignored: `save` rewrites the whole file, so ignoring a field would silently delete it on the next save.
+One error type: `JSONDecodeError`, `UnicodeDecodeError`, and the `ValueError` from `Task` are all `ValueError`s, so M3's CLI catches one type for a corrupt file and for `add ""`. A custom exception class waits until M3 needs to tell them apart. A failure to read the file (a directory in its place, no permission) stays an `OSError`, because the content is not at fault.
+A missing file stays `[]`. A missing directory does too, because `load` never creates anything.
+Test-first: 16 new tests failed (the messages had no filename or position, and a non-list or non-object file was not caught), then all 122 passed.
+Mutation check: ten breaks each fail a test (each rule dropped, the position starting at 0, the filename left out, an `OSError` reported as corrupt or as "no file"). One mutant survived and is equivalent: ignoring unknown fields at the final call changes nothing, because the earlier check already raises. The file was verified identical afterwards.
+Coverage of `storage.py` is 100%, and `ruff`, `pyright`, and the CI-version Python linters are clean.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load, step 4
+- Issue: #6
+
+## [2026-11-01 12:58] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** storage (`src/task_tracker/storage.py`, `tests/test_storage.py`)
+
+**Summary:**
+Added `load(path)` and `save(tasks, path)`. `save` writes a JSON list of plain records and creates the directories above the file. `load` rebuilds each task with `Task.restore`, and a file that does not exist is an empty list: nothing is created, not even the directory.
+The file holds one object per task with all eleven fields. Dates are ISO 8601 text (D6), the enums are their labels, and a missing value is `null`.
+
+**Rationale:**
+This is the round trip M3 builds on. The conversion between a task and plain data is two private functions in `storage.py`, as decided in `TODO.md`. The field names come from `dataclasses.fields(Task)`, so a new field cannot be forgotten.
+`save` is a plain write for now. The next commits make `load` strict (step 4) and `save` atomic (step 5), each test-first. The plain version is deliberate: the fails-partway test must be seen failing against it before the atomic version exists, or it proves nothing (audit finding G2).
+`load` opens the file and catches `FileNotFoundError` instead of checking `exists()` first, so there is no gap between the check and the open.
+The round-trip test builds its second task (`DONE`, completed 2026-10-15) with `Task.restore`, because the constructor cannot build a task done in the past.
+Test-first: collection failed (no module), then all 105 tests passed. Mutation check: six breaks (no `mkdir`, `mkdir` without `parents`, no trailing newline, a missing file no longer giving `[]`, dates not converted, a field dropped) each fail a test, and the file was verified identical afterwards. Coverage of `storage.py` is 100%, and `ruff`, `pyright`, and the CI-version Python linters are clean.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load, step 3
+- Issue: #6
+
+## [2026-11-01 12:41] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+Added `Task.restore(...)`, the one way to rebuild a task that already existed. It keeps the stored `created` and `updated`, runs the same rules as the constructor, and fills nothing in.
+The model also gained rules that a stored record needs and the constructor now shares: `updated` is not before `created`, neither is later than now, a `DONE` task has a date completed, `id` is an `int` and not a `bool`, and `description` is a string.
+`restore` rejects a `DONE` record without a date completed; the constructor still fills in "now".
+
+**Rationale:**
+M1 closed the constructor to `created` and `updated`, so the M2 loader needs a deliberate door. `restore` builds the object without calling `__init__`, assigns the stored fields, then runs `_normalize` and `_validate`, the same two steps the constructor uses. That keeps one rule set.
+Alternatives rejected: hidden `_created` and `_updated` init parameters (a back door for a false history), and a second copy of the rules inside `restore` (they drift apart when M5 changes one).
+The `id` and `description` checks close two gaps from M1 that a hand-edited `tasks.json` could reach: `"id": "1"` or `"id": true` would load and then break `highest + 1`, and `"description": null` would load as `None`. They raise `ValueError`, like the other fields, so the loader catches one type.
+Because the checks sit in the shared step, `Task(id="1", ...)` now fails too; that is intended (D5: `id` is a required `int`).
+Test-first: 35 new tests failed (28 because `restore` did not exist, 7 `DID NOT RAISE`), then all 98 passed.
+Mutation check: 14 breaks each fail a test (each new rule dropped, `restore` skipping `_normalize` or `_validate`, stored stamps replaced by the clock, a boundary made exclusive), and the file was verified identical to the green version afterwards.
+Coverage of `task.py` is 100%. `ruff`, `pyright`, and the CI-version Python linters are clean.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load, step 2
+- Issue: #6
+
+## [2026-11-01 12:24] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** task (`src/task_tracker/task.py`)
+
+**Summary:**
+Split `Task.__post_init__` into four steps: stamp `created` and `updated`, `_normalize`, `_fill_in_defaults`, and `_validate`. Behavior is unchanged.
+
+**Rationale:**
+`Task.restore` (next commit) must run the same rules as the constructor, but with stored `created` and `updated` instead of the clock. Before this change the rules were interleaved with the defaults: `_settle_date_completed` both filled in a missing date and checked it. Now filling in is separate from checking, so `restore` can skip the defaults (a stored record is complete) and still run every check.
+Proof of no change: the 63 existing tests pass unmodified, and `ruff`, `pyright`, and the CI-version Python linters (pylint, isort, black, flake8, mypy) are clean.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load, step 1
+- Issue: #6
+
+## [2026-11-01 12:20] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** planning (`TODO.md`)
+
+**Summary:**
+Added the plan for M2 save and load: seven commits in order, the tests beyond the plan's seven boxes, and the risks. It records two decisions made today. `Task.restore` shares one validation with the constructor, and the task-to-data conversion lives in `storage.py`.
+
+**Rationale:**
+The project rules ask for a `TODO.md` entry before any code.
+The entry adds rules for a stored record that the plan does not state: `updated` not before `created`, neither later than now, a `DONE` record has a date completed, every field present and none unknown, `id` an `int` and not a `bool`, and unique IDs. Unknown fields are rejected because `save` rewrites the whole file, so ignoring them would delete them on the next save.
+Alternatives rejected: hidden `_created` and `_updated` init parameters (a back door for a false history), a second copy of the rules inside `restore` (they drift apart), and `to_record` and `from_record` methods on `Task` (the model would know its storage format).
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+
 ## [2026-10-31 14:51] Commit Summary
 
 **Change Type:** Docs

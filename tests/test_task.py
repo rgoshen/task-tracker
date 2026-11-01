@@ -7,6 +7,7 @@ import time
 from collections.abc import Iterator
 from datetime import UTC, date, datetime, timedelta
 from itertools import count
+from typing import Any
 
 import pytest
 
@@ -283,3 +284,251 @@ def test_a_date_completed_of_this_very_moment_is_accepted():
     task = Task(id=1, name="x", status=Status.DONE, date_completed=moment)
 
     assert task.date_completed == FIRST_READING
+
+
+# --- Task.restore: rebuilding a task from a stored record (M2) ---
+
+STORED_CREATED = datetime(2026, 10, 10, 9, 0, 0)  # noqa: DTZ001
+STORED_DONE = datetime(2026, 10, 15, 17, 30, 0)  # noqa: DTZ001
+
+
+def stored(**overrides: Any) -> dict[str, Any]:
+    """A valid stored record; each test changes only the field it is about."""
+    record = {
+        "id": 1,
+        "name": "Buy milk",
+        "description": "",
+        "created": STORED_CREATED,
+        "updated": STORED_CREATED,
+        "due": None,
+        "date_completed": None,
+        "status": Status.TO_DO,
+        "priority": Priority.LOW,
+        "start": STORED_CREATED,
+        "stop": STORED_CREATED,
+    }
+    return record | overrides
+
+
+def test_restore_keeps_the_stored_created_and_updated():
+    updated = STORED_CREATED + timedelta(days=1)
+
+    task = Task.restore(**stored(updated=updated))
+
+    assert task.created == STORED_CREATED
+    assert task.updated == updated
+
+
+def test_restore_accepts_a_task_that_was_done_in_the_past():
+    # The constructor cannot build this: its created is always now.
+    task = Task.restore(
+        **stored(
+            status=Status.DONE,
+            updated=STORED_DONE,
+            stop=STORED_DONE,
+            date_completed=STORED_DONE,
+        )
+    )
+
+    assert task.created == STORED_CREATED
+    assert task.date_completed == STORED_DONE
+
+
+def test_restore_takes_keyword_arguments_only():
+    with pytest.raises(TypeError):
+        # Passing positional arguments is the point of the test.
+        # pylint: disable-next=too-many-function-args
+        Task.restore(1, "Buy milk")  # type: ignore[call-arg, misc]
+
+
+@pytest.mark.parametrize(
+    ("missing", "message"),
+    [(["stop"], "missing field.*stop"), (["stop", "due"], "missing field.*due, stop")],
+    ids=["one", "several-in-order"],
+)
+def test_restore_needs_every_field_and_fills_none_in(missing: list[str], message: str):
+    # A stored record is complete, so a missing value is a corrupt record. It is a
+    # ValueError like every other bad field, so the loader catches one type.
+    record = stored()
+    for name in missing:
+        del record[name]
+
+    with pytest.raises(ValueError, match=message):
+        Task.restore(**record)
+
+
+@pytest.mark.parametrize("field_name", list(stored()))
+def test_restore_requires_each_field_in_turn(field_name: str):
+    # Every field is required, including the ones that have a default in __init__.
+    record = stored()
+    del record[field_name]
+
+    with pytest.raises(ValueError, match=f"missing field.*{field_name}"):
+        Task.restore(**record)
+
+
+def test_restore_rejects_a_field_the_task_does_not_have():
+    # `save` rewrites the whole record, so a field ignored here would be deleted.
+    with pytest.raises(ValueError, match="unknown field.*colour"):
+        Task.restore(**stored(colour="red"))
+
+
+@pytest.mark.parametrize("field_name", ["created", "updated"])
+def test_restore_rejects_bad_stamp_text_naming_the_field(field_name: str):
+    with pytest.raises(ValueError, match=field_name):
+        Task.restore(**stored(**{field_name: "not a date"}))
+
+
+@pytest.mark.parametrize("field_name", ["created", "updated"])
+def test_restore_rejects_a_timezone_aware_stamp(field_name: str):
+    with pytest.raises(ValueError, match=field_name):
+        Task.restore(**stored(**{field_name: AWARE_DAY}))
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        (
+            {
+                "status": Status.DONE,
+                "date_completed": STORED_CREATED - timedelta(days=1),
+            },
+            "date completed must not be before created",
+        ),
+        (
+            {"start": STORED_CREATED - timedelta(days=1)},
+            "start must not be before created",
+        ),
+        (
+            {
+                "start": STORED_CREATED + timedelta(days=2),
+                "stop": STORED_CREATED + timedelta(days=1),
+            },
+            "stop must not be before start",
+        ),
+        (
+            {
+                "status": Status.DONE,
+                "date_completed": STORED_DONE,
+                "updated": STORED_DONE,
+                "start": STORED_DONE + timedelta(hours=1),
+                "stop": STORED_DONE + timedelta(hours=1),
+            },
+            "start must not be after the date completed",
+        ),
+        (
+            {
+                "status": Status.DONE,
+                "date_completed": STORED_DONE,
+                "updated": STORED_DONE,
+                "stop": STORED_DONE + timedelta(hours=1),
+            },
+            "stop must not be after the date completed",
+        ),
+        (
+            {"updated": STORED_CREATED - timedelta(days=1)},
+            "updated must not be before created",
+        ),
+    ],
+    ids=[
+        "date-completed-before-created",
+        "start-before-created",
+        "stop-before-start",
+        "start-after-date-completed",
+        "stop-after-date-completed",
+        "updated-before-created",
+    ],
+)
+def test_restore_rejects_each_broken_timeline_link(
+    overrides: dict[str, Any], message: str
+):
+    with pytest.raises(ValueError, match=message):
+        Task.restore(**stored(**overrides))
+
+
+@pytest.mark.usefixtures("readings")
+def test_restore_accepts_stamps_later_than_the_clock():
+    # The clock can move back: daylight saving ends, the time zone changes, or a
+    # skewed clock is fixed. A file that was valid when it was saved must still load.
+    later = FIRST_READING + timedelta(hours=1)
+
+    task = Task.restore(**stored(created=later, updated=later, start=later, stop=later))
+
+    assert task.created == task.updated == later
+
+
+@pytest.mark.usefixtures("readings")
+def test_restore_accepts_a_date_completed_later_than_the_clock():
+    later = FIRST_READING + timedelta(hours=1)
+
+    task = Task.restore(
+        **stored(status=Status.DONE, updated=later, date_completed=later)
+    )
+
+    assert task.date_completed == later
+
+
+def test_restore_rejects_a_done_task_without_a_date_completed():
+    # The constructor would fill in "now". A stored DONE task always has its date.
+    with pytest.raises(ValueError, match="DONE task must have a date completed"):
+        Task.restore(**stored(status=Status.DONE))
+
+
+@pytest.mark.parametrize("status", [Status.TO_DO, Status.IN_PROGRESS])
+def test_restore_rejects_a_date_completed_on_a_task_that_is_not_done(status: Status):
+    with pytest.raises(ValueError, match="only a DONE task"):
+        Task.restore(**stored(status=status, date_completed=STORED_DONE))
+
+
+@pytest.mark.parametrize("bad_id", ["1", 1.5, True, None])
+def test_an_id_that_is_not_an_int_is_rejected(bad_id: object):
+    # A hand-edited tasks.json can hold any JSON value. True is an int in Python.
+    with pytest.raises(ValueError, match="id must be an int"):
+        Task(id=bad_id, name="x")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("bad_id", ["1", 1.5, True, None])
+def test_restore_rejects_an_id_that_is_not_an_int(bad_id: object):
+    with pytest.raises(ValueError, match="id must be an int"):
+        Task.restore(**stored(id=bad_id))
+
+
+@pytest.mark.parametrize("bad_description", [5, None, ["a"]])
+def test_a_description_that_is_not_text_is_rejected(bad_description: object):
+    with pytest.raises(ValueError, match="description must be a string"):
+        Task(id=1, name="x", description=bad_description)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("bad_description", [5, None, ["a"]])
+def test_restore_rejects_a_description_that_is_not_text(bad_description: object):
+    with pytest.raises(ValueError, match="description must be a string"):
+        Task.restore(**stored(description=bad_description))
+
+
+# --- review of PR #25: values a hand-edited file can hold ---
+
+
+@pytest.mark.parametrize("field_name", ["created", "updated", "start", "stop"])
+def test_restore_rejects_a_missing_stamp_naming_the_field(field_name: str):
+    # A hand-edited file can hold null. Only due and date completed may be empty.
+    with pytest.raises(ValueError, match=f"{field_name} must be a date"):
+        Task.restore(**stored(**{field_name: None}))
+
+
+@pytest.mark.parametrize("field_name", ["start", "stop"])
+def test_a_start_or_stop_of_none_is_rejected_naming_the_field(field_name: str):
+    with pytest.raises(ValueError, match=f"{field_name} must be a date"):
+        Task(id=1, name="x", **{field_name: None})  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("bad_id", [0, -5])
+def test_an_id_below_one_is_rejected(bad_id: int):
+    # IDs are "highest existing ID + 1" (D5), so the first one is 1.
+    with pytest.raises(ValueError, match="id must be 1 or more"):
+        Task(id=bad_id, name="x")
+
+
+@pytest.mark.parametrize("bad_id", [0, -5])
+def test_restore_rejects_an_id_below_one(bad_id: int):
+    with pytest.raises(ValueError, match="id must be 1 or more"):
+        Task.restore(**stored(id=bad_id))
