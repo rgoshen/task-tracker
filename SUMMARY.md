@@ -1,5 +1,29 @@
 # Summary
 
+## [2026-11-01 13:12] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** storage (`src/task_tracker/storage.py`, `tests/test_storage.py`)
+
+**Summary:**
+`load` now rejects a corrupt file with a `ValueError` that names the file and, for a bad task, its position, such as `tasks.json: record 2: name must not be blank`.
+It rejects content that is not JSON (an empty file and binary garbage included), JSON that is not a list, a record that is not an object, a missing field, an unknown field, any value `Task.restore` refuses, and two records with the same `id`. The file is never touched.
+
+**Rationale:**
+A hand-edited `tasks.json` is the realistic source of bad data, and the next `add` would build its ID from it. Every rule is enforced, not only the one the plan names (`not json`), because each describes an impossible file.
+Unknown fields are rejected, not ignored: `save` rewrites the whole file, so ignoring a field would silently delete it on the next save.
+One error type: `JSONDecodeError`, `UnicodeDecodeError`, and the `ValueError` from `Task` are all `ValueError`s, so M3's CLI catches one type for a corrupt file and for `add ""`. A custom exception class waits until M3 needs to tell them apart. A failure to read the file (a directory in its place, no permission) stays an `OSError`, because the content is not at fault.
+A missing file stays `[]`. A missing directory does too, because `load` never creates anything.
+Test-first: 16 new tests failed (the messages had no filename or position, and a non-list or non-object file was not caught), then all 122 passed.
+Mutation check: ten breaks each fail a test (each rule dropped, the position starting at 0, the filename left out, an `OSError` reported as corrupt or as "no file"). One mutant survived and is equivalent: ignoring unknown fields at the final call changes nothing, because the earlier check already raises. The file was verified identical afterwards.
+Coverage of `storage.py` is 100%, and `ruff`, `pyright`, and the CI-version Python linters are clean.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load, step 4
+- Issue: #6
+
 ## [2026-11-01 12:58] Commit Summary
 
 **Change Type:** Feature

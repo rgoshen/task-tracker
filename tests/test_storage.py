@@ -1,9 +1,11 @@
 """Tests for saving tasks to a JSON file and loading them back."""
 
 # Test names state the intent, so per-test docstrings would only repeat them.
-# pylint: disable=missing-function-docstring
+# `== []` pins that load returns a list; `not load(...)` would also pass for None.
+# pylint: disable=missing-function-docstring,use-implicit-booleaness-not-comparison
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -122,3 +124,107 @@ def test_saving_creates_the_missing_directories(tmp_path: Path):
     save([], path)
 
     assert path.is_file()
+
+
+def a_record(**overrides: object) -> dict[str, object]:
+    """A valid stored record; each test changes only the field it is about."""
+    record: dict[str, object] = {
+        "id": 1,
+        "name": "Buy milk",
+        "description": "",
+        "created": "2026-10-10T09:00:00",
+        "updated": "2026-10-10T09:00:00",
+        "due": None,
+        "date_completed": None,
+        "status": "TO_DO",
+        "priority": "LOW",
+        "start": "2026-10-10T09:00:00",
+        "stop": "2026-10-10T09:00:00",
+    }
+    return record | overrides
+
+
+def without(field_name: str) -> dict[str, object]:
+    record = a_record()
+    del record[field_name]
+    return record
+
+
+def contents(*records: object) -> str:
+    return json.dumps(list(records))
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("not json", "not valid JSON"),
+        ("", "not valid JSON"),
+        ('{"id": 1}', "must hold a list"),
+        (contents("a task"), "record 1: must be an object"),
+        (contents(None), "record 1: must be an object"),
+        (contents(without("stop")), "record 1: missing field.*stop"),
+        (contents(a_record(colour="red")), "record 1: unknown field.*colour"),
+        (contents(a_record(id="1")), "record 1: id must be an int"),
+        (contents(a_record(id=True)), "record 1: id must be an int"),
+        (contents(a_record(name="  ")), "record 1: name must not be blank"),
+        (contents(a_record(priority="URGENT")), "record 1: .*URGENT"),
+        (contents(a_record(due="soon")), "record 1: due"),
+        (
+            contents(a_record(updated="2026-10-09T09:00:00")),
+            "record 1: updated must not be before created",
+        ),
+        (
+            contents(a_record(id=1), a_record(id=2), a_record(id=1)),
+            "record 3: duplicate id 1",
+        ),
+    ],
+    ids=[
+        "not-json",
+        "empty-file",
+        "object-instead-of-list",
+        "record-is-text",
+        "record-is-null",
+        "missing-field",
+        "unknown-field",
+        "id-is-text",
+        "id-is-true",
+        "blank-name",
+        "unknown-priority",
+        "bad-date",
+        "updated-before-created",
+        "duplicate-id",
+    ],
+)
+def test_a_corrupt_file_is_rejected_naming_the_file_and_left_unchanged(
+    tmp_path: Path, text: str, message: str
+):
+    path = tmp_path / "tasks.json"
+    path.write_text(text, encoding="utf-8")
+
+    with pytest.raises(ValueError, match=f"{re.escape(str(path))}: {message}"):
+        load(path)
+
+    assert path.read_text(encoding="utf-8") == text
+
+
+def test_a_file_that_is_not_text_is_rejected_naming_the_file(tmp_path: Path):
+    path = tmp_path / "tasks.json"
+    path.write_bytes(b"\xff\xfe\x00 not utf-8 \x80")
+
+    with pytest.raises(ValueError, match=f"{re.escape(str(path))}: not valid JSON"):
+        load(path)
+
+
+def test_the_second_bad_record_is_reported_by_its_position(tmp_path: Path):
+    path = tmp_path / "tasks.json"
+    path.write_text(contents(a_record(), a_record(id=2, name="")), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="record 2: name must not be blank"):
+        load(path)
+
+
+def test_a_file_that_cannot_be_read_is_not_reported_as_corrupt(tmp_path: Path):
+    # Only the content is "corrupt". A directory where the file should be is a
+    # problem with the disk, and the caller sees the operating system's error.
+    with pytest.raises(OSError, match="directory"):
+        load(tmp_path)
