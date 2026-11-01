@@ -118,7 +118,7 @@ Branch `feature/task-storage` (from `develop`). One atomic commit per step, each
 The seven Given/When/Then items are in the M2 section of the plan. In addition:
 
 - `Task.restore` keeps the stored `created` and `updated`, accepts a past date completed (created 2026-10-10, completed 2026-10-15), and raises `ValueError` for each broken timeline link with its own message, as the constructor does.
-- `Task.restore` raises `ValueError` when `updated` is before `created`, when a `DONE` record has no date completed (the constructor would fill in "now"; a stored record must not), when a date completed is in the future, and when a task that is not `DONE` has one.
+- `Task.restore` raises `ValueError` when `updated` is before `created`, when a `DONE` record has no date completed (the constructor would fill in "now"; a stored record must not), and when a task that is not `DONE` has one.
 - `Task.restore` turns ISO 8601 strings into the one datetime form, as the constructor does. The constructor still raises `TypeError` for `created=`.
 - The fails-partway test makes the serializer write some output and then raise, and asserts that the old contents are unchanged and no temp file is left in the directory. A failure that raises before any byte is written passes against a plain write too (audit finding G2). A second test makes `os.replace` raise and checks the same two things.
 - Corrupt file: `not json`, an empty file, JSON that is an object instead of a list, a list of non-objects, a record with a missing field, a record with an unknown field, an `id` that is a string or `true`, and two records with the same `id`. Each raises `ValueError` naming the file, and the file is unchanged.
@@ -126,9 +126,10 @@ The seven Given/When/Then items are in the M2 section of the plan. In addition:
 
 **Risks & Trade-offs:**
 
-- **Rules beyond the plan, proposed 2026-11-01 (veto any).** A stored record must be complete and internally consistent: `updated` not before `created`; `created` and `updated` not later than now (the rule M1 already applies to a date completed); a `DONE` record has a date completed; every field present; no unknown fields; `id` an `int` and not a `bool`; unique IDs.
+- **Rules beyond the plan, proposed 2026-11-01 (veto any).** A stored record must be complete and internally consistent: `updated` not before `created`; a `DONE` record has a date completed; every field present; no unknown fields; `id` an `int` of 1 or more and not a `bool`; no null `created`, `updated`, `start`, or `stop`; unique IDs.
   Unknown fields are rejected, not ignored, because `save` rewrites the whole file (D1), so ignoring them would delete them on the next save.
-  Naive local time (D6) means a clock set back an hour can trip the "not later than now" checks; M1 accepted that for the date completed.
+  Changed on review of PR #25 (2026-11-01): a "not later than now" check on stored stamps was dropped. Naive local time (D6) means a clock set back an hour, a changed time zone, or a fixed clock would make a file that was valid when saved unloadable, and every command that loads first would be locked out of all tasks.
+  The constructor still rejects a future date completed, as M1 did; a hand-edited far-future date on a stored task now loads.
 - **`restore` shares the validation, decided 2026-11-01.** `__post_init__` is split into stamping and validation (step 1). `restore` builds the object without calling `__init__`, assigns the stored fields, and runs the same validation.
   Rejected: hidden `_created` and `_updated` init parameters, which reopen the back door M1 closed, and a second copy of the rules, which drifts apart when M5 changes one.
 - **Conversion lives in `storage.py`, decided 2026-11-01.** Private `_to_record` and `_from_record` functions sit beside `save` and `load`, and the expected field names come from `dataclasses.fields(Task)` so a new field cannot be forgotten. Rejected for now: `Task.to_record()` and `Task.from_record()`, which make the model aware of its storage format. M8 revisits.
@@ -136,11 +137,16 @@ The seven Given/When/Then items are in the M2 section of the plan. In addition:
 - **One error type.** `json.JSONDecodeError` and `UnicodeDecodeError` are `ValueError` subclasses ([JSONDecodeError]), and `Task` already raises `ValueError` for any bad field. The loader catches `ValueError`, adds the file path and the record position, and raises `ValueError`.
   M3's CLI then catches one type for a corrupt file and for `add ""`. A custom exception class waits until M3 needs to tell the cases apart. An `OSError` (unreadable file, a directory in the way) propagates.
 - **Same directory for the temp file.** `os.replace` is atomic on success, but may fail when the source and target are on different filesystems ([os.replace]), so the temp file lives next to the target, not in the system temp directory.
-- **Cleanup.** A failed write must remove its temp file. A process killed between creating the temp file and the replace leaves a stray temp file; it is harmless because `load` reads only the named path.
+- **Cleanup.** A failed write must remove its temp file. A process killed between creating the temp file and the replace leaves a stray temp file; `load` ignores it, but Git does not: the project list often lives in a repository, and `git add .` would pick up the hidden `.tasks.json.*.tmp` file.
+  `README.md` documents the `.gitignore` pattern (review of PR #25, 2026-11-01). Rejected: deleting stale temporary files at the start of `save`, which could remove another process's file in the middle of its save and adds work to every save for a window of milliseconds.
 - **No `fsync`.** Without `flush()` and `os.fsync()` before the replace, a power loss can still leave the old or an empty file ([os.fsync]). Accepted for a personal task list; mark it with a `# ponytail:` comment naming this ceiling and the upgrade path.
-- **Permissions.** A temp file from `tempfile.mkstemp` is readable and writable only by its owner ([tempfile]), so the saved file loses any wider mode the old file had. Fine for a personal list.
+- **Permissions.** A temp file from `tempfile.mkstemp` is readable and writable only by its owner ([tempfile]), so `save` copies the mode of the file it replaces, and a new file stays owner-only (review of PR #25). An atomic save needs write permission on the directory, where a plain write needs it only on the file; that comes with replacing by rename.
 - **Lost updates.** Two processes that load, change, and save at once: the last save wins. No lock, because this is a single-user CLI.
-- **Encoding.** Read and write with an explicit `encoding="utf-8"` so the file does not depend on the machine's locale.
+- **Encoding.** Read and write with an explicit `encoding="utf-8"` so the file does not depend on the machine's locale. `json.dump` uses `ensure_ascii=False`, so non-ASCII text stays readable in the file; text that cannot be encoded fails the save and keeps the old file.
+- **Review of PR #25, decided 2026-11-01.** All eleven threads were accepted, some in part:
+  `restore` takes a record (`restore(**record)`) and reads the field list from the dataclass; a missing or unknown field is a `ValueError` raised by `Task`.
+  Null stamps and an `id` below 1 are rejected. `save` runs every record through the same rules as `load` before it creates a directory or a temporary file, so it cannot replace the last good file with one `load` rejects.
+  `save` follows a symbolic link, keeps an existing file's mode, writes UTF-8 text and whole-second dates. No upper bound on `id`: integers are unbounded and the JSON parser already raises `ValueError` past 4300 digits.
 - **Scope held back.** No version field in the file (D5 kept a bare list), no ID assignment (M3), no sorting (M3 and M4). M8 revisits where the task-to-data conversion lives.
 
 [dataclasses]: https://docs.python.org/3/library/dataclasses.html#mutable-default-values

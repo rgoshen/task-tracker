@@ -70,6 +70,7 @@ Every option has a long and a short form.
 - Project task list: `tasks.json` in the current directory, or in the directory named by `--dir`
 - Global task list: `tasks.json` in `~/.task-tracker/`
 - Dates and times: naive local time, stored as ISO 8601 strings
+- Interrupted saves: a save writes a temporary file next to the list and renames it over the list. If the process is killed at that moment, a hidden `.tasks.json.*.tmp` file is left behind. It is safe to delete, and `.tasks.json.*.tmp` belongs in `.gitignore` when the list lives in a Git repository
 
 ### Developer requirements
 

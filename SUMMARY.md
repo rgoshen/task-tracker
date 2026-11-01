@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-01 14:20] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `docs/implementation-plan.md`, `TODO.md`)
+
+**Summary:**
+Brought the plan, the `TODO.md` entry, and `README.md` in step with the review of PR #25. The plan gains three boxes (a refused save, stored dates not compared with the clock, the saved file's format) and four decisions.
+`TODO.md` drops the rule that stored `created` and `updated` are not later than now, and records the new ones. `README.md` documents the hidden `.tasks.json.*.tmp` file that a killed save can leave and the `.gitignore` pattern for it.
+
+**Rationale:**
+The project `CLAUDE.md` says to keep the plan, the matching issue, and `README.md` together when a decision changes. The earlier docs still listed a rule that the code no longer enforces, which would send the next reader back to the wrong behavior.
+Review of PR #25, thread 11: a process killed between creating the temporary file and the replace leaves a hidden file beside the list, which `git add .` would commit when the list lives in a repository.
+I took the reviewer's minimum option, documenting the pattern. The other option, deleting stale temporary files at the start of `save`, could remove another process's file in the middle of its save, and adds work to every save for a window of milliseconds.
+Issue #6 is regenerated from the plan separately, because it is a change on GitHub.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review thread 11
+
 ## [2026-11-01 14:12] Commit Summary
 
 **Change Type:** Fix

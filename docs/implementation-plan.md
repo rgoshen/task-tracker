@@ -167,11 +167,15 @@ Produces, for later milestones: load (path to list of tasks, empty when the file
 - [x] Given a file containing `not json`, when loading, then a clear error is raised and the file is unchanged.
 - [x] Given `tmp_path / "nested" / "dir" / "tasks.json"` whose directories don't exist, when saving, then the directories are created.
 - [x] Given a stored record that cannot be real, then a `ValueError` names the file and the record's position, such as `tasks.json: record 2: name must not be blank`, and the file is unchanged.
-      That covers: a record that is not an object, a missing or an unknown field, an `id` that is not an `int` (text, `true`), a `description` that is not text, a value `Task.restore` refuses, `updated` before `created`, `created` or `updated` later than now, a `DONE` task without a date completed, and two records with the same `id`.
+      That covers: a record that is not an object, a missing or an unknown field, an `id` that is not an `int` (text, `true`), a `description` that is not text, a value `Task.restore` refuses, `updated` before `created`, a null `created`, `updated`, `start`, or `stop`, an `id` below 1, a `DONE` task without a date completed, and two records with the same `id`.
       Unknown fields are rejected, not ignored, because `save` rewrites the whole file and would delete them.
 - [x] Given an empty file, binary content, or JSON that is not a list, then a `ValueError` names the file. Given a directory where the file should be, then the `OSError` is not reported as a corrupt file. Given no file, or a directory that does not exist, then `load` returns `[]` and creates nothing.
 - [x] Given a save that fails partway, then a first-time save leaves no file, a failed `os.replace` leaves the old file and no temporary file, and the temporary file is created in the same directory as the target.
       The failure must come after bytes are written (audit finding G2): the test makes `json.dump` write `[{` into the open file and then raise, and was seen failing against a plain overwrite first.
+
+- [x] Given tasks that `load` would reject (a duplicate `id`, or a name blanked after construction), then `save` raises a `ValueError` naming the file and the record before it creates a directory or a temporary file, and the previous file is unchanged.
+- [x] Given stamps or a date completed later than the clock (daylight saving ends, the time zone changes), then `Task.restore` accepts them: only the ordering rules apply to a stored task. The constructor still rejects a future date completed.
+- [x] Given a saved file, then non-ASCII text is written as text, every date as `YYYY-MM-DDTHH:MM:SS`, a symbolic link is followed, and an existing file's mode is kept. A new file is readable and writable by its owner only.
 
 **Think about:**
 
@@ -181,11 +185,17 @@ Produces, for later milestones: load (path to list of tasks, empty when the file
 
 **Decided (2026-11-01):**
 
-- `Task.restore` shares one validation with the constructor: `__post_init__` is split into stamping, `_normalize`, `_fill_in_defaults`, and `_validate`, and `restore` builds the object without `__init__`, then runs `_normalize` and `_validate`. Rejected: hidden `_created` and `_updated` init parameters and a second copy of the rules.
-- The temporary file lives next to the target, because `os.replace` is atomic only within one filesystem, and a `finally` removes it after a failure.
+- `Task.restore` shares one validation with the constructor: `__post_init__` is split into stamping, `_normalize`, `_fill_in_defaults`, and `_validate`, and `restore` builds the object without `__init__`, then runs `_normalize` and `_validate`.
+  It takes the record as keyword arguments and reads the field list from the dataclass (review of PR #25), so a missing or unknown field is a `ValueError` raised by `Task`. Rejected: hidden `_created` and `_updated` init parameters and a second copy of the rules.
+- The temporary file lives next to the target, because `os.replace` is atomic only within one filesystem, and a `finally` removes it after a failure. If the target is a symbolic link, the temporary file lives next to the real file.
 - The task-to-data conversion is two private functions in `storage.py`, with the field names taken from `dataclasses.fields(Task)`. M8 revisits.
 - One error type: every corrupt-file failure is a `ValueError` (`JSONDecodeError` and `UnicodeDecodeError` are subclasses), so M3's CLI catches one type. No custom exception class until M3 needs to tell the cases apart.
 - Known limit: no `fsync` before the replace (a `ponytail:` comment in `storage.py` names the upgrade).
+- Stored dates are not compared with the clock (review of PR #25). Naive local time means a clock set back an hour, a changed time zone, or a fixed clock would make a file that was valid when saved unloadable and lock every command out of all tasks.
+  Only the constructor holds a new task to the clock. A hand-edited far-future date on a stored task now loads.
+- `save` runs every record through the rules `load` applies, before it creates anything (review of PR #25), so it cannot replace the last good file with one `load` rejects.
+- A save killed between creating the temporary file and the replace leaves a hidden `.tasks.json.*.tmp` file. `README.md` documents the `.gitignore` pattern. Rejected: deleting stale temporary files at the start of `save`, which could remove another process's file mid-save.
+- An atomic save needs write permission on the directory, where a plain write needs it only on the file. That comes with replacing by rename.
 - Audit findings addressed: G2 (a test that passes against a non-atomic save) and G3 (corrupt file handling).
 
 ### M3. First slice: add and list
