@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-01 12:20] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** planning (`TODO.md`)
+
+**Summary:**
+Added the plan for M2 save and load: seven commits in order, the tests beyond the plan's seven boxes, and the risks. It records two decisions made today. `Task.restore` shares one validation with the constructor, and the task-to-data conversion lives in `storage.py`.
+
+**Rationale:**
+The project rules ask for a `TODO.md` entry before any code.
+The entry adds rules for a stored record that the plan does not state: `updated` not before `created`, neither later than now, a `DONE` record has a date completed, every field present and none unknown, `id` an `int` and not a `bool`, and unique IDs. Unknown fields are rejected because `save` rewrites the whole file, so ignoring them would delete them on the next save.
+Alternatives rejected: hidden `_created` and `_updated` init parameters (a back door for a false history), a second copy of the rules inside `restore` (they drift apart), and `to_record` and `from_record` methods on `Task` (the model would know its storage format).
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+
 ## [2026-10-31 14:51] Commit Summary
 
 **Change Type:** Docs

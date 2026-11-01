@@ -97,5 +97,55 @@ Test-first on `feature/task-model`, in this order, one commit each.
 - A planned future `start` needs `stop` to be at least that late, so the default `stop` follows `start`.
 - A `start` after `created` is allowed, including a date in the future, because only "not before created" was asked.
 
+## [2026-11-01] Feature: M2 Save and load
+
+**Objective:**
+Save a list of tasks to a JSON file and load it back unchanged, so M3 can build `add` and `list` on top. Covers issue #6 and the M2 section of `docs/implementation-plan.md`.
+Produces `load(path)` (a list of tasks, empty when the file is missing), `save(tasks, path)` (atomic, creating parent directories), and `Task.restore()`, the one deliberate way to rebuild a task with its stored `created` and `updated`. No CLI yet. You write the tests and the code; this entry fixes the order and the traps.
+
+**Approach:**
+Branch `feature/task-storage` (from `develop`). One atomic commit per step, each with its own `SUMMARY.md` entry. New module `src/task_tracker/storage.py` with tests in `tests/test_storage.py`; the `Task.restore` tests go in `tests/test_task.py`. Standard library only, so `uv.lock` does not change.
+
+1. Refactor while green: separate the stamping of `created` and `updated` from the validation in `Task.__post_init__`, so a second entry point can run the same rules. The existing tests are the safety net, so no new test. Commit: `refactor(task): separate stamping from validation`.
+2. `Task.restore(...)`, test-first. It takes every field, including `created`, `updated`, `start`, and `stop`, and applies the constructor's rules with two differences: it never fills in a missing value (a stored record is complete), and the timeline is checked against the stored `created`, not the clock. Commit: `feat(task): add Task.restore for stored records`.
+3. `load` of a missing file (`[]`, nothing created), then `save` and `load` together for the round trip, creating missing directories. The round trip needs `restore` because task 2 is `DONE` with a past date completed. Commit: `feat(storage): save and load tasks`.
+4. `load` strictness: bad JSON, wrong shape, missing or unknown fields, a wrong `id` type, duplicate IDs. Every error names the file and the record. Commit: `feat(storage): reject a corrupt task file`.
+5. Atomic `save`. Write the fails-partway test while `save` is still a plain write and watch it fail because the old contents are gone. Then write a temp file in the target's own directory and `os.replace` it over the target, removing the temp file on failure. Once green, break the atomic code on purpose and confirm the test goes red again. Commit: `feat(storage): write the task file atomically`.
+6. Docs: tick the M2 boxes in the plan and issue #6, record the extra rules below in both, and add audit findings G2 and G3 to the plan (queued until PR #23 merged). Commit: `docs(plan): record the M2 rules`.
+7. Open a PR into `develop`. Done when the tests pass locally and in CI, coverage on changed code is at least 80%, and the CI-version Python linters and the Markdown linters are clean locally.
+
+**Tests:**
+The seven Given/When/Then items are in the M2 section of the plan. In addition:
+
+- `Task.restore` keeps the stored `created` and `updated`, accepts a past date completed (created 2026-10-10, completed 2026-10-15), and raises `ValueError` for each broken timeline link with its own message, as the constructor does.
+- `Task.restore` raises `ValueError` when `updated` is before `created`, when a `DONE` record has no date completed (the constructor would fill in "now"; a stored record must not), when a date completed is in the future, and when a task that is not `DONE` has one.
+- `Task.restore` turns ISO 8601 strings into the one datetime form, as the constructor does. The constructor still raises `TypeError` for `created=`.
+- The fails-partway test makes the serializer write some output and then raise, and asserts that the old contents are unchanged and no temp file is left in the directory. A failure that raises before any byte is written passes against a plain write too (audit finding G2). A second test makes `os.replace` raise and checks the same two things.
+- Corrupt file: `not json`, an empty file, JSON that is an object instead of a list, a list of non-objects, a record with a missing field, a record with an unknown field, an `id` that is a string or `true`, and two records with the same `id`. Each raises `ValueError` naming the file, and the file is unchanged.
+- Saving `[]` writes a file that loads as `[]`.
+
+**Risks & Trade-offs:**
+
+- **Rules beyond the plan, proposed 2026-11-01 (veto any).** A stored record must be complete and internally consistent: `updated` not before `created`; `created` and `updated` not later than now (the rule M1 already applies to a date completed); a `DONE` record has a date completed; every field present; no unknown fields; `id` an `int` and not a `bool`; unique IDs.
+  Unknown fields are rejected, not ignored, because `save` rewrites the whole file (D1), so ignoring them would delete them on the next save.
+  Naive local time (D6) means a clock set back an hour can trip the "not later than now" checks; M1 accepted that for the date completed.
+- **`restore` shares the validation, decided 2026-11-01.** `__post_init__` is split into stamping and validation (step 1). `restore` builds the object without calling `__init__`, assigns the stored fields, and runs the same validation.
+  Rejected: hidden `_created` and `_updated` init parameters, which reopen the back door M1 closed, and a second copy of the rules, which drifts apart when M5 changes one.
+- **Conversion lives in `storage.py`, decided 2026-11-01.** Private `_to_record` and `_from_record` functions sit beside `save` and `load`, and the expected field names come from `dataclasses.fields(Task)` so a new field cannot be forgotten. Rejected for now: `Task.to_record()` and `Task.from_record()`, which make the model aware of its storage format. M8 revisits.
+- **`restore` is a door.** The constructor stays closed to `created` and `updated` (M1 owner decision), so `restore` must not become a general way to skip validation. It runs the same checks and differs only in where the two stamps come from.
+- **One error type.** `json.JSONDecodeError` and `UnicodeDecodeError` are `ValueError` subclasses ([JSONDecodeError]), and `Task` already raises `ValueError` for any bad field. The loader catches `ValueError`, adds the file path and the record position, and raises `ValueError`.
+  M3's CLI then catches one type for a corrupt file and for `add ""`. A custom exception class waits until M3 needs to tell the cases apart. An `OSError` (unreadable file, a directory in the way) propagates.
+- **Same directory for the temp file.** `os.replace` is atomic on success, but may fail when the source and target are on different filesystems ([os.replace]), so the temp file lives next to the target, not in the system temp directory.
+- **Cleanup.** A failed write must remove its temp file. A process killed between creating the temp file and the replace leaves a stray temp file; it is harmless because `load` reads only the named path.
+- **No `fsync`.** Without `flush()` and `os.fsync()` before the replace, a power loss can still leave the old or an empty file ([os.fsync]). Accepted for a personal task list; mark it with a `# ponytail:` comment naming this ceiling and the upgrade path.
+- **Permissions.** A temp file from `tempfile.mkstemp` is readable and writable only by its owner ([tempfile]), so the saved file loses any wider mode the old file had. Fine for a personal list.
+- **Lost updates.** Two processes that load, change, and save at once: the last save wins. No lock, because this is a single-user CLI.
+- **Encoding.** Read and write with an explicit `encoding="utf-8"` so the file does not depend on the machine's locale.
+- **Scope held back.** No version field in the file (D5 kept a bare list), no ID assignment (M3), no sorting (M3 and M4). M8 revisits where the task-to-data conversion lives.
+
 [dataclasses]: https://docs.python.org/3/library/dataclasses.html#mutable-default-values
 [pytest exit codes]: https://docs.pytest.org/en/stable/reference/exit-codes.html
+[JSONDecodeError]: https://docs.python.org/3/library/json.html#json.JSONDecodeError
+[os.replace]: https://docs.python.org/3/library/os.html#os.replace
+[os.fsync]: https://docs.python.org/3/library/os.html#os.fsync
+[tempfile]: https://docs.python.org/3/library/tempfile.html#tempfile.mkstemp
