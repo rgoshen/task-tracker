@@ -1,5 +1,23 @@
 # Summary
 
+## [2026-11-01 14:17] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** planning (`TODO.md`)
+
+**Summary:**
+Added the M3 entry to `TODO.md`: objective, a five-step approach, the tests beyond the plan's nine, and the decisions the plan left to the implementer. Those are the two exit codes, a single `except` in `main`, how `--due` is parsed, priority rank from the enum's definition order, what `add` and `list` leave out (Q3 and `description`), the shape of a list line, and where the ID and sort rules live.
+
+**Rationale:**
+The global rules say the plan is written before any code. The M3 "Think about" list asks seven questions, and this records an answer to each so the tests that follow have something to be wrong against. I did not stop to ask first: every answer is cheap to change in M4 to M8 and none touches stored data.
+Pushing and the pull request are left to the project owner, as the entry says.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M3 First slice, add and list
+- Issue: #7
+
 ## [2026-11-01 14:30] Commit Summary
 
 **Change Type:** Fix

@@ -149,6 +149,40 @@ The seven Given/When/Then items are in the M2 section of the plan. In addition:
   `save` follows a symbolic link, keeps an existing file's mode, writes UTF-8 text and whole-second dates. No upper bound on `id`: integers are unbounded and the JSON parser already raises `ValueError` past 4300 digits.
 - **Scope held back.** No version field in the file (D5 kept a bare list), no ID assignment (M3), no sorting (M3 and M4). M8 revisits where the task-to-data conversion lives.
 
+## [2026-11-01] Feature: M3 First slice, add and list
+
+**Objective:**
+Make `uv run task-tracker add "Buy milk"` and `uv run task-tracker list` work end-to-end against `./tasks.json` in the current directory, so the first real command exists before the other five. Covers issue #7 and the M3 section of `docs/implementation-plan.md`. Features 3 and 5 of `README.md`, project-level list only: `--dir` and `--global` arrive in M7.
+
+**Approach:**
+Branch `feature/add-and-list` (from `develop`). Test-first, one atomic commit per step, each with its own `SUMMARY.md` entry. New module `src/task_tracker/cli.py` with tests in `tests/test_cli.py`. `main(argv)` moves out of `__init__.py`, which reexports it so the `task_tracker:main` entry point is unchanged. Standard library only, so `uv.lock` does not change.
+
+1. `add`: parse with argparse subcommands, take the next ID from the stored tasks, save, and print the new ID. Commit: `feat(cli): add the add command`.
+2. `list`: current tasks only, sorted by due date (undated last), then priority rank, then ID. Commit: `feat(cli): add the list command`.
+3. Bad input and failures: a one-line error and a nonzero exit instead of a traceback. Commit: `feat(cli): report errors without a traceback`.
+4. Docs: tick the M3 boxes in the plan and issue #7 and record the decisions below in both. Commit: `docs(plan): record the M3 decisions`.
+5. Done when the tests pass locally, coverage on changed code is at least 80%, the CI-version linters are clean locally, and the two commands work in a scratch directory. Pushing and opening the PR into `develop` wait for the project owner.
+
+**Tests:**
+The nine Given/When/Then items are in the M3 section of the plan. In addition:
+
+- `add` takes ID highest + 1, not the count: with stored IDs 1 and 5 the new task is 6 (D5).
+- Two current tasks with the same due date and priority list the lower ID first, even when the file holds them in the other order.
+- `list` with nothing current prints a message that names the file it read (D2) and exits 0.
+- A directory where `tasks.json` should be gives a one-line error and a nonzero exit, not a traceback (the `OSError` that M2 left for the CLI).
+- A corrupt file leaves `add` without a new task and the file unchanged.
+
+**Risks & Trade-offs:**
+
+- **Exit codes, decided 2026-11-01.** 2 for a bad option value, which argparse reports itself (an unknown priority, an unparsable `--due`). 1 for everything else that goes wrong at runtime: a blank name, a corrupt file, an unreadable file. Both print one error line on standard error and never a traceback. The plan only requires nonzero for the second group.
+- **One `except` in `main`, decided 2026-11-01.** It catches `ValueError` (from `Task` and `load`) and `OSError` and prints `task-tracker: error: <message>`. M2 already made every corrupt-file failure a `ValueError` naming the file, so no custom exception class is needed yet.
+- **`--due` is parsed by argparse with `datetime.fromisoformat`.** A malformed value exits 2 as the plan says. A value with a UTC offset parses, then `Task` refuses it as not naive local time (D6), so that case exits 1 with a message naming `due`. Rejected: a second parser in the CLI that repeats the rules in `Task`.
+- **Priority rank comes from the enum's definition order** (`CRITICAL` first), not from the string value, which sorts `MEDIUM` after `LOW` (Review Focus 1). A test pins the order, so reordering the enum fails loudly.
+- **Q3 and `description`, decided 2026-11-01.** `add` does not set `start`, `stop`, or `description`, and `list` does not show `start` or `stop`: they stay plain fields with their defaults until a milestone needs them. Cheap to add later; each would need a short flag the options table does not assign yet.
+- **List line.** One line per task: ID, status, priority, due date (`-` when there is none), name. No header, no color. Every datetime prints through `isoformat()`, the form M2 stores.
+- **Where the rules live.** "Highest ID + 1" and the sort key are private functions in `cli.py`. M4 reuses the sort key for the first half of `list --all`. M8 revisits the module layout.
+- **Known limit.** Two processes running `add` at once can both take the same ID and the last save wins. No lock, as in M2.
+
 [dataclasses]: https://docs.python.org/3/library/dataclasses.html#mutable-default-values
 [pytest exit codes]: https://docs.pytest.org/en/stable/reference/exit-codes.html
 [JSONDecodeError]: https://docs.python.org/3/library/json.html#json.JSONDecodeError
