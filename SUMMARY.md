@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-01 12:58] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** storage (`src/task_tracker/storage.py`, `tests/test_storage.py`)
+
+**Summary:**
+Added `load(path)` and `save(tasks, path)`. `save` writes a JSON list of plain records and creates the directories above the file. `load` rebuilds each task with `Task.restore`, and a file that does not exist is an empty list: nothing is created, not even the directory.
+The file holds one object per task with all eleven fields. Dates are ISO 8601 text (D6), the enums are their labels, and a missing value is `null`.
+
+**Rationale:**
+This is the round trip M3 builds on. The conversion between a task and plain data is two private functions in `storage.py`, as decided in `TODO.md`. The field names come from `dataclasses.fields(Task)`, so a new field cannot be forgotten.
+`save` is a plain write for now. The next commits make `load` strict (step 4) and `save` atomic (step 5), each test-first. The plain version is deliberate: the fails-partway test must be seen failing against it before the atomic version exists, or it proves nothing (audit finding G2).
+`load` opens the file and catches `FileNotFoundError` instead of checking `exists()` first, so there is no gap between the check and the open.
+The round-trip test builds its second task (`DONE`, completed 2026-10-15) with `Task.restore`, because the constructor cannot build a task done in the past.
+Test-first: collection failed (no module), then all 105 tests passed. Mutation check: six breaks (no `mkdir`, `mkdir` without `parents`, no trailing newline, a missing file no longer giving `[]`, dates not converted, a field dropped) each fail a test, and the file was verified identical afterwards. Coverage of `storage.py` is 100%, and `ruff`, `pyright`, and the CI-version Python linters are clean.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load, step 3
+- Issue: #6
+
 ## [2026-11-01 12:41] Commit Summary
 
 **Change Type:** Feature
