@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-01 13:42] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** task, storage (`src/task_tracker/task.py`, `src/task_tracker/storage.py`, tests)
+
+**Summary:**
+`Task.restore` now takes the stored record as keyword arguments (`restore(**record)`) and reads the field list from the dataclass, so the 11-parameter copy of it is gone. It raises `ValueError` for a missing field and for an unknown one, and `storage._from_record` defers to it, so `_FIELD_NAMES` is gone too. Behavior is unchanged except that the two errors are now raised by the model.
+The remaining pylint suppressions now have their reason beside them.
+
+**Rationale:**
+Review of PR #25, threads 8 and 9. Adding a `Task` field needed three edits (the dataclass, the `restore` signature, and `_FIELD_NAMES`); it now needs one. The old shape also let a forgotten parameter surface as `TypeError: unexpected keyword`, which the loader does not catch.
+Cost accepted: `restore` no longer documents its fields in its signature, and pyright cannot check a misspelled keyword at a call site. Every caller already passes a dictionary, and the dataclass is the one list.
+The two `# pylint: disable=protected-access` lines call `_normalize` and `_validate` from a classmethod of the same class. The reason sits in the comment directly above them, the way `DTZ001` is explained in `task.py`. The `redefined-builtin` and `too-many-arguments` suppressions disappeared with the old signature. One new `disable-next` in a test carries its reason on the line above it.
+Test-first: three tests failed with the raw `TypeError`s, then all 143 passed. The first mutation check found a real gap: a record without `description` would have been filled in with a default and no test noticed, because the test only dropped `stop` and `due`. A test now drops each of the eleven fields in turn.
+Mutation check: eight breaks (each check dropped, an unknown field ignored, a field never assigned, `_normalize` or `_validate` skipped, one dataclass field ignored, a default filled in for a missing field) each fail a test (154 tests), and the file was verified identical afterwards.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review threads 8 and 9
+
 ## [2026-11-01 13:35] Commit Summary
 
 **Change Type:** Fix

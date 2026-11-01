@@ -334,40 +334,43 @@ def test_restore_accepts_a_task_that_was_done_in_the_past():
     assert task.date_completed == STORED_DONE
 
 
-def test_restore_needs_every_field_and_fills_none_in():
+def test_restore_takes_keyword_arguments_only():
     with pytest.raises(TypeError):
-        # The missing arguments are the point of the test.
-        Task.restore(1, "Buy milk")  # type: ignore[call-arg]  # pylint: disable=missing-kwoa
+        # Passing positional arguments is the point of the test.
+        # pylint: disable-next=too-many-function-args
+        Task.restore(1, "Buy milk")  # type: ignore[call-arg, misc]
 
 
-def test_restore_turns_iso_text_into_the_one_datetime_form():
-    task = Task.restore(
-        **stored(
-            created="2026-10-10T09:00:00",
-            updated="2026-10-10 09:00:00",
-            start="2026-10-10T09:00:00",
-            stop="2026-10-10T09:00:00",
-            due="2026-11-02",
-        )
-    )
+@pytest.mark.parametrize(
+    ("missing", "message"),
+    [(["stop"], "missing field.*stop"), (["stop", "due"], "missing field.*due, stop")],
+    ids=["one", "several-in-order"],
+)
+def test_restore_needs_every_field_and_fills_none_in(missing: list[str], message: str):
+    # A stored record is complete, so a missing value is a corrupt record. It is a
+    # ValueError like every other bad field, so the loader catches one type.
+    record = stored()
+    for name in missing:
+        del record[name]
 
-    assert task.created == task.updated == task.start == task.stop == STORED_CREATED
-    assert task.due == NAIVE_DAY
+    with pytest.raises(ValueError, match=message):
+        Task.restore(**record)
 
 
-def test_restore_turns_labels_into_enum_members():
-    task = Task.restore(
-        **stored(
-            status="DONE",
-            priority="HIGH",
-            updated=STORED_DONE,
-            stop=STORED_DONE,
-            date_completed=STORED_DONE,
-        )
-    )
+@pytest.mark.parametrize("field_name", list(stored()))
+def test_restore_requires_each_field_in_turn(field_name: str):
+    # Every field is required, including the ones that have a default in __init__.
+    record = stored()
+    del record[field_name]
 
-    assert task.status is Status.DONE
-    assert task.priority is Priority.HIGH
+    with pytest.raises(ValueError, match=f"missing field.*{field_name}"):
+        Task.restore(**record)
+
+
+def test_restore_rejects_a_field_the_task_does_not_have():
+    # `save` rewrites the whole record, so a field ignored here would be deleted.
+    with pytest.raises(ValueError, match="unknown field.*colour"):
+        Task.restore(**stored(colour="red"))
 
 
 @pytest.mark.parametrize("field_name", ["created", "updated"])

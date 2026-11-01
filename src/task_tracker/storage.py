@@ -10,8 +10,6 @@ from typing import Any
 
 from task_tracker.task import Task
 
-_FIELD_NAMES = {field.name for field in fields(Task)}
-
 
 def _to_record(task: Task) -> dict[str, Any]:
     return {
@@ -40,13 +38,6 @@ def _read_records(path: Path) -> list[Any]:
 def _from_record(record: object) -> Task:
     if not isinstance(record, dict):
         raise ValueError("must be an object")  # noqa: TRY004
-    missing = _FIELD_NAMES - record.keys()
-    if missing:
-        raise ValueError(f"missing field(s): {', '.join(sorted(missing))}")
-    unknown = record.keys() - _FIELD_NAMES
-    if unknown:
-        # Ignoring a field would delete it on the next save, which rewrites the file.
-        raise ValueError(f"unknown field(s): {', '.join(sorted(unknown))}")
     return Task.restore(**record)
 
 

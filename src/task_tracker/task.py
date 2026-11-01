@@ -1,8 +1,8 @@
 """The task record."""
 
-from dataclasses import KW_ONLY, dataclass, field
+from dataclasses import KW_ONLY, dataclass, field, fields
 from datetime import date, datetime, time
-from typing import Self
+from typing import Any, Self
 
 from task_tracker.priority import Priority
 from task_tracker.status import Status
@@ -84,41 +84,23 @@ class Task:  # pylint: disable=too-many-instance-attributes
             raise ValueError("date completed must not be in the future")
 
     @classmethod
-    # `id` is the field's name, so `restore(**record)` needs the parameter to match.
-    # A stored record is complete, so every field is required and none has a default.
-    def restore(  # pylint: disable=redefined-builtin,too-many-arguments
-        cls,
-        id: int,
-        name: str,
-        *,
-        description: str,
-        created: datetime,
-        updated: datetime,
-        due: datetime | None,
-        date_completed: datetime | None,
-        status: Status,
-        priority: Priority,
-        start: datetime,
-        stop: datetime,
-    ) -> Self:
+    def restore(cls, **record: Any) -> Self:
         """Rebuild a task from a stored record, keeping its stored stamps.
 
         The constructor stamps `created` and `updated` with the clock, so it cannot
         build a task that already existed. This runs every other rule the
-        constructor does, and fills nothing in: a record without a value is invalid.
+        constructor does and fills nothing in, so a record must hold every field
+        and no other. The field list is the dataclass's own.
         """
+        names = {field.name for field in fields(cls)}
+        if missing := names - record.keys():
+            raise ValueError(f"missing field(s): {', '.join(sorted(missing))}")
+        if unknown := record.keys() - names:
+            raise ValueError(f"unknown field(s): {', '.join(sorted(unknown))}")
         task = cls.__new__(cls)
-        task.id = id
-        task.name = name
-        task.description = description
-        task.created = created
-        task.updated = updated
-        task.due = due
-        task.date_completed = date_completed
-        task.status = status
-        task.priority = priority
-        task.start = start
-        task.stop = stop
+        for name in names:
+            setattr(task, name, record[name])
+        # Same class: restore is a classmethod of Task, so these steps are its own.
         task._normalize()  # pylint: disable=protected-access
         task._validate()  # pylint: disable=protected-access
         return task
