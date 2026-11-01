@@ -251,6 +251,22 @@ def test_a_file_that_cannot_be_read_is_not_reported_as_corrupt(tmp_path: Path):
     assert not isinstance(raised.value, ValueError)
 
 
+@pytest.fixture(name="replacements")
+def _replacements(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[tuple[Path, Path]]:
+    # Records every os.replace call as (source, destination) and still performs it.
+    moves: list[tuple[Path, Path]] = []
+    real_replace = os.replace
+
+    def spy(source: Any, destination: Any) -> None:
+        moves.append((Path(source), Path(destination)))
+        real_replace(source, destination)
+
+    monkeypatch.setattr(os, "replace", spy)
+    return moves
+
+
 def files_in(directory: Path) -> list[str]:
     return sorted(entry.name for entry in directory.iterdir())
 
@@ -310,24 +326,15 @@ def test_a_save_that_cannot_replace_the_file_leaves_the_old_file_and_no_temp_fil
 
 
 def test_the_new_file_is_built_next_to_the_target_before_it_replaces_it(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, replacements: list[tuple[Path, Path]]
 ):
     # os.replace is atomic only within one filesystem, and the system temp
     # directory is often on another.
     path = tmp_path / "tasks.json"
-    moves: list[tuple[Path, Path]] = []
-    real_replace = os.replace
-
-    def spy(source: Any, destination: Any) -> None:
-        moves.append((Path(source), Path(destination)))
-        real_replace(source, destination)
-
-    monkeypatch.setattr(os, "replace", spy)
-
     save([], path)
 
-    assert len(moves) == 1
-    source, destination = moves[0]
+    assert len(replacements) == 1
+    source, destination = replacements[0]
     assert destination == path
     assert source.parent == path.parent
     assert source != destination
@@ -460,7 +467,7 @@ def test_saving_through_a_symlink_updates_the_file_it_points_to(
 
 
 def test_saving_through_a_symlink_builds_the_new_file_beside_the_real_one(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, replacements: list[tuple[Path, Path]]
 ):
     # os.replace is atomic only within one filesystem, and a link can point to
     # another one, so the temporary file belongs next to the file it replaces.
@@ -471,19 +478,11 @@ def test_saving_through_a_symlink_builds_the_new_file_beside_the_real_one(
         link.symlink_to(real)
     except OSError:
         pytest.skip("this system does not allow symbolic links")
-    moves: list[tuple[Path, Path]] = []
-    real_replace = os.replace
-
-    def spy(source: Any, destination: Any) -> None:
-        moves.append((Path(source), Path(destination)))
-        real_replace(source, destination)
-
-    monkeypatch.setattr(os, "replace", spy)
-
+    replacements.clear()  # the setup save above was recorded too
     save([], link)
 
-    assert len(moves) == 1
-    source, destination = moves[0]
+    assert len(replacements) == 1
+    source, destination = replacements[0]
     assert destination == real
     assert source.parent == real.parent
 

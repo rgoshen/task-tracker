@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-01 14:30] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_storage.py`)
+
+**Summary:**
+Two tests each carried the same ten-line `os.replace` spy. It is now one fixture, `replacements`, that records every call as (source, destination) and still performs it. No product code changed, and the number of tests is the same (165).
+
+**Rationale:**
+The `Lint` job on PR #25 failed after the review fixes were pushed. Only one linter failed: JSCPD, the duplicate-code detector in super-linter, with threshold 0, reported the duplicated spy (`tests/test_storage.py` lines 318 to 327 and 474 to 483). I introduced the copy in the symlink commit by pasting the spy from the earlier temporary-file test.
+My local mirror of the CI linters covered ruff, black, isort, flake8, pylint, mypy, markdownlint, textlint, and Prettier, but not JSCPD, so this was invisible until CI ran. `jscpd` 5.0.10 with super-linter's own config is now part of the local checks. Run against the pushed version it reports exactly what CI did (1 clone, 9 duplicated lines, 71 tokens), and against this change it reports 0 clones.
+One consequence of sharing the fixture: it patches `os.replace` before the test body runs, so the setup `save` in the symlink test is recorded too. That test clears the list before the call it checks.
+Tests: 165 pass before and after; the spy tests were run in both shapes.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, failed `Lint` check after the review fixes
+
 ## [2026-11-01 14:20] Commit Summary
 
 **Change Type:** Docs
