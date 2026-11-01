@@ -80,6 +80,17 @@ Every option has a long and a short form.
 
 ## Commands
 
+### Adding and listing tasks
+
+```bash
+uv run task-tracker add "Pay rent" --priority HIGH --due 2026-11-02
+uv run task-tracker list
+```
+
+- `add NAME` stores a task in `tasks.json` in the current directory and prints its ID. `--priority` (`-p`) takes `CRITICAL`, `HIGH`, `MEDIUM`, or `LOW` and defaults to `LOW`. `--due` (`-D`) takes `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SS`.
+- `list` shows the current tasks, one per line: ID, status, priority, due date (`-` when there is none), and name. The earliest due date comes first and tasks without one come last, then the highest priority, then the lowest ID. When nothing is current it says so and names the file it read.
+- Exit codes: 0 on success, 2 for a bad option value, 1 for anything else that goes wrong (a blank name, a corrupt or unreadable task file). An error prints one line on standard error and never a traceback.
+
 ### Running GitHub Actions locally
 
 > NOTE: Must have [act](https://github.com/nektos/act) installed already

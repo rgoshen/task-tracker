@@ -1,5 +1,23 @@
 # Summary
 
+## [2026-11-01 14:28] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `README.md`)
+
+**Summary:**
+Ticked the nine M3 boxes in the plan and added five that record what was built beyond them: the highest-ID-plus-one rule, the ID tie-break, the empty-list message, the shape of a list line, and the two failure cases. Added a "Decided (2026-11-01)" list to M3 and closed the half of Q3 that M3 owned. `README.md` gains a short section on `add` and `list` with the exit codes.
+
+**Rationale:**
+The project `CLAUDE.md` says to change the plan, the matching issue, and `README.md` together when a decision changes. The usage section only describes behavior I ran in a scratch directory: the three exit codes, the sort order, and the empty-list message.
+Issue #7 still shows the old checklist. It is a change on GitHub, so it waits for the project owner along with the push and the pull request.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M3 First slice, add and list
+- Issue: #7
+
 ## [2026-11-01 14:27] Commit Summary
 
 **Change Type:** Feature
