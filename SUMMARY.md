@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-01 13:32] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`, `tests/test_storage.py`)
+
+**Summary:**
+A `null` in `created`, `updated`, `start`, or `stop` now raises `ValueError: <field> must be a date or ISO 8601 text`, and an `id` below 1 raises `ValueError: id must be 1 or more`. Only `due` and `date_completed` may be empty.
+
+**Rationale:**
+Review of PR #25, threads 1 and 7. A hand-edited `tasks.json` with `"created": null` made `load` fail with a raw `TypeError` from a comparison, not the `ValueError` naming the file and record, and M3's CLI catches only `ValueError`. `Task(start=None)` did the same. An `id` of 0 or -5 loaded without complaint, although IDs are "highest existing ID + 1" (D5) and the first is 1.
+No upper bound on `id` was added: Python integers are unbounded, `highest + 1` works for any size, and the JSON parser already raises a `ValueError` for an integer over 4300 digits.
+My earlier mutation check never dropped the `None` handling, so it could not have found the first gap; the new one drops each field from the allowed-empty list in turn.
+Test-first: 16 new tests failed (10 raw `TypeError`s, 6 `DID NOT RAISE`), then all 143 passed. Mutation check: ten breaks (each of the four stamps allowed to be null, `due` and `date_completed` no longer allowed, the ID bound dropped, off-by-one in each direction) each fail a test. The file was verified identical afterwards.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review threads 1 and 7
+
 ## [2026-11-01 13:48] Commit Summary
 
 **Change Type:** Docs

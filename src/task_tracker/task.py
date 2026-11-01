@@ -13,6 +13,8 @@ from task_tracker.status import Status
 # chose naive local time on purpose, so DTZ001 does not apply here.
 _UNSET = datetime(1, 1, 1)  # noqa: DTZ001
 _DATETIME_FIELDS = ("created", "updated", "due", "date_completed", "start", "stop")
+# The only datetimes that may be empty. The others take part in the timeline.
+_OPTIONAL_DATETIMES = ("due", "date_completed")
 
 
 def _now() -> datetime:
@@ -122,6 +124,8 @@ class Task:  # pylint: disable=too-many-instance-attributes
         # bool is an int in Python, and JSON `true` must not pass for an ID.
         if isinstance(self.id, bool) or not isinstance(self.id, int):
             raise ValueError("id must be an int")  # noqa: TRY004
+        if self.id < 1:
+            raise ValueError("id must be 1 or more")
         if not isinstance(self.name, str):
             raise ValueError("name must be a string")  # noqa: TRY004
         self.name = self.name.strip()
@@ -133,8 +137,12 @@ class Task:  # pylint: disable=too-many-instance-attributes
         self.priority = Priority(self.priority)
         for name in _DATETIME_FIELDS:
             value = getattr(self, name)
-            if value is not _UNSET:
-                setattr(self, name, _as_naive_datetime(name, value))
+            if value is _UNSET:
+                continue
+            if value is None and name not in _OPTIONAL_DATETIMES:
+                # ValueError, not TypeError: a null in the file must reach the loader.
+                raise ValueError(f"{name} must be a date or ISO 8601 text")
+            setattr(self, name, _as_naive_datetime(name, value))
 
     def _fill_in_defaults(self, now: datetime) -> None:
         if self.status is Status.DONE and self.date_completed is None:

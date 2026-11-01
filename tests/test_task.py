@@ -510,3 +510,32 @@ def test_a_description_that_is_not_text_is_rejected(bad_description: object):
 def test_restore_rejects_a_description_that_is_not_text(bad_description: object):
     with pytest.raises(ValueError, match="description must be a string"):
         Task.restore(**stored(description=bad_description))
+
+
+# --- review of PR #25: values a hand-edited file can hold ---
+
+
+@pytest.mark.parametrize("field_name", ["created", "updated", "start", "stop"])
+def test_restore_rejects_a_missing_stamp_naming_the_field(field_name: str):
+    # A hand-edited file can hold null. Only due and date completed may be empty.
+    with pytest.raises(ValueError, match=f"{field_name} must be a date"):
+        Task.restore(**stored(**{field_name: None}))
+
+
+@pytest.mark.parametrize("field_name", ["start", "stop"])
+def test_a_start_or_stop_of_none_is_rejected_naming_the_field(field_name: str):
+    with pytest.raises(ValueError, match=f"{field_name} must be a date"):
+        Task(id=1, name="x", **{field_name: None})  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("bad_id", [0, -5])
+def test_an_id_below_one_is_rejected(bad_id: int):
+    # IDs are "highest existing ID + 1" (D5), so the first one is 1.
+    with pytest.raises(ValueError, match="id must be 1 or more"):
+        Task(id=bad_id, name="x")
+
+
+@pytest.mark.parametrize("bad_id", [0, -5])
+def test_restore_rejects_an_id_below_one(bad_id: int):
+    with pytest.raises(ValueError, match="id must be 1 or more"):
+        Task.restore(**stored(id=bad_id))
