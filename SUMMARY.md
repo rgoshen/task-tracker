@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-01 14:12] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_storage.py`)
+
+**Summary:**
+The test that a directory in place of the file is not reported as a corrupt file no longer matches the operating system's error text. It asserts an `OSError` and that the error is not a `ValueError`.
+
+**Rationale:**
+Review of PR #25, thread 10. `open()` on a directory raises `IsADirectoryError: ... Is a directory` on macOS and Linux and `PermissionError: ... Permission denied` on Windows, so `match="directory"` failed there although `load` behaved correctly. I confirmed it by simulating the Windows wording: the old assertion failed on the text alone, and the new one passed.
+The `ValueError` check is the part of the old test that mattered: `pytest.raises(OSError)` alone would already fail for a `ValueError`, but the explicit assertion states the intent, that a disk problem is not reported as a corrupt file. A targeted mutation check (an `OSError` reported as corrupt, an `OSError` treated as "no file") fails the test, and the file was verified identical afterwards.
+No product code changed.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review thread 10
+
 ## [2026-11-01 14:05] Commit Summary
 
 **Change Type:** Fix

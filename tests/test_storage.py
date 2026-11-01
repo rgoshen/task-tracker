@@ -242,8 +242,13 @@ def test_the_second_bad_record_is_reported_by_its_position(tmp_path: Path):
 def test_a_file_that_cannot_be_read_is_not_reported_as_corrupt(tmp_path: Path):
     # Only the content is "corrupt". A directory where the file should be is a
     # problem with the disk, and the caller sees the operating system's error.
-    with pytest.raises(OSError, match="directory"):
+    with pytest.raises(OSError) as raised:
         load(tmp_path)
+
+    # The wording, and even the exception class, differ between operating systems
+    # (IsADirectoryError on macOS and Linux, PermissionError on Windows), so the
+    # test checks only what must hold everywhere.
+    assert not isinstance(raised.value, ValueError)
 
 
 def files_in(directory: Path) -> list[str]:
