@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-01 14:25] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`task-tracker add NAME [--priority/-p P] [--due/-D DATETIME]` now stores a task in `./tasks.json` and prints `Added task <id>: <name>`. The ID is the highest stored ID plus one.
+`main(argv)` moved from `__init__.py` into the new `cli.py` and returns the exit code; `__init__.py` reexports it, so the `task_tracker:main` entry point is unchanged.
+`list` and error handling follow in the next commits.
+
+**Rationale:**
+argparse subcommands (D3) with `set_defaults(run=...)`, the pattern in the Python documentation, so a new command is one parser plus one function. A bad priority and an unparsable `--due` are left to argparse, which exits 2 as the plan asks; `--due` uses `datetime.fromisoformat` and `Task` does the rest of the normalizing (D6), so the rules are not written twice.
+The ID rule lives in `_add` (D5 says the command computes it).
+Five tests, written first and seen failing on `main() takes 0 positional arguments`. Mutation checks: `len(tasks) + 1` for the ID, renamed short flags, ignored priority, ignored exit code, and no output are each caught.
+One test was too weak. Comparing the long and the short form of the same command passes when both runs drop `--due`, so ignoring `--due` survived until the test also asserted the stored due date. An early mutation run also read a stale `.pyc` (same size, same second), so the runs were repeated with bytecode caching off.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M3 First slice, add and list
+- Issue: #7
+
 ## [2026-11-01 14:17] Commit Summary
 
 **Change Type:** Docs
