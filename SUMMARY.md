@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-01 13:58] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** storage (`src/task_tracker/storage.py`, `tests/test_storage.py`)
+
+**Summary:**
+`save` now writes non-ASCII text as text (`"Café ☕"`, not `"Café ☕"`) and every date in whole seconds (`2026-11-01T09:00:00`), whatever was assigned to a field after the task was built.
+Text that cannot be written as UTF-8 (a lone surrogate) now fails the save with `UnicodeEncodeError`, leaves the previous file as it was, and leaves no temporary file.
+
+**Rationale:**
+Review of PR #25, threads 4 and 6. The file is meant to be read and edited by a person (D1) and is opened as UTF-8, but `json.dump` defaults to `ensure_ascii=True`, so the encoding never mattered and a name in any other script was unreadable.
+The `README.md` promises every date as `YYYY-MM-DDTHH:MM:SS`, but the model drops microseconds only when it builds or restores a task, so `task.due = datetime.now()` (likely in M5's `update`) wrote `…:00.123456`, and `load` then truncated it: the round trip did not hold.
+`timespec="seconds"` in the writer closes the file-format half. The in-memory task still holds the microseconds until M5's `update` normalizes what it assigns, which is the known limit already recorded for M5; the loaded copy equals what was saved.
+Side effect worth knowing: a command-line argument that is not valid UTF-8 reaches Python as a lone surrogate. Before this change it was written as an escape. Now the write fails (`UnicodeEncodeError` is a `ValueError`, so M3's single catch handles it) and nothing on disk changes. A test pins this.
+Test-first: three tests failed (escapes in the file, microseconds in the file, nothing raised for the surrogate), then all 160 passed. Mutation check: five breaks (escapes back on, microseconds kept, minutes only, microseconds padded, no conversion) each fail a test; a sixth was skipped because its pattern matched twice and duplicated the first. The file was verified identical afterwards.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review threads 4 and 6
+
 ## [2026-11-01 13:50] Commit Summary
 
 **Change Type:** Fix

@@ -19,7 +19,11 @@ def _to_record(task: Task) -> dict[str, Any]:
 
 def _to_json_value(value: object) -> object:
     # The enums are `StrEnum`s, so JSON already writes their labels.
-    return value.isoformat() if isinstance(value, datetime) else value
+    # Whole seconds, whatever was assigned after construction: the README promises
+    # YYYY-MM-DDTHH:MM:SS, and load drops anything finer.
+    if isinstance(value, datetime):
+        return value.isoformat(timespec="seconds")
+    return value
 
 
 def _read_records(path: Path) -> list[Any]:
@@ -95,7 +99,9 @@ def save(tasks: list[Task], path: Path) -> None:
     temp_path = Path(name)
     try:
         with os.fdopen(file_descriptor, "w", encoding="utf-8") as file:
-            json.dump(records, file, indent=2)
+            # ensure_ascii=False: the file is for people to read and edit (D1), and
+            # it is written as UTF-8, so text stays text instead of \uXXXX escapes.
+            json.dump(records, file, indent=2, ensure_ascii=False)
             file.write("\n")
             # ponytail: no flush and fsync before the replace, so a power cut right
             # after a save can still leave the old or an empty file. Add

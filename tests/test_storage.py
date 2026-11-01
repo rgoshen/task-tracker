@@ -375,3 +375,51 @@ def test_a_refused_save_creates_no_directory(tmp_path: Path):
         save([Task(1, "a"), Task(1, "b")], path)
 
     assert not path.parent.exists()
+
+
+# --- review of PR #25: what the file looks like ---
+
+
+def test_non_ascii_text_is_written_as_text_not_as_escapes(tmp_path: Path):
+    # The file is meant to be read and edited by a person (D1).
+    path = tmp_path / "tasks.json"
+
+    save([Task(1, "Café ☕")], path)
+
+    text = path.read_text(encoding="utf-8")
+    assert "Café ☕" in text
+    assert "\\u" not in text
+    assert load(path)[0].name == "Café ☕"
+
+
+def test_text_that_cannot_be_written_as_utf8_fails_the_save_and_keeps_the_old_file(
+    tmp_path: Path, two_tasks: list[Task]
+):
+    # A command-line argument that is not valid UTF-8 reaches Python as a lone
+    # surrogate. Writing it as text fails, and the failure must cost nothing.
+    path = tmp_path / "tasks.json"
+    save(two_tasks, path)
+    before = path.read_bytes()
+
+    with pytest.raises(UnicodeEncodeError):
+        save([Task(3, "bad \udcff")], path)
+
+    assert path.read_bytes() == before
+    assert files_in(tmp_path) == ["tasks.json"]
+
+
+def test_a_date_assigned_after_construction_is_written_in_whole_seconds(
+    tmp_path: Path,
+):
+    # The model drops microseconds when it builds or restores a task, not when a
+    # field is assigned later (M5's update will assign). The file always holds
+    # YYYY-MM-DDTHH:MM:SS, as the README promises.
+    path = tmp_path / "tasks.json"
+    task = Task(1, "Buy milk")
+    task.due = DUE.replace(microsecond=123456)
+
+    save([task], path)
+
+    [record] = json.loads(path.read_text(encoding="utf-8"))
+    assert record["due"] == "2026-11-01T09:00:00"
+    assert load(path)[0].due == DUE
