@@ -1,6 +1,7 @@
 """The command line: argument parsing and the commands that use the task file."""
 
 import argparse
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -92,8 +93,16 @@ def main(argv: list[str] | None = None) -> int:
     """Run the command in `argv` (the process arguments by default).
 
     The return value is the exit code: the console script passes it to
-    `sys.exit`.
+    `sys.exit`. A bad option value exits 2 inside argparse. Anything else that
+    goes wrong at runtime prints one line to standard error and returns 1.
     """
-    args = _build_parser().parse_args(argv)
-    args.run(args, Path.cwd() / _LIST_FILE)
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    try:
+        args.run(args, Path.cwd() / _LIST_FILE)
+    except (ValueError, OSError) as error:
+        # `Task` and `load` raise ValueError for a blank name or a corrupt file
+        # (M2 made it the one type); OSError is a file that cannot be read or written.
+        print(f"{parser.prog}: error: {error}", file=sys.stderr)
+        return 1
     return 0

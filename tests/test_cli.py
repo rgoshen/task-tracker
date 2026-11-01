@@ -233,3 +233,46 @@ def test_list_with_nothing_current_says_so_and_names_the_file_it_read(
     assert exit_code == 0
     assert "No current tasks" in out
     assert str(project) in out
+
+
+def _assert_one_line_error(capsys: pytest.CaptureFixture[str], mention: str) -> None:
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.startswith("task-tracker: error: ")
+    assert mention in captured.err
+    # One line, and no traceback.
+    assert len(captured.err.splitlines()) == 1
+
+
+@pytest.mark.parametrize("argv", [["list"], ["add", "Buy milk"]])
+def test_a_corrupt_list_file_gives_a_one_line_error_and_is_left_alone(
+    project: Path, capsys: pytest.CaptureFixture[str], argv: list[str]
+):
+    project.write_text("not json", encoding="utf-8")
+
+    exit_code = main(argv)
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "tasks.json")
+    assert project.read_text(encoding="utf-8") == "not json"
+
+
+def test_add_with_a_blank_name_gives_a_one_line_error_and_writes_nothing(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    exit_code = main(["add", ""])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "name")
+    assert not project.exists()
+
+
+def test_a_directory_where_the_list_should_be_gives_a_one_line_error(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    project.mkdir()
+
+    exit_code = main(["list"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "tasks.json")

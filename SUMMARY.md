@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-01 14:27] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`add` and `list` no longer end in a traceback when something is wrong with the data or the file. A blank name, a corrupt task file, or a path that cannot be read or written prints `task-tracker: error: <message>` on standard error and returns 1. A bad option value still exits 2 inside argparse.
+
+**Rationale:**
+One `except (ValueError, OSError)` in `main`. M2 made every corrupt-file failure a `ValueError` that names the file, and `Task` raises `ValueError` for a bad field, so no custom exception class is needed. `OSError` is the case M2 left for the CLI on purpose: a directory where `tasks.json` should be, or a file that cannot be read.
+The risk is that a programming mistake that raises `ValueError` is reported as bad input. It still prints its message and exits nonzero, and the fix would be a custom exception, which waits until the two cases need telling apart.
+Four tests, written first and seen failing with the raw exception escaping `main`. Five mutations are each caught: `OSError` not caught, `ValueError` not caught, exit 0 on error, the message on standard output, and no program prefix.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M3 First slice, add and list
+- Issue: #7
+
 ## [2026-11-01 14:26] Commit Summary
 
 **Change Type:** Feature
