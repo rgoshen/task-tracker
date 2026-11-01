@@ -293,3 +293,6 @@ tmbootpicker.efi
 
 # Misc
 .serena/
+
+# Mission Control Recall (code graph MCP) — machine-specific, do not commit
+.mcp.json
