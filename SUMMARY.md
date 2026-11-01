@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-01 13:50] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** storage (`src/task_tracker/storage.py`, `tests/test_storage.py`)
+
+**Summary:**
+`save` now refuses a list of tasks that `load` would reject, with the same `ValueError` naming the file and the record (for example `record 3: duplicate id 1`), before it creates a directory or a temporary file. The previous file is left as it was.
+`load` and `save` share one helper, `_restore_all`, so both apply the same rules from one place.
+
+**Rationale:**
+Review of PR #25, thread 3. `save([Task(1, "a"), Task(1, "b")], path)` succeeded and the next `load` raised, and the same happened after `task.name = "   "` (the dataclass is mutable, and M5's `update` will assign to fields).
+Because `save` replaces the previous good file, the user lost their last valid state and had to repair JSON by hand. The atomic replace protects against a crash partway through a write, but not against writing something unreadable.
+The check runs each record through the loader's own path (`_from_record`, which is `Task.restore`), so the rules cannot drift apart, and it needs no clock because the stored-date check was removed in the previous commits. A task the constructor accepts always passes.
+Alternative rejected: checking only for duplicate IDs in `save` and leaving per-task rules to M5's `update`. That would cover the case in this review, but not the next bug that assigns a bad value; the extra cost is one pass over the records.
+Test-first: three tests failed with `DID NOT RAISE`, then all 157 passed. Mutation check: eight breaks (validation skipped, run after the directory is created, duplicates not detected or never remembered, position or filename wrong, `load` bypassing the helper, a record dropped on write) each fail a test, and the file was verified identical afterwards.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review thread 3
+
 ## [2026-11-01 13:42] Commit Summary
 
 **Change Type:** Refactor

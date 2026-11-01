@@ -330,3 +330,48 @@ def test_a_save_that_succeeds_leaves_no_temp_file(tmp_path: Path):
     save([Task(1, "Buy milk")], tmp_path / "tasks.json")
 
     assert files_in(tmp_path) == ["tasks.json"]
+
+
+# --- review of PR #25: save must not write what load would reject ---
+
+
+def blank_named() -> Task:
+    # The dataclass is mutable, so a later assignment skips the checks made at
+    # construction (M5's `update` will assign too).
+    task = Task(1, "Buy milk")
+    task.name = "   "
+    return task
+
+
+@pytest.mark.parametrize(
+    ("tasks", "message"),
+    [
+        ([Task(1, "a"), Task(2, "b"), Task(1, "c")], "record 3: duplicate id 1"),
+        ([blank_named()], "record 1: name must not be blank"),
+    ],
+    ids=["duplicate-id", "name-blanked-after-construction"],
+)
+def test_save_refuses_tasks_that_load_would_reject_and_keeps_the_old_file(
+    tmp_path: Path,
+    two_tasks: list[Task],
+    tasks: list[Task],
+    message: str,
+):
+    path = tmp_path / "tasks.json"
+    save(two_tasks, path)
+    before = path.read_bytes()
+
+    with pytest.raises(ValueError, match=f"{re.escape(str(path))}: {message}"):
+        save(tasks, path)
+
+    assert path.read_bytes() == before
+    assert files_in(tmp_path) == ["tasks.json"]
+
+
+def test_a_refused_save_creates_no_directory(tmp_path: Path):
+    path = tmp_path / "nested" / "tasks.json"
+
+    with pytest.raises(ValueError, match="duplicate id 1"):
+        save([Task(1, "a"), Task(1, "b")], path)
+
+    assert not path.parent.exists()

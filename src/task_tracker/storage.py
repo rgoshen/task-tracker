@@ -41,16 +41,12 @@ def _from_record(record: object) -> Task:
     return Task.restore(**record)
 
 
-def load(path: Path) -> list[Task]:
-    """Read the tasks in `path`. A file that does not exist is an empty list.
+def _restore_all(records: list[Any], path: Path) -> list[Task]:
+    """Rebuild every task, enforcing the rules a file must meet.
 
-    A file whose content is wrong raises `ValueError` naming the file and, for a
-    bad task, its position. Any other failure to read it is left as it is.
+    `load` applies them to what it read and `save` to what it is about to write,
+    so a file this module writes is one it can read back.
     """
-    try:
-        records = _read_records(path)
-    except FileNotFoundError:
-        return []
     tasks: list[Task] = []
     seen_ids: set[int] = set()
     for position, record in enumerate(records, start=1):
@@ -65,12 +61,31 @@ def load(path: Path) -> list[Task]:
     return tasks
 
 
+def load(path: Path) -> list[Task]:
+    """Read the tasks in `path`. A file that does not exist is an empty list.
+
+    A file whose content is wrong raises `ValueError` naming the file and, for a
+    bad task, its position. Any other failure to read it is left as it is.
+    """
+    try:
+        records = _read_records(path)
+    except FileNotFoundError:
+        return []
+    return _restore_all(records, path)
+
+
 def save(tasks: list[Task], path: Path) -> None:
     """Write `tasks` to `path`, creating the directories above it.
 
+    Tasks that `load` would reject raise `ValueError` before anything is written.
     The file is replaced in one step, so a failure partway leaves the previous
     file as it was and no temporary file behind.
     """
+    records = [_to_record(task) for task in tasks]
+    # The file being replaced is the last good state. Refuse a list that load would
+    # reject (a duplicate ID, or a field changed after construction) before any
+    # directory or temporary file exists.
+    _restore_all(records, path)
     path.parent.mkdir(parents=True, exist_ok=True)
     # Next to the target, not in the system temp directory: os.replace is atomic
     # only within one filesystem and may fail across two.
@@ -80,7 +95,7 @@ def save(tasks: list[Task], path: Path) -> None:
     temp_path = Path(name)
     try:
         with os.fdopen(file_descriptor, "w", encoding="utf-8") as file:
-            json.dump([_to_record(task) for task in tasks], file, indent=2)
+            json.dump(records, file, indent=2)
             file.write("\n")
             # ponytail: no flush and fsync before the replace, so a power cut right
             # after a save can still leave the old or an empty file. Add
