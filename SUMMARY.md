@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-01 14:05] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** storage (`src/task_tracker/storage.py`, `tests/test_storage.py`)
+
+**Summary:**
+`save` now follows a symbolic link and replaces the file it points to, so a list kept in a synced folder or a dotfiles repository stays linked. It also copies the mode of the file it replaces onto the new one. A file that did not exist is still created readable and writable by its owner only.
+
+**Rationale:**
+Review of PR #25, thread 5. `os.replace` on a symlink replaces the link itself: after a save the link was a regular file and the real file kept stale content (reproduced). A 0644 file became 0600 because `tempfile.mkstemp` creates owner-only files, so a list someone shared quietly became private.
+The fix resolves the path after validation, so errors still name the path the caller gave, and builds the temporary file beside the real file, because `os.replace` is atomic only within one filesystem and a link can point to another one. The mode comes from `shutil.copymode`; for a file that does not exist yet the copy is skipped.
+Not done: the review also notes that an atomic save needs write permission on the directory, where a plain write needs it only on the file. That cost comes with replacing by rename and cannot be removed without giving up atomicity, so it is documented in the plan instead.
+Test-first: the symlink test and the mode test failed (the link became a regular file, 0644 became 0600); the owner-only test for a new file already passed and now pins the behavior. The mutation check found two gaps in my first tests, a temporary file built beside the link instead of the real file and directories created beside the link, and two more tests close them.
+Mutation check: seven breaks (link not followed, mode not kept, a new file treated as an error, the link replaced, the temporary file or the directories beside the link, the mode copied from the wrong file) each fail a test. The file was verified identical afterwards. The mode tests skip on Windows, which has no owner, group, and other bits.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M2 Save and load
+- Issue: #6
+- Pull request: #25, review thread 5
+
 ## [2026-11-01 13:58] Commit Summary
 
 **Change Type:** Fix

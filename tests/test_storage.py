@@ -7,6 +7,8 @@
 import json
 import os
 import re
+import stat
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -423,3 +425,95 @@ def test_a_date_assigned_after_construction_is_written_in_whole_seconds(
     [record] = json.loads(path.read_text(encoding="utf-8"))
     assert record["due"] == "2026-11-01T09:00:00"
     assert load(path)[0].due == DUE
+
+
+# --- review of PR #25: the file being replaced may be a link or have a mode ---
+
+only_on_posix = pytest.mark.skipif(
+    sys.platform == "win32", reason="Windows has no owner, group, and other bits"
+)
+
+
+def test_saving_through_a_symlink_updates_the_file_it_points_to(
+    tmp_path: Path, two_tasks: list[Task]
+):
+    # A list kept in a synced folder or a dotfiles repository is often linked in.
+    real = tmp_path / "synced" / "tasks.json"
+    link = tmp_path / "tasks.json"
+    save([], real)
+    try:
+        link.symlink_to(real)
+    except OSError:
+        pytest.skip("this system does not allow symbolic links")
+
+    save(two_tasks, link)
+
+    assert link.is_symlink()
+    assert load(real) == two_tasks
+    assert files_in(real.parent) == ["tasks.json"]
+    assert files_in(tmp_path) == ["synced", "tasks.json"]
+
+
+def test_saving_through_a_symlink_builds_the_new_file_beside_the_real_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    # os.replace is atomic only within one filesystem, and a link can point to
+    # another one, so the temporary file belongs next to the file it replaces.
+    real = tmp_path / "synced" / "tasks.json"
+    link = tmp_path / "tasks.json"
+    save([], real)
+    try:
+        link.symlink_to(real)
+    except OSError:
+        pytest.skip("this system does not allow symbolic links")
+    moves: list[tuple[Path, Path]] = []
+    real_replace = os.replace
+
+    def spy(source: Any, destination: Any) -> None:
+        moves.append((Path(source), Path(destination)))
+        real_replace(source, destination)
+
+    monkeypatch.setattr(os, "replace", spy)
+
+    save([], link)
+
+    assert len(moves) == 1
+    source, destination = moves[0]
+    assert destination == real
+    assert source.parent == real.parent
+
+
+def test_saving_through_a_symlink_creates_the_directory_it_points_into(
+    tmp_path: Path, two_tasks: list[Task]
+):
+    real = tmp_path / "not-yet" / "tasks.json"
+    link = tmp_path / "tasks.json"
+    try:
+        link.symlink_to(real)
+    except OSError:
+        pytest.skip("this system does not allow symbolic links")
+
+    save(two_tasks, link)
+
+    assert link.is_symlink()
+    assert load(real) == two_tasks
+
+
+@only_on_posix
+def test_saving_keeps_the_mode_of_the_file_it_replaces(tmp_path: Path):
+    path = tmp_path / "tasks.json"
+    save([], path)
+    path.chmod(0o644)
+
+    save([Task(1, "Buy milk")], path)
+
+    assert stat.S_IMODE(path.stat().st_mode) == 0o644
+
+
+@only_on_posix
+def test_a_new_file_is_readable_and_writable_by_its_owner_only(tmp_path: Path):
+    path = tmp_path / "tasks.json"
+
+    save([], path)
+
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600

@@ -2,7 +2,9 @@
 
 import json
 import os
+import shutil
 import tempfile
+from contextlib import suppress
 from dataclasses import fields
 from datetime import datetime
 from pathlib import Path
@@ -83,18 +85,22 @@ def save(tasks: list[Task], path: Path) -> None:
 
     Tasks that `load` would reject raise `ValueError` before anything is written.
     The file is replaced in one step, so a failure partway leaves the previous
-    file as it was and no temporary file behind.
+    file as it was and no temporary file behind. A symbolic link is followed, so
+    the file it points to is the one replaced, and an existing file keeps its mode.
     """
     records = [_to_record(task) for task in tasks]
     # The file being replaced is the last good state. Refuse a list that load would
     # reject (a duplicate ID, or a field changed after construction) before any
     # directory or temporary file exists.
     _restore_all(records, path)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    # os.replace on a symlink replaces the link, not the file it points to, so
+    # work on the real file: a list kept in a synced folder stays linked.
+    target = path.resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
     # Next to the target, not in the system temp directory: os.replace is atomic
     # only within one filesystem and may fail across two.
     file_descriptor, name = tempfile.mkstemp(
-        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp"
+        dir=target.parent, prefix=f".{target.name}.", suffix=".tmp"
     )
     temp_path = Path(name)
     try:
@@ -106,7 +112,11 @@ def save(tasks: list[Task], path: Path) -> None:
             # ponytail: no flush and fsync before the replace, so a power cut right
             # after a save can still leave the old or an empty file. Add
             # file.flush() and os.fsync(file.fileno()) if that ever matters.
-        os.replace(temp_path, path)
+        # mkstemp makes the file owner-only. Keep the mode of a file that exists,
+        # so a list someone shared does not quietly become private.
+        with suppress(FileNotFoundError):
+            shutil.copymode(target, temp_path)
+        os.replace(temp_path, target)
     finally:
         # Gone already after a successful replace; this removes it after a failure.
         temp_path.unlink(missing_ok=True)
