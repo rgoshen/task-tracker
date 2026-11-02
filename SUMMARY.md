@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-01 18:06] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+Two documented behaviors of the command line now have a test: `--due` keeps a time of day (`2026-11-02T10:30:45` is stored as that moment, not as midnight), and a bare `task-tracker` with no command exits 2 and says a command is required. No production code changes.
+
+**Rationale:**
+Review comment 7 found that every `--due` test passed a bare date, so a version that kept only the date part passed the whole suite, and that dropping `required=True` on the subparsers would only show up when someone ran the program.
+Both tests pass as soon as they are written, because the behavior already exists, so they were checked the other way round: each was run against a deliberate break of the code. Dropping the time from the parsed `--due` fails the first test, and `required=False` fails the second. The source was restored and the full suite is green again (192 tests).
+The third item in the comment, a UTC-offset `--due`, is pinned in the next commit with the converter that changes what it does.
+
+**Bugfix Context:**
+Review comment 7 on PR #26. These were gaps in the tests and not defects in the program.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 3
+- Issue: #7 (PR #26, review comment 7)
+
 ## [2026-11-01 18:05] Commit Summary
 
 **Change Type:** Fix

@@ -19,6 +19,7 @@ CLOCK = datetime(2026, 10, 31, 9, 30, 0)  # noqa: DTZ001
 NOV_1 = datetime(2026, 11, 1)  # noqa: DTZ001
 NOV_2 = datetime(2026, 11, 2)  # noqa: DTZ001
 NOV_3 = datetime(2026, 11, 3)  # noqa: DTZ001
+NOV_2_TIMED = datetime(2026, 11, 2, 10, 30, 45)  # noqa: DTZ001
 
 
 @pytest.fixture(name="project")
@@ -86,6 +87,23 @@ def test_add_with_a_date_that_cannot_exist_exits_2_with_an_error_line(
     assert "2026-13-45" in error
     assert "Traceback" not in error
     assert not project.exists()
+
+
+def test_add_with_a_time_of_day_keeps_the_time(project: Path):
+    # Every other --due test passes a bare date, which is midnight.
+    main(["add", "Pay rent", "--due", "2026-11-02T10:30:45"])
+
+    assert load(project)[0].due == NOV_2_TIMED
+
+
+def test_a_bare_command_exits_2_and_asks_for_a_command(
+    capsys: pytest.CaptureFixture[str],
+):
+    with pytest.raises(SystemExit) as exit_info:
+        main([])
+
+    assert exit_info.value.code == 2
+    assert "command" in capsys.readouterr().err.splitlines()[-1]
 
 
 @pytest.mark.usefixtures("fixed_clock")
