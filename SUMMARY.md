@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-01 18:16] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `README.md`, `TODO.md`)
+
+**Summary:**
+Recorded what the review of PR #26 changed. The plan gains five checked Given/When/Then items and four "Decided" bullets (plain-string priority choices, text UTF-8 cannot hold, output printed after the `try` with escapes, and the corrected limit).
+The `--due` and exit-code bullets in the plan and in `TODO.md` now say that an offset exits 2 and that a closed pipe exits 1 quietly. `README.md` says the same in the usage section.
+The known limit is reworded from "can take the same ID" to "a task is lost" in all three files, with a pointer to the follow-up issue #27.
+
+**Rationale:**
+The project `CLAUDE.md` says to change the plan, the matching issue, and `README.md` together when a decision changes, and two decisions changed: the exit code for a UTC-offset `--due` (1 to 2) and the wording of the concurrency limit. Review comment 6 pointed out that "can take the same ID" understates it:
+20 simultaneous `add` commands stored 17, 16 and 14 tasks in three runs, so tasks are lost. The review offered a lock or an honest note; a portable lock needs a design of its own (`fcntl` is Unix-only, and an `O_EXCL` lockfile goes stale after a crash), so the note is here and the lock is issue #27 with three options and acceptance criteria.
+Issue #7 still shows the old checklist and is ticked once CI is green, as before.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 8
+- Issue: #7 (PR #26, review comment 6), #27 (the lock)
+
 ## [2026-11-01 18:13] Commit Summary
 
 **Change Type:** Fix

@@ -175,13 +175,15 @@ The nine Given/When/Then items are in the M3 section of the plan. In addition:
 **Risks & Trade-offs:**
 
 - **Exit codes, decided 2026-11-01.** 2 for a bad option value, which argparse reports itself (an unknown priority, an unparsable `--due`). 1 for everything else that goes wrong at runtime: a blank name, a corrupt file, an unreadable file. Both print one error line on standard error and never a traceback. The plan only requires nonzero for the second group.
+  A reader that closes the pipe early also ends with 1, quietly, and a failed write of the output prints `cannot write the output` and returns 1 (PR #26 review).
 - **One `except` in `main`, decided 2026-11-01.** It catches `ValueError` (from `Task` and `load`) and `OSError` and prints `task-tracker: error: <message>`. M2 already made every corrupt-file failure a `ValueError` naming the file, so no custom exception class is needed yet.
-- **`--due` is parsed by argparse with `datetime.fromisoformat`.** A malformed value exits 2 as the plan says. A value with a UTC offset parses, then `Task` refuses it as not naive local time (D6), so that case exits 1 with a message naming `due`. Rejected: a second parser in the CLI that repeats the rules in `Task`.
+- **`--due` is read by `_due`, a converter around `datetime.fromisoformat`.** A malformed value exits 2 as the plan says. A value with a UTC offset also exits 2: it parses, but D6 stores local time only. Changed 2026-11-01 in the review of PR #26; it first exited 1 from `Task`, with a message that did not name the flag.
+  The converter repeats the naive-time rule that `Task` enforces, which is the cost of one rule and one exit code.
 - **Priority rank comes from the enum's definition order** (`CRITICAL` first), not from the string value, which sorts `MEDIUM` after `LOW` (Review Focus 1). A test pins the order, so reordering the enum fails loudly.
 - **Q3 and `description`, decided 2026-11-01.** `add` does not set `start`, `stop`, or `description`, and `list` does not show `start` or `stop`: they stay plain fields with their defaults until a milestone needs them. Cheap to add later; each would need a short flag the options table does not assign yet.
 - **List line.** One line per task: ID, status, priority, due date (`-` when there is none), name. No header, no color. Every datetime prints through `isoformat()`, the form M2 stores.
 - **Where the rules live.** "Highest ID + 1" and the sort key are private functions in `cli.py`. M4 reuses the sort key for the first half of `list --all`. M8 revisits the module layout.
-- **Known limit.** Two processes running `add` at once can both take the same ID and the last save wins. No lock, as in M2.
+- **Known limit.** Two processes running `add` at once can both read the same list, so the second save replaces the first: a task is lost, and both took the same ID. No lock, as in M2; tracked in #27.
 
 ## [2026-11-01] Fix: PR #26 review
 

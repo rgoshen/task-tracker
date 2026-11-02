@@ -218,6 +218,11 @@ Suggested seam: `main(argv: list[str] | None = None) -> int`, so tests call `mai
 - [x] Given no file, or only `DONE` tasks, when `list`, then it prints `No current tasks in <path>` and exits 0.
 - [x] Given a task, when `list`, then its line holds the ID, status, priority, due date (`-` when there is none), and name, in that order.
 - [x] Given a corrupt project file, when `add "Buy milk"`, then the exit code is 1, one error line is printed, and the file is unchanged. Given a directory where `tasks.json` should be, when `list`, then the exit code is 1 with one error line.
+- [x] Given `add "Pay rent" --due 2026-11-02T10:00:00Z` (a UTC offset), then the exit code is 2 and the error line names `--due` and `YYYY-MM-DDTHH:MM:SS`. Given `add "Pay rent" --priority URGENT` or `-p high`, then the exit code is 2 and the error line lists `CRITICAL`, `HIGH`, `MEDIUM`, and `LOW`. (PR #26 review)
+- [x] Given a project file with a record that has a key named `cls`, or a file nested 200,000 deep, when `list` or `add`, then the exit code is 1, one error line is printed, and the file is unchanged. (PR #26 review)
+- [x] Given a task whose name holds a newline or an escape character, when `list`, then it is one line with the character shown as `\n` or `\x1b`. Given standard output that cannot encode a character, then it is shown as an escape and the exit code is 0. (PR #26 review)
+- [x] Given `add` with a name that UTF-8 cannot hold, then the exit code is 1, the error says the name must be valid UTF-8 text, and no file is written. The same text in a stored record makes `load` report that record. (PR #26 review)
+- [x] Given `list` piped to a reader that exits after one line, then standard error stays empty and the exit code is 1. Given a write that fails after `add` has saved, then the error says `cannot write the output` and the task stays saved. (PR #26 review)
 
 **Think about:**
 
@@ -229,15 +234,20 @@ Suggested seam: `main(argv: list[str] | None = None) -> int`, so tests call `mai
 
 **Decided (2026-11-01):**
 
-- Exit codes: 2 for a bad option value, which argparse reports itself (an unknown priority, an unparsable `--due`); 1 for everything else that goes wrong at runtime (a blank name, a corrupt or unreadable file). Both print one error line on standard error and never a traceback.
+- Exit codes: 2 for a bad option value, which argparse reports itself (an unknown priority, an unparsable `--due`, or a `--due` with a UTC offset); 1 for everything else that goes wrong at runtime (a blank name or one UTF-8 cannot hold, a corrupt or unreadable file, an output that cannot be written). Both print one error line on standard error and never a traceback.
+  A reader that closes the pipe early (`list | head -1`) ends the output quietly, also with 1, as Python's `signal` documentation does.
 - `main` has one `except (ValueError, OSError)` that prints `task-tracker: error: <message>` and returns 1. M2 already made every corrupt-file failure a `ValueError` naming the file, so there is still no custom exception class.
-- `--due` is parsed by argparse with `datetime.fromisoformat`; `Task` does the rest of the normalizing (D6). A value with a UTC offset parses and then `Task` refuses it, so that case exits 1 with a message naming `due`, not 2.
+- `--due` is read by a small converter around `datetime.fromisoformat`. Every bad value, a UTC offset included, gives one message that names the flag and the form `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SS`, and exits 2. Changed in the review of PR #26: an offset first exited 1 from `Task`. The converter repeats the naive-time rule of D6, and `Task` still enforces it for every other caller.
 - The priority rank is the enum's definition order (`CRITICAL` first), not the string value (Review Focus 1). The sort key is `(due or datetime.max, rank, id)`: `datetime.max` stands in for a missing due date, and the ID settles ties so the order does not depend on how the file was written. M4 reuses the key for the first half of `list --all`.
 - Q3: `add` does not set `start` or `stop`, and `list` does not show them. `add` does not set `description` either. Each would need a short flag the options table does not assign yet.
 - A list line is the ID, status, priority, due date (`-` when there is none), and name, with no header. `list` names the file it read only when nothing is current (D2).
 - "Highest ID + 1" is computed in the `add` command, in `cli.py` (D5). The module split waits for M8.
 - `main(argv)` lives in `src/task_tracker/cli.py` and `__init__.py` reexports it, so the `task_tracker:main` entry point is unchanged. Its return value becomes the exit code because the generated script wraps the call in `sys.exit` ([entry points]).
-- Known limit: two `add` commands at the same moment can take the same ID and the last save wins. No lock, as in M2.
+- `--priority` takes plain-string `choices`, with no `type=`: argparse converts before it checks `choices`, so a converter made the "invalid choice" message unreachable. `Task` turns the checked string into a `Priority`.
+- `Task` refuses a name or description that UTF-8 cannot hold, such as the lone surrogate an undecodable command-line byte becomes, because `save` writes UTF-8. A file that holds one is a corrupt file that names the record.
+- The commands return their lines and `main` prints them after the `try`, so a failed write is never reported as bad data, and `add` has already saved. Each line is escaped first: control characters and the line and paragraph separators, and anything standard output cannot encode, are shown as `\n`, `\x1b`, `\u2028`.
+  Rejecting them in `Task` was rejected: one such name in a shared file would make the whole list unloadable.
+- Known limit: two `add` commands at the same moment can both read the same list, so the second save replaces the first. A task is lost, and both took the same ID. No lock, as in M2; tracked in #27.
 
 **Done when:** `uv run task-tracker add "Buy milk"` then `uv run task-tracker list` works in a scratch directory.
 
