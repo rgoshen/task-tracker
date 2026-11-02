@@ -183,6 +183,41 @@ The nine Given/When/Then items are in the M3 section of the plan. In addition:
 - **Where the rules live.** "Highest ID + 1" and the sort key are private functions in `cli.py`. M4 reuses the sort key for the first half of `list --all`. M8 revisits the module layout.
 - **Known limit.** Two processes running `add` at once can both take the same ID and the last save wins. No lock, as in M2.
 
+## [2026-11-01] Fix: PR #26 review
+
+**Objective:**
+Answer the eleven inline comments on PR #26 (M3, `add` and `list`). Each claim was reproduced in a scratch directory before it was triaged. Eight are fixed, #5 is fixed in part, and #6 and #8 are answered with a reason.
+
+**Approach:**
+Same branch, `feature/add-and-list`. Test-first, one atomic commit per comment, each with its own `SUMMARY.md` entry. The tests are written and seen failing before the code that passes them.
+
+1. #1, a corrupt file can still end in a traceback: `Task.restore` takes `cls` positionally only, so a record with a `cls` key is an unknown field. `RecursionError` from a deeply nested file becomes the `ValueError` that names the file. Commit: `fix(storage): turn every corrupt-file shape into a ValueError`.
+2. #4, the priority error lists the valid values: drop `type=Priority`, keep `choices` as plain strings, and let `Task` normalize. Commit: `fix(cli): list the valid priorities in the error`.
+3. #7, three untested behaviors: a timed `--due`, a bare `task-tracker`, and a UTC-offset `--due`. The first two pass at once, so they are mutation-checked. Commit: `test(cli): pin a timed due date and the missing command`.
+4. #5, one converter for `--due` that names the flag and the format, and sends an offset to exit 2. Commit: `fix(cli): report every bad due date as one exit 2 error`.
+5. #2 (names `save` cannot write): `Task` rejects text that UTF-8 cannot hold, in the name and the description. Commit: `fix(task): reject text that UTF-8 cannot hold`.
+6. #2 (output failures): the commands return their lines and `main` prints them outside the `try`. A closed pipe exits quietly; any other write failure has its own message. Commit: `fix(cli): keep output failures out of the data-error path`.
+7. #3, control characters in a name: escape them, and anything standard output cannot encode, as the line is printed. Commit: `fix(cli): escape control characters and unencodable text on output`.
+8. #6 wording, the M3 decisions, and `README.md`: `docs(plan): record the PR #26 review changes`.
+9. #9, #10, #11: restamp the M3 `SUMMARY.md` entries with their commit times, update the project `CLAUDE.md`, and ignore `tasks.json` and its temp files.
+10. Done when the tests pass locally, coverage is at least 80%, the CI-version linters are clean, and every reply is posted. Pushing waits until the last commit; threads that were fixed are resolved after the push.
+
+**Tests:**
+
+- A record with a `cls` key, and a file nested 200,000 deep, each give the one-line error from `list` and `add` and leave the file alone.
+- A wrong `--priority` names all four valid values on the error line. A bad `--due` names the flag and the format and exits 2, for a malformed date and for a UTC offset.
+- A real pipeline closed early (`list | head -1` over 3,000 tasks) writes nothing to standard error. A write that fails reports "cannot write the output" and leaves the stored task in place.
+- A name with a lone surrogate is rejected by `Task` and by `load`, naming the record. A name with a newline or an escape sequence prints on one line as escapes. A task named `café` prints as `caf\xe9` when standard output is ASCII.
+
+**Risks & Trade-offs:**
+
+- **Offset `--due` now exits 2, decided 2026-11-01.** The converter repeats the one-line naive-time rule that `Task` already enforces (D6). The cost is two places to change if D6 changes; the gain is one rule and one exit code for every bad `--due`.
+- **A superset of ISO 8601 is still accepted** (`20261102`, week dates, fractional seconds that are truncated). Rejected: a stricter parser, which would be a second spec to keep in step with `fromisoformat`.
+- **Control characters are escaped on output, not rejected by `Task`.** One such name in a shared file would otherwise make the whole list unloadable. A literal backslash followed by `n` prints the same as an escaped newline.
+- **Surrogates are rejected by `Task`**, so a file that holds one is now a corrupt file naming its record, where `list` used to abort partway.
+- **Concurrent `add` can lose a task, not only an ID.** The wording is corrected in this plan, `README.md`, and the PR. The lock is deferred to its own issue: `fcntl` is Unix-only and an `O_EXCL` lockfile goes stale after a crash.
+- **#8, the subject of `0e0d554`, is not reworded.** That needs a force-push, which this work never does, and the merge commit keeps the subject in history. The missing `SUMMARY.md` entry is recorded in the `.gitignore` commit.
+
 [dataclasses]: https://docs.python.org/3/library/dataclasses.html#mutable-default-values
 [pytest exit codes]: https://docs.pytest.org/en/stable/reference/exit-codes.html
 [JSONDecodeError]: https://docs.python.org/3/library/json.html#json.JSONDecodeError

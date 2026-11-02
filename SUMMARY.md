@@ -1,5 +1,23 @@
 # Summary
 
+## [2026-11-01 18:02] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`)
+
+**Summary:**
+Planned the work that answers the eleven inline review comments on PR #26: eleven steps, each with its commit subject, the tests that will pin it, and the risks. Eight comments are fixed, one (#5) is fixed in part, and two (#6, #8) are answered with a reason instead of a code change.
+
+**Rationale:**
+The project rule is to plan in `TODO.md` before any code changes, and the review fixes touch the exit-code decision, the error path, and the output, so they need a recorded plan as much as a feature does. Every claim in the review was reproduced in a scratch directory before it was triaged: the two tracebacks, the broken pipe, the control characters, the two argparse messages, and the untracked `tasks.json`.
+Two choices were made with the project owner before writing this: a UTC-offset `--due` now exits 2 in a named converter, and the concurrent-`add` limit gets a follow-up issue instead of a lock in this PR.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review
+- Issue: #7 (PR #26)
+
 ## [2026-11-01 14:28] Commit Summary
 
 **Change Type:** Docs
