@@ -1,5 +1,391 @@
 # Summary
 
+## [2026-11-01 18:22] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests and docs (`tests/test_cli.py`, `SUMMARY.md`, `TODO.md`)
+
+**Summary:**
+CI's `Lint` job failed on the push of the review fixes: codespell 2.4.2 in super-linter read the three letters before the backslash in the escaped form of an accented example word as a misspelling of "calf" (`SUMMARY.md`, `TODO.md`, and `tests/test_cli.py`). The ASCII-output test now uses the name `Zoë ☕`, expecting `Zo\xeb \u2615`, and the two docs describe the escape in words.
+No behavior changes.
+
+**Rationale:**
+The escape is correct output, but the word was split by the backslash, so a spell checker sees a fragment. Changing the example is cheaper and clearer than adding a codespell ignore word for the whole repository, and the test checks the same thing with any non-ASCII letter.
+The unescaped `café` in the other tests is not flagged, because the checker reads `é` as part of the word.
+My local checks run ruff, black, isort, flake8, pylint, mypy, markdownlint, textlint, Prettier, and the duplicate-code check at the CI versions, but not codespell, which is why this reached CI. It now has been run locally at 2.4.2 over every tracked file and reports nothing.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review
+- Issue: #7 (PR #26, CI)
+
+## [2026-11-01 18:19] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** repository (`.gitignore`)
+
+**Summary:**
+`.gitignore` now ignores `/tasks.json` and `.tasks.json.*.tmp`. Running the example in `README.md`, `uv run task-tracker add ...`, from the repository root writes `tasks.json` there, and a save that is killed leaves a `.tasks.json.<random>.tmp` file behind. Neither was ignored, so a later `git add .` would have committed a personal task list.
+
+**Rationale:**
+Review comment 11. The `/tasks.json` pattern is anchored to the repository root, so it does not touch any other file of that name, and `git check-ignore` confirms it: `tasks.json` and a temporary file in any directory are ignored, `tests/tasks.json` is not, and the existing `!.vscode/tasks.json` exception still leaves that file un-ignored.
+`README.md` says the temporary pattern belongs in `.gitignore` when the list lives in a repository.
+This change also covers a gap the review noted in the commit before it, `0e0d554` (`update .gitignore`, which added `CLAUDE.local.md`): that commit has no `SUMMARY.md` entry. That is recorded here so the log is complete: it ignores `CLAUDE.local.md`, a private per-project instructions file that is not meant to be checked in.
+The subject of that commit is not reworded because that would need a force-push.
+
+**Bugfix Context:**
+Review comment 11 on PR #26. Root cause: M3 is the first milestone that writes a file named `tasks.json` in the directory it is run from, and nothing ignored it.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 9
+- Issue: #7 (PR #26, review comments 8 and 11)
+
+## [2026-11-01 18:18] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`CLAUDE.md`)
+
+**Summary:**
+The project `CLAUDE.md` now matches the code. "An early scaffold" and "a placeholder `main()` in `__init__.py`" became a description of the first slice: `main()` and the `add` and `list` commands live in `cli.py`, features 3 and 5 exist for the project list only, and the other five are named as not built. A line records the exit-code convention.
+The command example is `uv run task-tracker list`, with a note that a command is required, because a bare `task-tracker` now exits 2.
+
+**Rationale:**
+Review comment 10: the file is read at the start of every session, so a stale "none of the seven features" sends the next session looking for a placeholder that no longer exists. The global Definition of Done asks for documentation to be updated with the change, and `CLAUDE.md` is documentation.
+The exit-code line is the one fact a future change to `main` most needs and cannot guess from the code alone.
+The five features not built are listed by name so the file stays true until M4 to M9 change it, and the text says which milestones the code covers instead of counting tests or lines, which would go stale on the next commit.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 9
+- Issue: #7 (PR #26, review comment 10)
+
+## [2026-11-01 18:17] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`SUMMARY.md`)
+
+**Summary:**
+Four M3 entries now carry the minute of the commit that contains them: 14:25 became 14:19 (`feat(cli): add the add command`), 14:26 became 14:21 (`add the list command`), 14:27 became 14:22 (`report errors without a traceback`), and 14:28 became 14:24 (`record the M3 decisions`). The fifth, 14:17, was already right. Only the four headings changed.
+
+**Rationale:**
+Review comment 9 found that the stamps were written ahead of the commits, by 4 to 6 minutes, and a log of decisions is only a trustworthy record if its times are real. The times come from `git log --date=iso` for the commit that added each entry, so the mapping can be checked.
+Not changed: the file is still not strictly newest-first below the M3 block. The `14:30` entry came in with commit `20ad501`, made at 13:46, so the M2 entries around it were stamped later than their commits. They belong to PR #25, which is merged, and restamping them is a separate change to another milestone's record, so they are left as they are.
+From here on each entry is stamped with the clock at the time of writing.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 9
+- Issue: #7 (PR #26, review comment 9)
+
+## [2026-11-01 18:16] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `README.md`, `TODO.md`)
+
+**Summary:**
+Recorded what the review of PR #26 changed. The plan gains five checked Given/When/Then items and four "Decided" bullets (plain-string priority choices, text UTF-8 cannot hold, output printed after the `try` with escapes, and the corrected limit).
+The `--due` and exit-code bullets in the plan and in `TODO.md` now say that an offset exits 2 and that a closed pipe exits 1 quietly. `README.md` says the same in the usage section.
+The known limit is reworded from "can take the same ID" to "a task is lost" in all three files, with a pointer to the follow-up issue #27.
+
+**Rationale:**
+The project `CLAUDE.md` says to change the plan, the matching issue, and `README.md` together when a decision changes, and two decisions changed: the exit code for a UTC-offset `--due` (1 to 2) and the wording of the concurrency limit. Review comment 6 pointed out that "can take the same ID" understates it:
+20 simultaneous `add` commands stored 17, 16 and 14 tasks in three runs, so tasks are lost. The review offered a lock or an honest note; a portable lock needs a design of its own (`fcntl` is Unix-only, and an `O_EXCL` lockfile goes stale after a crash), so the note is here and the lock is issue #27 with three options and acceptance criteria.
+Issue #7 still shows the old checklist and is ticked once CI is green, as before.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 8
+- Issue: #7 (PR #26, review comment 6), #27 (the lock)
+
+## [2026-11-01 18:13] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+Every line the commands print now goes through `_printable`. Control characters, the C1 controls, and the line and paragraph separators are shown as escapes, so `add $'a\nb'` lists as one line ending `a\nb` and `$'evil\x1b[31mRED'` lists as `evil\x1b[31mRED` instead of sending the escape sequence to the terminal.
+Text that standard output cannot encode is shown as an escape too: with `PYTHONIOENCODING=ascii`, an accented letter prints as its escape (`é` as `\xe9`) and the command exits 0 where `list` used to stop partway with a codec error. The stored name is unchanged.
+
+**Rationale:**
+A name is whatever was typed or whatever a shared file carries, and `README.md` expects lists to be shared, so it should not reach the terminal raw (global `CLAUDE.md`: "sanitize all outputs"). The review offered two places for the fix.
+Rejecting control characters in `Task` would make a single such name in a shared file turn the whole list unloadable, so the fix is at the output, the one place that has the danger.
+Only the categories that break a line or drive the terminal are escaped (`Cc`, `Zl`, `Zp`). `str.isprintable` was rejected as the test because it also flags format characters and non-ASCII spaces, which would damage a zero-width joiner in an emoji sequence or an ideographic space in a name written in another language.
+Encoding uses `backslashreplace` against the stream's own encoding, so the same function covers the surrogate-free but unencodable case.
+Known limit: a literal backslash is not doubled, so a name that really contains `\n` looks like one that contains a newline.
+Eight tests were written first and seen failing, and four deliberate breaks of the code are each caught (no `Zl`, no `Cc`, `replace` in place of `backslashreplace`, and over-escaping with `Zs` and `Cf`). The over-escaping break first survived, so the test for unchanged text was widened to a joiner and a wide space.
+
+**Bugfix Context:**
+Review comment 3 on PR #26. Root cause: `_describe` and the `add` message interpolated the name into the line unchanged.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 7
+- Issue: #7 (PR #26, review comment 3)
+
+## [2026-11-01 18:11] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+A failure to write the output is no longer reported as a problem with the data. `task-tracker list | head -1` prints one line and nothing on standard error, and exits 1 quietly; it used to print `task-tracker: error: [Errno 32] Broken pipe` plus `Exception ignored while flushing sys.stdout` and exit 120. Any other write failure prints `task-tracker: error:
+cannot write the output: <reason>` and exits 1, and for `add` the task is already saved.
+
+**Rationale:**
+`add` and `list` printed inside the `try` that exists for load and save, so a closed pipe or a full disk was reported as an `error:` about the data, and `add` reported it after it had stored the task, which invited a retry and a duplicate. The commands now return their lines and `main` hands them to `_show` after the `try`.
+`_show` flushes inside its own `try`, because a pipe buffers and a reader that has gone shows up at the flush, and on `BrokenPipeError` it points stdout at devnull, the recipe in the Python `signal` documentation. That recipe exits with 1 as well, so a closed pipe keeps one exit code.
+Rejected: treating a closed pipe as success (exit 0), which the `signal` note does not do, and restoring the default `SIGPIPE` action, which the same note advises against because it also kills the program on a broken socket.
+Four tests were written first and seen failing, then checked with four deliberate breaks of the code: no devnull redirect, exit 0 on a closed pipe, no `BrokenPipeError` branch, and no flush. The last one first survived, because a long list fails mid-stream and never reaches the flush.
+A second test starts the child with a pipe whose reader is already closed, which makes the flush the only place the error can appear, and it now catches that break. A real `list | head -1` over 3000 tasks was also checked by hand.
+
+**Bugfix Context:**
+Review comment 2 on PR #26 (output failures and the `add` retry). Root cause: output and data errors shared one `try`, so one `except` could not tell them apart.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 6
+- Issue: #7 (PR #26, review comment 2)
+
+## [2026-11-01 18:08] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`, `tests/test_storage.py`)
+
+**Summary:**
+`Task` now refuses a name or description that UTF-8 cannot hold, such as a lone surrogate. `task-tracker add $'bad \xff'` prints `task-tracker: error: name must be valid UTF-8 text`, exits 1, and writes nothing. A file that holds such text is a corrupt file: `load` reports `<file>: record N:
+name must be valid UTF-8 text`, where `list` used to print the earlier tasks and then stop with a codec error.
+
+**Rationale:**
+A byte that is not valid UTF-8 in a command-line argument reaches Python as a lone surrogate (`surrogateescape`), and JSON accepts an escaped one, so such text can come from either side. `save` writes UTF-8, so it could never be stored: the first task with that name was lost at the point of saving, and a file that already held one made every later `add` fail.
+Refusing it in `_normalize` closes both ends with one rule, and it keeps the invariant M2 set up: what `save` writes is what `load` accepts, and what `load` rejects `save` refuses.
+Rejected: replacing the bad characters with `?` or an escape on input, which would store a different name than the user typed, and handling the codec error in `main`, which would leave a corrupt file loadable.
+Seven tests were written first and seen failing. One older test could no longer be built: it saved a task constructed with a lone surrogate and expected a `UnicodeEncodeError`. Its promise, that a refused save leaves the old file and no temporary file, is now one more case of the existing save-refusal test, with the surrogate assigned after construction.
+
+**Bugfix Context:**
+Review comment 2 on PR #26 (the part about names that load but cannot be encoded). Root cause: `Task` accepted text that the storage layer could not write.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 5
+- Issue: #7 (PR #26, review comment 2)
+
+## [2026-11-01 18:07] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+Every bad `--due` now gives one message and one exit code. `--due 2026-13-45` prints `argument --due/-D: expected YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS in local time, not '2026-13-45'` and exits 2.
+A value with a UTC offset (`2026-11-02T10:00:00Z`) gets the same message and exit 2, where it used to parse and then fail later with exit 1 and a message that did not name the flag. The old text named the parser (`invalid fromisoformat value`).
+
+**Rationale:**
+A small named converter, `_due`, replaces `type=datetime.fromisoformat`. It raises `argparse.ArgumentTypeError`, which argparse shows verbatim after the flag name, and rejects a timezone-aware result. The check repeats a one-line rule that `Task` already enforces (D6, naive local time).
+That is the price of one rule and one exit code for every bad `--due`; the project owner chose it over keeping exit 1 for offsets,
+which reverses the decision recorded in the plan and `TODO.md` and is updated in the docs commit that follows.
+Not changed: `fromisoformat` still accepts more than `README.md` promises (`20261102`, week dates, fractional seconds that `Task` truncates). A stricter parser would be a second spec to keep in step with the standard library, and accepting a superset harms no one.
+The test was written first and seen failing four ways: no format in the message, `fromisoformat` in the message, and both offsets not raising `SystemExit` at all.
+
+**Bugfix Context:**
+Review comment 5 on PR #26 (and the UTC-offset item of comment 7). Root cause: argparse names the converter in its default message, and the offset rule lived only in the model, so it surfaced after parsing with a different exit code.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 4
+- Issue: #7 (PR #26, review comments 5 and 7)
+
+## [2026-11-01 18:06] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+Two documented behaviors of the command line now have a test: `--due` keeps a time of day (`2026-11-02T10:30:45` is stored as that moment, not as midnight), and a bare `task-tracker` with no command exits 2 and says a command is required. No production code changes.
+
+**Rationale:**
+Review comment 7 found that every `--due` test passed a bare date, so a version that kept only the date part passed the whole suite, and that dropping `required=True` on the subparsers would only show up when someone ran the program.
+Both tests pass as soon as they are written, because the behavior already exists, so they were checked the other way round: each was run against a deliberate break of the code. Dropping the time from the parsed `--due` fails the first test, and `required=False` fails the second. The source was restored and the full suite is green again (192 tests).
+The third item in the comment, a UTC-offset `--due`, is pinned in the next commit with the converter that changes what it does.
+
+**Bugfix Context:**
+Review comment 7 on PR #26. These were gaps in the tests and not defects in the program.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 3
+- Issue: #7 (PR #26, review comment 7)
+
+## [2026-11-01 18:05] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+A wrong `--priority` now says what is valid: `argument --priority/-p: invalid choice: 'URGENT' (choose from 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW')`. It used to say `invalid Priority value: 'URGENT'` and list nothing. Case is still significant, so `-p high` is rejected with the same message. The exit code stays 2.
+
+**Rationale:**
+argparse runs `type=` before it checks `choices`, so with `type=Priority` a wrong value died in the converter and the `invalid choice` message was unreachable. Dropping `type=` and passing the labels as plain strings is the change the review suggested, and `Task` already normalizes a string through `Priority(...)`, so nothing else moves.
+The choices are `priority.value` strings, not the enum members, because argparse prints each choice with `repr` and a member would show as `<Priority.CRITICAL: 'CRITICAL'>`.
+Rejected: `type=str.upper`, which would accept `-p high`. The spec says users type the enum names, and the PR already records the case-sensitive rule as a risk.
+The test was written first and seen failing on the missing names. It checks the error line and not the whole output, because the usage line printed above it already lists the four names and would have let the old message pass.
+
+**Bugfix Context:**
+Review comment 4 on PR #26. Root cause: the order argparse applies `type` and `choices` made the `choices` check dead code.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 2
+- Issue: #7 (PR #26, review comment 4)
+
+## [2026-11-01 18:03] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** storage (`src/task_tracker/storage.py`, `src/task_tracker/task.py`, `tests/test_storage.py`, `tests/test_task.py`, `tests/test_cli.py`)
+
+**Summary:**
+A corrupt task file no longer ends in a traceback in two cases that escaped the CLI's single `except`. A record with a `cls` key is now reported as an unknown field, and a file nested too deeply for `json.load` is reported as `<file>: nested too deeply to read`. Both are one-line errors with exit code 1, from `list` and from `add`, and the file is left alone.
+
+**Rationale:**
+`_from_record` spreads a stored record into `Task.restore(**record)`, so a key named `cls` collided with the classmethod's own first parameter and raised a `TypeError`. Making `cls` positional-only is the smallest fix at the root: the key lands in `record` and the existing unknown-field check rejects it.
+`json.load` raises `RecursionError` on a file nested 200,000 deep, which is not a `ValueError`, so `_read_records` maps it to the `ValueError` that names the file, as M2 does for every other bad file.
+Rejected: catching `TypeError` and `RecursionError` in `main`. That would hide programming mistakes behind the same message, and the contract that a bad file is always a `ValueError` would stay broken for any other caller of `load`. A fuzz of every field against 13 JSON values found no other exception type that escapes `Task.restore`.
+Seven tests were written first and seen failing with the raw `TypeError` and `RecursionError`: two in `test_storage.py`, one in `test_task.py`, and four end-to-end cases in `test_cli.py` (both commands, both shapes).
+
+**Bugfix Context:**
+Review comment 1 on PR #26. Root cause: `Task.restore(cls, **record)` shared a namespace between the classmethod's parameter and the stored field names, and `load` shared an exception contract with `json.load` that has one hole. Reproduced with `[{"cls": 1}]` and `[` repeated 200,000 times through `task-tracker list` and `task-tracker add`.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 1
+- Issue: #7 (PR #26, review comment 1)
+
+## [2026-11-01 18:02] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`)
+
+**Summary:**
+Planned the work that answers the eleven inline review comments on PR #26: eleven steps, each with its commit subject, the tests that will pin it, and the risks. Eight comments are fixed, one (#5) is fixed in part, and two (#6, #8) are answered with a reason instead of a code change.
+
+**Rationale:**
+The project rule is to plan in `TODO.md` before any code changes, and the review fixes touch the exit-code decision, the error path, and the output, so they need a recorded plan as much as a feature does. Every claim in the review was reproduced in a scratch directory before it was triaged: the two tracebacks, the broken pipe, the control characters, the two argparse messages, and the untracked `tasks.json`.
+Two choices were made with the project owner before writing this: a UTC-offset `--due` now exits 2 in a named converter, and the concurrent-`add` limit gets a follow-up issue instead of a lock in this PR.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review
+- Issue: #7 (PR #26)
+
+## [2026-11-01 14:24] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `README.md`)
+
+**Summary:**
+Ticked the nine M3 boxes in the plan and added five that record what was built beyond them: the highest-ID-plus-one rule, the ID tie-break, the empty-list message, the shape of a list line, and the two failure cases. Added a "Decided (2026-11-01)" list to M3 and closed the half of Q3 that M3 owned. `README.md` gains a short section on `add` and `list` with the exit codes.
+
+**Rationale:**
+The project `CLAUDE.md` says to change the plan, the matching issue, and `README.md` together when a decision changes. The usage section only describes behavior I ran in a scratch directory: the three exit codes, the sort order, and the empty-list message.
+Issue #7 still shows the old checklist. It is a change on GitHub, so it waits for the project owner along with the push and the pull request.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M3 First slice, add and list
+- Issue: #7
+
+## [2026-11-01 14:22] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`add` and `list` no longer end in a traceback when something is wrong with the data or the file. A blank name, a corrupt task file, or a path that cannot be read or written prints `task-tracker: error: <message>` on standard error and returns 1. A bad option value still exits 2 inside argparse.
+
+**Rationale:**
+One `except (ValueError, OSError)` in `main`. M2 made every corrupt-file failure a `ValueError` that names the file, and `Task` raises `ValueError` for a bad field, so no custom exception class is needed. `OSError` is the case M2 left for the CLI on purpose: a directory where `tasks.json` should be, or a file that cannot be read.
+The risk is that a programming mistake that raises `ValueError` is reported as bad input. It still prints its message and exits nonzero, and the fix would be a custom exception, which waits until the two cases need telling apart.
+Four tests, written first and seen failing with the raw exception escaping `main`. Five mutations are each caught: `OSError` not caught, `ValueError` not caught, exit 0 on error, the message on standard output, and no program prefix.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M3 First slice, add and list
+- Issue: #7
+
+## [2026-11-01 14:21] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`task-tracker list` prints the current tasks (everything but `DONE`) sorted by due date with undated tasks last, then by priority rank from `CRITICAL` down, then by ID. One line per task: ID, status, priority, due date (`-` when there is none), name. With nothing current it prints `No current tasks in <path>`.
+
+**Rationale:**
+The sort key is `(due or datetime.max, priority rank, id)`. `datetime.max` stands in for a missing due date, which sorts undated tasks last without a separate flag. A stored date always has whole seconds, so it can never equal `max`. Rejected: a leading `due is None` item, which the tests showed was redundant.
+The rank is the enum's definition order, not the string value, which sorts `MEDIUM` after `LOW` (Review Focus 1). The ID settles ties, and a test stores the pair in the opposite order to prove it is the ID and not the file order.
+The empty message names the file so a second list started from a subdirectory explains itself (D2). `start` and `stop` are not shown (Q3).
+Eight tests, written first and seen failing on `invalid choice: 'list'`. Seven mutations are each caught: rank by the raw string, no ID tie-break, including `DONE` tasks, undated first, a different empty message, reversed order, and no due column. Ruff 0.16 flags `datetime.max` (DTZ901) where CI's 0.15.17 does not, so the line carries a `noqa` with the D6 reason, as `task.py` does for its sentinel.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M3 First slice, add and list
+- Issue: #7
+
+## [2026-11-01 14:19] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`task-tracker add NAME [--priority/-p P] [--due/-D DATETIME]` now stores a task in `./tasks.json` and prints `Added task <id>: <name>`. The ID is the highest stored ID plus one.
+`main(argv)` moved from `__init__.py` into the new `cli.py` and returns the exit code; `__init__.py` reexports it, so the `task_tracker:main` entry point is unchanged.
+`list` and error handling follow in the next commits.
+
+**Rationale:**
+argparse subcommands (D3) with `set_defaults(run=...)`, the pattern in the Python documentation, so a new command is one parser plus one function. A bad priority and an unparsable `--due` are left to argparse, which exits 2 as the plan asks; `--due` uses `datetime.fromisoformat` and `Task` does the rest of the normalizing (D6), so the rules are not written twice.
+The ID rule lives in `_add` (D5 says the command computes it).
+Five tests, written first and seen failing on `main() takes 0 positional arguments`. Mutation checks: `len(tasks) + 1` for the ID, renamed short flags, ignored priority, ignored exit code, and no output are each caught.
+One test was too weak. Comparing the long and the short form of the same command passes when both runs drop `--due`, so ignoring `--due` survived until the test also asserted the stored due date. An early mutation run also read a stale `.pyc` (same size, same second), so the runs were repeated with bytecode caching off.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M3 First slice, add and list
+- Issue: #7
+
+## [2026-11-01 14:17] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** planning (`TODO.md`)
+
+**Summary:**
+Added the M3 entry to `TODO.md`: objective, a five-step approach, the tests beyond the plan's nine, and the decisions the plan left to the implementer. Those are the two exit codes, a single `except` in `main`, how `--due` is parsed, priority rank from the enum's definition order, what `add` and `list` leave out (Q3 and `description`), the shape of a list line, and where the ID and sort rules live.
+
+**Rationale:**
+The global rules say the plan is written before any code. The M3 "Think about" list asks seven questions, and this records an answer to each so the tests that follow have something to be wrong against. I did not stop to ask first: every answer is cheap to change in M4 to M8 and none touches stored data.
+Pushing and the pull request are left to the project owner, as the entry says.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Feature: M3 First slice, add and list
+- Issue: #7
+
 ## [2026-11-01 14:30] Commit Summary
 
 **Change Type:** Fix

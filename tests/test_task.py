@@ -145,6 +145,18 @@ def test_non_string_name_is_rejected_with_value_error():
         Task(id=1, name=None)  # type: ignore[arg-type]
 
 
+def test_a_name_that_utf8_cannot_hold_is_rejected():
+    # A command-line argument with an undecodable byte reaches Python as a lone
+    # surrogate (surrogateescape), and `save` writes UTF-8, which cannot hold it.
+    with pytest.raises(ValueError, match="name must be valid UTF-8 text"):
+        Task(1, "bad \udcff")
+
+
+def test_a_description_that_utf8_cannot_hold_is_rejected():
+    with pytest.raises(ValueError, match="description must be valid UTF-8 text"):
+        Task(1, "Buy milk", description="bad \udcff")
+
+
 def test_name_is_stored_without_surrounding_whitespace():
     assert Task(id=1, name="  Buy milk  ").name == "Buy milk"
 
@@ -371,6 +383,20 @@ def test_restore_rejects_a_field_the_task_does_not_have():
     # `save` rewrites the whole record, so a field ignored here would be deleted.
     with pytest.raises(ValueError, match="unknown field.*colour"):
         Task.restore(**stored(colour="red"))
+
+
+@pytest.mark.parametrize("field_name", ["name", "description"])
+def test_restore_rejects_text_that_utf8_cannot_hold(field_name: str):
+    # JSON accepts an escaped lone surrogate, so a file can hold one.
+    with pytest.raises(ValueError, match=f"{field_name} must be valid UTF-8 text"):
+        Task.restore(**stored(**{field_name: "bad \ud83d"}))
+
+
+def test_restore_rejects_a_field_named_cls_as_unknown_not_as_a_clash():
+    # A stored key is spread into keyword arguments, so `cls` must not be a
+    # parameter that a key can collide with: that raised a TypeError.
+    with pytest.raises(ValueError, match="unknown field.*cls"):
+        Task.restore(**stored(cls=1))
 
 
 @pytest.mark.parametrize("field_name", ["created", "updated"])

@@ -80,6 +80,19 @@ Every option has a long and a short form.
 
 ## Commands
 
+### Adding and listing tasks
+
+```bash
+uv run task-tracker add "Pay rent" --priority HIGH --due 2026-11-02
+uv run task-tracker list
+```
+
+- `add NAME` stores a task in `tasks.json` in the current directory and prints its ID. `--priority` (`-p`) takes `CRITICAL`, `HIGH`, `MEDIUM`, or `LOW` and defaults to `LOW`. `--due` (`-D`) takes `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SS`, in local time: a value with a UTC offset is refused.
+- `list` shows the current tasks, one per line: ID, status, priority, due date (`-` when there is none), and name. The earliest due date comes first and tasks without one come last, then the highest priority, then the lowest ID. When nothing is current it says so and names the file it read. A name is shown with control characters as escapes (`\n`, `\x1b`), so one task is always one line.
+- Exit codes: 0 on success, 2 for a bad option value (an unknown priority, or a `--due` that is not a local date or date and time), 1 for anything else that goes wrong (a blank name or one UTF-8 cannot hold, a corrupt or unreadable task file, an output that cannot be written). An error prints one line on standard error and never a traceback.
+- `add` stores the task before it prints, so an error about the output means the task is stored. A reader that closes the pipe early (`task-tracker list | head -1`) ends the output quietly, with exit code 1.
+- Two `add` commands running at the same moment can lose a task: there is no lock yet ([#27](https://github.com/rgoshen/task-tracker/issues/27)).
+
 ### Running GitHub Actions locally
 
 > NOTE: Must have [act](https://github.com/nektos/act) installed already

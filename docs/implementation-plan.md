@@ -81,7 +81,7 @@ Whole seconds because `created` carries microseconds while a typed date does not
 
 - Q1. **Decided:** users type and see the enum names (`TO_DO`, `IN_PROGRESS`, `DONE`; `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`). `Priority.MED` is renamed `MEDIUM` so the word matches `README.md`. Do it before any task file exists: the stored value is the enum value.
 - Q2. **Decided:** `due` is optional and defaults to `None`. Tasks without a due date sort after tasks with one, then by priority. (Defaulting to now made every new task overdue and ranked undated tasks ahead of future deadlines.)
-- Q3. **Decided:** `start` and `stop` are plain datetime fields that default to the current time, with no tracking logic. Still open: can `add` and `update` set them, and does `list` show them (decide in M3 and M5)?
+- Q3. **Decided:** `start` and `stop` are plain datetime fields that default to the current time, with no tracking logic. Decided in M3 (2026-11-01): `add` does not set them and `list` does not show them. Still open for M5: can `update` set them?
 - Q4. **Decided:** yes. Moving a task out of `DONE` sets date completed to `None`, so `status != DONE` always means date completed is `None`. **Amended 2026-10-31 (project owner):** the converse holds too. A `DONE` task always has a date completed, defaulting to the moment it was marked done, and a date passed in cannot be in the future.
 - Q5. **Decided:** yes. `delete` shows the task's name and asks before deleting (see D5). A `--yes` flag for scripts is deferred.
 - Q6. **Decided:** a date and time. `due`, `created`, `updated`, and `date completed` are all datetimes; a bare date such as `2026-11-02` parses to midnight.
@@ -204,15 +204,25 @@ Branch `feature/add-and-list`. Covers features 3 and 5, project-level list only,
 
 Suggested seam: `main(argv: list[str] | None = None) -> int`, so tests call `main(["add", "Buy milk"])` directly, with `monkeypatch.chdir(tmp_path)` and `capsys`.
 
-- [ ] Given an empty project directory, when `add "Buy milk"`, then exit code is 0, the project file holds one task with ID 1 named "Buy milk" with no due date, and the output names ID 1.
-- [ ] Given A (due 2026-11-02, `LOW`), B (due 2026-11-01, `LOW`), C (due 2026-11-01, `CRITICAL`), D (`DONE`), and E (due 2026-11-03, `IN_PROGRESS`), when `list`, then the order is C, B, A, E and D is absent.
-- [ ] Given four tasks all due 2026-11-01 with priorities `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`, when `list`, then the order is `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`.
-- [ ] Given a task with no due date (`MEDIUM`) and a task due 2026-11-01 (`LOW`), when `list`, then the dated task comes first (Q2). Given two tasks with no due date, `LOW` added first and `HIGH` second, then `HIGH` comes first.
-- [ ] Given `add "Pay rent" --priority URGENT`, then argparse exits with code 2 and no file is written.
-- [ ] Given `add "Pay rent" --due 2026-13-45`, then exit code is 2 with an error line and no traceback.
-- [ ] Given `add ""`, then the exit code is nonzero, an error line is printed, and no file is written.
-- [ ] Given a corrupt project file, when `list`, then a one-line error is printed, the exit code is nonzero, and there is no traceback.
-- [ ] Given `add "Pay rent" -p HIGH -D 2026-11-02`, then the stored task equals the one from `add "Pay rent" --priority HIGH --due 2026-11-02`.
+- [x] Given an empty project directory, when `add "Buy milk"`, then exit code is 0, the project file holds one task with ID 1 named "Buy milk" with no due date, and the output names ID 1.
+- [x] Given A (due 2026-11-02, `LOW`), B (due 2026-11-01, `LOW`), C (due 2026-11-01, `CRITICAL`), D (`DONE`), and E (due 2026-11-03, `IN_PROGRESS`), when `list`, then the order is C, B, A, E and D is absent.
+- [x] Given four tasks all due 2026-11-01 with priorities `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`, when `list`, then the order is `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`.
+- [x] Given a task with no due date (`MEDIUM`) and a task due 2026-11-01 (`LOW`), when `list`, then the dated task comes first (Q2). Given two tasks with no due date, `LOW` added first and `HIGH` second, then `HIGH` comes first.
+- [x] Given `add "Pay rent" --priority URGENT`, then argparse exits with code 2 and no file is written.
+- [x] Given `add "Pay rent" --due 2026-13-45`, then exit code is 2 with an error line and no traceback.
+- [x] Given `add ""`, then the exit code is nonzero, an error line is printed, and no file is written.
+- [x] Given a corrupt project file, when `list`, then a one-line error is printed, the exit code is nonzero, and there is no traceback.
+- [x] Given `add "Pay rent" -p HIGH -D 2026-11-02`, then the stored task equals the one from `add "Pay rent" --priority HIGH --due 2026-11-02`.
+- [x] Given stored IDs 1 and 5, when `add "third"`, then the new task has ID 6: highest + 1, not the count.
+- [x] Given two current tasks with the same due date and priority, stored with the higher ID first, when `list`, then the lower ID comes first.
+- [x] Given no file, or only `DONE` tasks, when `list`, then it prints `No current tasks in <path>` and exits 0.
+- [x] Given a task, when `list`, then its line holds the ID, status, priority, due date (`-` when there is none), and name, in that order.
+- [x] Given a corrupt project file, when `add "Buy milk"`, then the exit code is 1, one error line is printed, and the file is unchanged. Given a directory where `tasks.json` should be, when `list`, then the exit code is 1 with one error line.
+- [x] Given `add "Pay rent" --due 2026-11-02T10:00:00Z` (a UTC offset), then the exit code is 2 and the error line names `--due` and `YYYY-MM-DDTHH:MM:SS`. Given `add "Pay rent" --priority URGENT` or `-p high`, then the exit code is 2 and the error line lists `CRITICAL`, `HIGH`, `MEDIUM`, and `LOW`. (PR #26 review)
+- [x] Given a project file with a record that has a key named `cls`, or a file nested 200,000 deep, when `list` or `add`, then the exit code is 1, one error line is printed, and the file is unchanged. (PR #26 review)
+- [x] Given a task whose name holds a newline or an escape character, when `list`, then it is one line with the character shown as `\n` or `\x1b`. Given standard output that cannot encode a character, then it is shown as an escape and the exit code is 0. (PR #26 review)
+- [x] Given `add` with a name that UTF-8 cannot hold, then the exit code is 1, the error says the name must be valid UTF-8 text, and no file is written. The same text in a stored record makes `load` report that record. (PR #26 review)
+- [x] Given `list` piped to a reader that exits after one line, then standard error stays empty and the exit code is 1. Given a write that fails after `add` has saved, then the error says `cannot write the output` and the task stays saved. (PR #26 review)
 
 **Think about:**
 
@@ -221,6 +231,23 @@ Suggested seam: `main(argv: list[str] | None = None) -> int`, so tests call `mai
 - What does `list` print when nothing is current? Which fields fit on one line? Does it show `start` and `stop` (Q3), and what does it print for a missing due date? Should the empty-list message name the file it read (D2), so a second list started from a subdirectory explains itself?
 - The generated `task-tracker` script calls `main()`. How does the return value become the process exit code? ([entry points])
 - Where does "highest ID + 1" get computed?
+
+**Decided (2026-11-01):**
+
+- Exit codes: 2 for a bad option value, which argparse reports itself (an unknown priority, an unparsable `--due`, or a `--due` with a UTC offset); 1 for everything else that goes wrong at runtime (a blank name or one UTF-8 cannot hold, a corrupt or unreadable file, an output that cannot be written). Both print one error line on standard error and never a traceback.
+  A reader that closes the pipe early (`list | head -1`) ends the output quietly, also with 1, as Python's `signal` documentation does.
+- `main` has one `except (ValueError, OSError)` that prints `task-tracker: error: <message>` and returns 1. M2 already made every corrupt-file failure a `ValueError` naming the file, so there is still no custom exception class.
+- `--due` is read by a small converter around `datetime.fromisoformat`. Every bad value, a UTC offset included, gives one message that names the flag and the form `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SS`, and exits 2. Changed in the review of PR #26: an offset first exited 1 from `Task`. The converter repeats the naive-time rule of D6, and `Task` still enforces it for every other caller.
+- The priority rank is the enum's definition order (`CRITICAL` first), not the string value (Review Focus 1). The sort key is `(due or datetime.max, rank, id)`: `datetime.max` stands in for a missing due date, and the ID settles ties so the order does not depend on how the file was written. M4 reuses the key for the first half of `list --all`.
+- Q3: `add` does not set `start` or `stop`, and `list` does not show them. `add` does not set `description` either. Each would need a short flag the options table does not assign yet.
+- A list line is the ID, status, priority, due date (`-` when there is none), and name, with no header. `list` names the file it read only when nothing is current (D2).
+- "Highest ID + 1" is computed in the `add` command, in `cli.py` (D5). The module split waits for M8.
+- `main(argv)` lives in `src/task_tracker/cli.py` and `__init__.py` reexports it, so the `task_tracker:main` entry point is unchanged. Its return value becomes the exit code because the generated script wraps the call in `sys.exit` ([entry points]).
+- `--priority` takes plain-string `choices`, with no `type=`: argparse converts before it checks `choices`, so a converter made the "invalid choice" message unreachable. `Task` turns the checked string into a `Priority`.
+- `Task` refuses a name or description that UTF-8 cannot hold, such as the lone surrogate an undecodable command-line byte becomes, because `save` writes UTF-8. A file that holds one is a corrupt file that names the record.
+- The commands return their lines and `main` prints them after the `try`, so a failed write is never reported as bad data, and `add` has already saved. Each line is escaped first: control characters and the line and paragraph separators, and anything standard output cannot encode, are shown as `\n`, `\x1b`, `\u2028`.
+  Rejecting them in `Task` was rejected: one such name in a shared file would make the whole list unloadable.
+- Known limit: two `add` commands at the same moment can both read the same list, so the second save replaces the first. A task is lost, and both took the same ID. No lock, as in M2; tracked in #27.
 
 **Done when:** `uv run task-tracker add "Buy milk"` then `uv run task-tracker list` works in a scratch directory.
 
