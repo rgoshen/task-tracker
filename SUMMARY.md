@@ -1,5 +1,30 @@
 # Summary
 
+## [2026-11-01 18:11] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+A failure to write the output is no longer reported as a problem with the data. `task-tracker list | head -1` prints one line and nothing on standard error, and exits 1 quietly; it used to print `task-tracker: error: [Errno 32] Broken pipe` plus `Exception ignored while flushing sys.stdout` and exit 120. Any other write failure prints `task-tracker: error:
+cannot write the output: <reason>` and exits 1, and for `add` the task is already saved.
+
+**Rationale:**
+`add` and `list` printed inside the `try` that exists for load and save, so a closed pipe or a full disk was reported as an `error:` about the data, and `add` reported it after it had stored the task, which invited a retry and a duplicate. The commands now return their lines and `main` hands them to `_show` after the `try`.
+`_show` flushes inside its own `try`, because a pipe buffers and a reader that has gone shows up at the flush, and on `BrokenPipeError` it points stdout at devnull, the recipe in the Python `signal` documentation. That recipe exits with 1 as well, so a closed pipe keeps one exit code.
+Rejected: treating a closed pipe as success (exit 0), which the `signal` note does not do, and restoring the default `SIGPIPE` action, which the same note advises against because it also kills the program on a broken socket.
+Four tests were written first and seen failing, then checked with four deliberate breaks of the code: no devnull redirect, exit 0 on a closed pipe, no `BrokenPipeError` branch, and no flush. The last one first survived, because a long list fails mid-stream and never reaches the flush.
+A second test starts the child with a pipe whose reader is already closed, which makes the flush the only place the error can appear, and it now catches that break. A real `list | head -1` over 3000 tasks was also checked by hand.
+
+**Bugfix Context:**
+Review comment 2 on PR #26 (output failures and the `add` retry). Root cause: output and data errors shared one `try`, so one `except` could not tell them apart.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 6
+- Issue: #7 (PR #26, review comment 2)
+
 ## [2026-11-01 18:08] Commit Summary
 
 **Change Type:** Fix

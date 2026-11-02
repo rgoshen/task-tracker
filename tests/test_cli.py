@@ -3,8 +3,13 @@
 # Test names state the intent, so per-test docstrings would only repeat them.
 # pylint: disable=missing-function-docstring
 
+import errno
+import os
+import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -318,3 +323,83 @@ def test_a_directory_where_the_list_should_be_gives_a_one_line_error(
 
     assert exit_code == 1
     _assert_one_line_error(capsys, "tasks.json")
+
+
+# --- review of PR #26: failures while writing the output ---
+
+
+def _list_in_a_new_process(
+    folder: Path, stdout: int, errors: Path
+) -> subprocess.Popen[str]:
+    """Start `task-tracker list` in `folder`; the error text goes to `errors`."""
+    # The console script does the same: it passes the return value to sys.exit.
+    command = "import sys, task_tracker; sys.exit(task_tracker.main(['list']))"
+    with errors.open("w", encoding="utf-8") as error_file:
+        child = subprocess.Popen(  # pylint: disable=consider-using-with
+            [sys.executable, "-c", command],
+            cwd=folder,
+            stdout=stdout,
+            stderr=error_file,
+            text=True,
+        )
+    return child
+
+
+def test_a_reader_that_stops_early_ends_the_list_quietly(tmp_path: Path):
+    # `task-tracker list | head -1`: the reader leaves while the list is still being
+    # written. 3000 lines are more than a pipe holds, so the writer notices.
+    save(
+        [Task(number, f"task {number}") for number in range(1, 3001)],
+        tmp_path / "tasks.json",
+    )
+    errors = tmp_path / "errors.txt"
+
+    child = _list_in_a_new_process(tmp_path, subprocess.PIPE, errors)
+    with child:
+        assert child.stdout is not None
+        first_line = child.stdout.readline()
+        child.stdout.close()
+        child.wait(timeout=30)
+
+    assert first_line.split()[-1] == "1"
+    assert errors.read_text(encoding="utf-8") == ""
+    # Python's own exit code for a broken pipe (the `signal` module's SIGPIPE note).
+    assert child.returncode == 1
+
+
+def test_a_pipe_that_is_already_closed_ends_a_short_list_quietly(tmp_path: Path):
+    # A short list sits in the buffer until the flush, so this is the flush's test.
+    save([Task(1, "Buy milk")], tmp_path / "tasks.json")
+    errors = tmp_path / "errors.txt"
+    read_end, write_end = os.pipe()
+    os.close(read_end)
+
+    child = _list_in_a_new_process(tmp_path, write_end, errors)
+    os.close(write_end)
+    with child:
+        child.wait(timeout=30)
+
+    assert errors.read_text(encoding="utf-8") == ""
+    assert child.returncode == 1
+
+
+def test_a_write_that_fails_after_add_saved_has_its_own_message(
+    project: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+):
+    def refuse(_text: str) -> int:
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    monkeypatch.setattr(
+        sys,
+        "stdout",
+        SimpleNamespace(encoding="utf-8", write=refuse, flush=lambda: None),
+    )
+
+    exit_code = main(["add", "Buy milk"])
+
+    error = capsys.readouterr().err
+    assert exit_code == 1
+    assert error.startswith("task-tracker: error: cannot write the output: ")
+    assert len(error.splitlines()) == 1
+    # The task was saved before the output was written, and it stays saved.
+    assert [task.name for task in load(project)] == ["Buy milk"]

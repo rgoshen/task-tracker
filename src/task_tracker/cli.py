@@ -1,6 +1,7 @@
 """The command line: argument parsing and the commands that use the task file."""
 
 import argparse
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -14,13 +15,14 @@ from task_tracker.task import Task
 _LIST_FILE = "tasks.json"
 
 
-def _add(args: argparse.Namespace, path: Path) -> None:
+def _add(args: argparse.Namespace, path: Path) -> list[str]:
+    """Store the new task and return the lines to show."""
     tasks = load(path)
     # D5: highest + 1, not a count, so a gap left by a delete is not reused.
     next_id = max((task.id for task in tasks), default=0) + 1
     task = Task(next_id, args.name, priority=args.priority, due=args.due)
     save([*tasks, task], path)
-    print(f"Added task {task.id}: {task.name}")
+    return [f"Added task {task.id}: {task.name}"]
 
 
 # Highest priority first. The rank is the enum's definition order, because the
@@ -56,13 +58,38 @@ def _describe(task: Task) -> str:
     )
 
 
-def _list(_args: argparse.Namespace, path: Path) -> None:
+def _list(_args: argparse.Namespace, path: Path) -> list[str]:
+    """Return the lines to show: the current tasks, or that there are none."""
     current = [task for task in load(path) if task.status is not Status.DONE]
     if not current:
-        print(f"No current tasks in {path}")
-        return
-    for task in sorted(current, key=_current_order):
-        print(_describe(task))
+        return [f"No current tasks in {path}"]
+    return [_describe(task) for task in sorted(current, key=_current_order)]
+
+
+def _show(lines: list[str], prog: str) -> int:
+    """Print `lines` and return the exit code.
+
+    The commands only build their lines. Printing is here, outside the `try` in
+    `main`, so a failure to write is never reported as a problem with the data,
+    and `add` has already saved by the time it can happen.
+    """
+    try:
+        for line in lines:
+            print(line)
+        # A pipe buffers, so a reader that has gone shows up at the flush.
+        sys.stdout.flush()
+    except BrokenPipeError:
+        # The reader stopped early, as `head` does. That is not worth a message.
+        # Python flushes stdout once more at exit and would fail the same way, so
+        # point it at devnull first (the recipe in the `signal` module's SIGPIPE
+        # note, which also exits with 1).
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        return 1
+    except OSError as error:
+        print(f"{prog}: error: cannot write the output: {error}", file=sys.stderr)
+        return 1
+    return 0
 
 
 def _due(text: str) -> datetime:
@@ -116,15 +143,16 @@ def main(argv: list[str] | None = None) -> int:
 
     The return value is the exit code: the console script passes it to
     `sys.exit`. A bad option value exits 2 inside argparse. Anything else that
-    goes wrong at runtime prints one line to standard error and returns 1.
+    goes wrong at runtime prints one line to standard error and returns 1, and so
+    does a reader that closes the pipe early, quietly.
     """
     parser = _build_parser()
     args = parser.parse_args(argv)
     try:
-        args.run(args, Path.cwd() / _LIST_FILE)
+        lines = args.run(args, Path.cwd() / _LIST_FILE)
     except (ValueError, OSError) as error:
         # `Task` and `load` raise ValueError for a blank name or a corrupt file
         # (M2 made it the one type); OSError is a file that cannot be read or written.
         print(f"{parser.prog}: error: {error}", file=sys.stderr)
         return 1
-    return 0
+    return _show(lines, parser.prog)
