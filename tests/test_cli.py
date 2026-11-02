@@ -57,14 +57,21 @@ def test_add_numbers_the_new_task_one_above_the_highest_id(project: Path):
     assert [task.id for task in load(project)] == [1, 5, 6]
 
 
-def test_add_with_an_unknown_priority_exits_2_and_writes_nothing(
-    project: Path, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize("priority", ["URGENT", "high"])
+def test_add_with_an_unknown_priority_exits_2_and_says_what_is_valid(
+    project: Path, capsys: pytest.CaptureFixture[str], priority: str
 ):
+    # "high" is the case-sensitive one: users type the enum names (Q1).
     with pytest.raises(SystemExit) as exit_info:
-        main(["add", "Pay rent", "--priority", "URGENT"])
+        main(["add", "Pay rent", "--priority", priority])
 
+    # The usage line above it already lists the names, so check the error itself.
+    error_line = capsys.readouterr().err.splitlines()[-1]
     assert exit_info.value.code == 2
-    assert "URGENT" in capsys.readouterr().err
+    assert "--priority" in error_line
+    assert priority in error_line
+    for name in ("CRITICAL", "HIGH", "MEDIUM", "LOW"):
+        assert name in error_line
     assert not project.exists()
 
 

@@ -70,11 +70,14 @@ def _build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
     add = commands.add_parser("add", help="add a task")
     add.add_argument("name")
+    # No `type=`: argparse converts before it checks `choices`, so a converter
+    # would fail first with a message that lists nothing. The choices are plain
+    # strings because argparse prints each one with `repr`, and `Task` turns the
+    # checked string into a `Priority`.
     add.add_argument(
         "--priority",
         "-p",
-        type=Priority,
-        choices=list(Priority),
+        choices=[priority.value for priority in Priority],
         default=Priority.LOW,
     )
     add.add_argument(

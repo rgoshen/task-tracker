@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-01 18:05] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+A wrong `--priority` now says what is valid: `argument --priority/-p: invalid choice: 'URGENT' (choose from 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW')`. It used to say `invalid Priority value: 'URGENT'` and list nothing. Case is still significant, so `-p high` is rejected with the same message. The exit code stays 2.
+
+**Rationale:**
+argparse runs `type=` before it checks `choices`, so with `type=Priority` a wrong value died in the converter and the `invalid choice` message was unreachable. Dropping `type=` and passing the labels as plain strings is the change the review suggested, and `Task` already normalizes a string through `Priority(...)`, so nothing else moves.
+The choices are `priority.value` strings, not the enum members, because argparse prints each choice with `repr` and a member would show as `<Priority.CRITICAL: 'CRITICAL'>`.
+Rejected: `type=str.upper`, which would accept `-p high`. The spec says users type the enum names, and the PR already records the case-sensitive rule as a risk.
+The test was written first and seen failing on the missing names. It checks the error line and not the whole output, because the usage line printed above it already lists the four names and would have let the old message pass.
+
+**Bugfix Context:**
+Review comment 4 on PR #26. Root cause: the order argparse applies `type` and `choices` made the `choices` check dead code.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 2
+- Issue: #7 (PR #26, review comment 4)
+
 ## [2026-11-01 18:03] Commit Summary
 
 **Change Type:** Fix
