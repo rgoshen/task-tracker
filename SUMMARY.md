@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-01 18:19] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** repository (`.gitignore`)
+
+**Summary:**
+`.gitignore` now ignores `/tasks.json` and `.tasks.json.*.tmp`. Running the example in `README.md`, `uv run task-tracker add ...`, from the repository root writes `tasks.json` there, and a save that is killed leaves a `.tasks.json.<random>.tmp` file behind. Neither was ignored, so a later `git add .` would have committed a personal task list.
+
+**Rationale:**
+Review comment 11. The `/tasks.json` pattern is anchored to the repository root, so it does not touch any other file of that name, and `git check-ignore` confirms it: `tasks.json` and a temporary file in any directory are ignored, `tests/tasks.json` is not, and the existing `!.vscode/tasks.json` exception still leaves that file un-ignored.
+`README.md` says the temporary pattern belongs in `.gitignore` when the list lives in a repository.
+This change also covers a gap the review noted in the commit before it, `0e0d554` (`update .gitignore`, which added `CLAUDE.local.md`): that commit has no `SUMMARY.md` entry. That is recorded here so the log is complete: it ignores `CLAUDE.local.md`, a private per-project instructions file that is not meant to be checked in.
+The subject of that commit is not reworded because that would need a force-push.
+
+**Bugfix Context:**
+Review comment 11 on PR #26. Root cause: M3 is the first milestone that writes a file named `tasks.json` in the directory it is run from, and nothing ignored it.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 9
+- Issue: #7 (PR #26, review comments 8 and 11)
+
 ## [2026-11-01 18:18] Commit Summary
 
 **Change Type:** Docs
