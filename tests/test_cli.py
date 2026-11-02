@@ -468,7 +468,7 @@ def test_text_that_standard_output_cannot_encode_is_shown_as_escapes(
 ):
     # PYTHONIOENCODING=ascii, or a legacy Windows code page: `print` would raise
     # UnicodeEncodeError partway through the listing.
-    save([Task(1, "Café ☕")], project)
+    save([Task(1, "Zoë ☕")], project)
     buffer = io.BytesIO()
     stdout = io.TextIOWrapper(buffer, encoding="ascii")
     monkeypatch.setattr(sys, "stdout", stdout)
@@ -477,4 +477,4 @@ def test_text_that_standard_output_cannot_encode_is_shown_as_escapes(
 
     stdout.flush()
     assert exit_code == 0
-    assert buffer.getvalue().endswith(b"  Caf\\xe9 \\u2615\n")
+    assert buffer.getvalue().endswith(b"  Zo\\xeb \\u2615\n")

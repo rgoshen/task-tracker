@@ -209,7 +209,7 @@ Same branch, `feature/add-and-list`. Test-first, one atomic commit per comment, 
 - A record with a `cls` key, and a file nested 200,000 deep, each give the one-line error from `list` and `add` and leave the file alone.
 - A wrong `--priority` names all four valid values on the error line. A bad `--due` names the flag and the format and exits 2, for a malformed date and for a UTC offset.
 - A real pipeline closed early (`list | head -1` over 3,000 tasks) writes nothing to standard error. A write that fails reports "cannot write the output" and leaves the stored task in place.
-- A name with a lone surrogate is rejected by `Task` and by `load`, naming the record. A name with a newline or an escape sequence prints on one line as escapes. A task named `café` prints as `caf\xe9` when standard output is ASCII.
+- A name with a lone surrogate is rejected by `Task` and by `load`, naming the record. A name with a newline or an escape sequence prints on one line as escapes. A task named with an accented letter and a symbol prints both as escapes (`\xeb`, `\u2615`) when standard output is ASCII.
 
 **Risks & Trade-offs:**
 

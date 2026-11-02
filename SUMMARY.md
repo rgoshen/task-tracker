@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-01 18:22] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests and docs (`tests/test_cli.py`, `SUMMARY.md`, `TODO.md`)
+
+**Summary:**
+CI's `Lint` job failed on the push of the review fixes: codespell 2.4.2 in super-linter read the three letters before the backslash in the escaped form of an accented example word as a misspelling of "calf" (`SUMMARY.md`, `TODO.md`, and `tests/test_cli.py`). The ASCII-output test now uses the name `Zoë ☕`, expecting `Zo\xeb \u2615`, and the two docs describe the escape in words.
+No behavior changes.
+
+**Rationale:**
+The escape is correct output, but the word was split by the backslash, so a spell checker sees a fragment. Changing the example is cheaper and clearer than adding a codespell ignore word for the whole repository, and the test checks the same thing with any non-ASCII letter.
+The unescaped `café` in the other tests is not flagged, because the checker reads `é` as part of the word.
+My local checks run ruff, black, isort, flake8, pylint, mypy, markdownlint, textlint, Prettier, and the duplicate-code check at the CI versions, but not codespell, which is why this reached CI. It now has been run locally at 2.4.2 over every tracked file and reports nothing.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review
+- Issue: #7 (PR #26, CI)
+
 ## [2026-11-01 18:19] Commit Summary
 
 **Change Type:** Fix
@@ -91,7 +111,7 @@ Issue #7 still shows the old checklist and is ticked once CI is green, as before
 
 **Summary:**
 Every line the commands print now goes through `_printable`. Control characters, the C1 controls, and the line and paragraph separators are shown as escapes, so `add $'a\nb'` lists as one line ending `a\nb` and `$'evil\x1b[31mRED'` lists as `evil\x1b[31mRED` instead of sending the escape sequence to the terminal.
-Text that standard output cannot encode is shown as an escape too: with `PYTHONIOENCODING=ascii`, `café` prints as `caf\xe9` and exits 0 where `list` used to stop partway with a codec error. The stored name is unchanged.
+Text that standard output cannot encode is shown as an escape too: with `PYTHONIOENCODING=ascii`, an accented letter prints as its escape (`é` as `\xe9`) and the command exits 0 where `list` used to stop partway with a codec error. The stored name is unchanged.
 
 **Rationale:**
 A name is whatever was typed or whatever a shared file carries, and `README.md` expects lists to be shared, so it should not reach the terminal raw (global `CLAUDE.md`: "sanitize all outputs"). The review offered two places for the fix.
