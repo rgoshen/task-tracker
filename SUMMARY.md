@@ -1,5 +1,29 @@
 # Summary
 
+## [2026-11-01 18:08] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`, `tests/test_storage.py`)
+
+**Summary:**
+`Task` now refuses a name or description that UTF-8 cannot hold, such as a lone surrogate. `task-tracker add $'bad \xff'` prints `task-tracker: error: name must be valid UTF-8 text`, exits 1, and writes nothing. A file that holds such text is a corrupt file: `load` reports `<file>: record N:
+name must be valid UTF-8 text`, where `list` used to print the earlier tasks and then stop with a codec error.
+
+**Rationale:**
+A byte that is not valid UTF-8 in a command-line argument reaches Python as a lone surrogate (`surrogateescape`), and JSON accepts an escaped one, so such text can come from either side. `save` writes UTF-8, so it could never be stored: the first task with that name was lost at the point of saving, and a file that already held one made every later `add` fail.
+Refusing it in `_normalize` closes both ends with one rule, and it keeps the invariant M2 set up: what `save` writes is what `load` accepts, and what `load` rejects `save` refuses.
+Rejected: replacing the bad characters with `?` or an escape on input, which would store a different name than the user typed, and handling the codec error in `main`, which would leave a corrupt file loadable.
+Seven tests were written first and seen failing. One older test could no longer be built: it saved a task constructed with a lone surrogate and expected a `UnicodeEncodeError`. Its promise, that a refused save leaves the old file and no temporary file, is now one more case of the existing save-refusal test, with the surrogate assigned after construction.
+
+**Bugfix Context:**
+Review comment 2 on PR #26 (the part about names that load but cannot be encoded). Root cause: `Task` accepted text that the storage layer could not write.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 5
+- Issue: #7 (PR #26, review comment 2)
+
 ## [2026-11-01 18:07] Commit Summary
 
 **Change Type:** Fix

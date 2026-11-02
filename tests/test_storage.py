@@ -181,6 +181,14 @@ def contents(*records: object) -> str:
         (contents(a_record(start=None)), "record 1: start must be a date"),
         (contents(a_record(stop=None)), "record 1: stop must be a date"),
         (contents(a_record(name="  ")), "record 1: name must not be blank"),
+        (
+            contents(a_record(name="bad \ud83d")),
+            "record 1: name must be valid UTF-8 text",
+        ),
+        (
+            contents(a_record(description="bad \ud83d")),
+            "record 1: description must be valid UTF-8 text",
+        ),
         (contents(a_record(priority="URGENT")), "record 1: .*URGENT"),
         (contents(a_record(due="soon")), "record 1: due"),
         (
@@ -211,6 +219,8 @@ def contents(*records: object) -> str:
         "start-is-null",
         "stop-is-null",
         "blank-name",
+        "name-with-a-lone-surrogate",
+        "description-with-a-lone-surrogate",
         "unknown-priority",
         "bad-date",
         "updated-before-created",
@@ -363,13 +373,26 @@ def blank_named() -> Task:
     return task
 
 
+def surrogate_named() -> Task:
+    # A command-line argument that is not valid UTF-8 reaches Python as a lone
+    # surrogate. `Task` refuses it at construction, so assign it afterwards.
+    task = Task(1, "Buy milk")
+    task.name = "bad \udcff"
+    return task
+
+
 @pytest.mark.parametrize(
     ("tasks", "message"),
     [
         ([Task(1, "a"), Task(2, "b"), Task(1, "c")], "record 3: duplicate id 1"),
         ([blank_named()], "record 1: name must not be blank"),
+        ([surrogate_named()], "record 1: name must be valid UTF-8 text"),
     ],
-    ids=["duplicate-id", "name-blanked-after-construction"],
+    ids=[
+        "duplicate-id",
+        "name-blanked-after-construction",
+        "name-with-a-lone-surrogate-after-construction",
+    ],
 )
 def test_save_refuses_tasks_that_load_would_reject_and_keeps_the_old_file(
     tmp_path: Path,
@@ -410,22 +433,6 @@ def test_non_ascii_text_is_written_as_text_not_as_escapes(tmp_path: Path):
     assert "Café ☕" in text
     assert "\\u" not in text
     assert load(path)[0].name == "Café ☕"
-
-
-def test_text_that_cannot_be_written_as_utf8_fails_the_save_and_keeps_the_old_file(
-    tmp_path: Path, two_tasks: list[Task]
-):
-    # A command-line argument that is not valid UTF-8 reaches Python as a lone
-    # surrogate. Writing it as text fails, and the failure must cost nothing.
-    path = tmp_path / "tasks.json"
-    save(two_tasks, path)
-    before = path.read_bytes()
-
-    with pytest.raises(UnicodeEncodeError):
-        save([Task(3, "bad \udcff")], path)
-
-    assert path.read_bytes() == before
-    assert files_in(tmp_path) == ["tasks.json"]
 
 
 def test_a_date_assigned_after_construction_is_written_in_whole_seconds(

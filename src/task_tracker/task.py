@@ -49,6 +49,21 @@ def _as_naive_datetime(name: str, value: object) -> datetime | None:
     return value.replace(microsecond=0)
 
 
+def _require_utf8_text(name: str, text: str) -> None:
+    """Refuse text that UTF-8 cannot hold, because `save` writes UTF-8.
+
+    An undecodable byte in a command-line argument becomes a lone surrogate
+    (`surrogateescape`), and JSON accepts an escaped one, so such text can arrive
+    from either side. Refusing it here makes it a clear error at the door, and a
+    file that holds it a corrupt file that names the record, instead of a codec
+    error from partway through a listing or a save.
+    """
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        raise ValueError(f"{name} must be valid UTF-8 text") from None
+
+
 # README.md "Task object" defines 11 fields; pylint's default limit is 7.
 @dataclass
 class Task:  # pylint: disable=too-many-instance-attributes
@@ -122,6 +137,8 @@ class Task:  # pylint: disable=too-many-instance-attributes
             raise ValueError("name must not be blank")
         if not isinstance(self.description, str):
             raise ValueError("description must be a string")  # noqa: TRY004
+        _require_utf8_text("name", self.name)
+        _require_utf8_text("description", self.description)
         self.status = Status(self.status)
         self.priority = Priority(self.priority)
         for name in _DATETIME_FIELDS:
