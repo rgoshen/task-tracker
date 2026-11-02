@@ -245,16 +245,22 @@ def _assert_one_line_error(capsys: pytest.CaptureFixture[str], mention: str) -> 
 
 
 @pytest.mark.parametrize("argv", [["list"], ["add", "Buy milk"]])
+@pytest.mark.parametrize(
+    "text",
+    ["not json", '[{"cls": 1}]', "[" * 200_000],
+    ids=["not-json", "field-named-cls", "nested-too-deeply"],
+)
 def test_a_corrupt_list_file_gives_a_one_line_error_and_is_left_alone(
-    project: Path, capsys: pytest.CaptureFixture[str], argv: list[str]
+    project: Path, capsys: pytest.CaptureFixture[str], argv: list[str], text: str
 ):
-    project.write_text("not json", encoding="utf-8")
+    # The last two used to escape as a TypeError and a RecursionError.
+    project.write_text(text, encoding="utf-8")
 
     exit_code = main(argv)
 
     assert exit_code == 1
     _assert_one_line_error(capsys, "tasks.json")
-    assert project.read_text(encoding="utf-8") == "not json"
+    assert project.read_text(encoding="utf-8") == text
 
 
 def test_add_with_a_blank_name_gives_a_one_line_error_and_writes_nothing(

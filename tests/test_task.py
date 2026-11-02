@@ -373,6 +373,13 @@ def test_restore_rejects_a_field_the_task_does_not_have():
         Task.restore(**stored(colour="red"))
 
 
+def test_restore_rejects_a_field_named_cls_as_unknown_not_as_a_clash():
+    # A stored key is spread into keyword arguments, so `cls` must not be a
+    # parameter that a key can collide with: that raised a TypeError.
+    with pytest.raises(ValueError, match="unknown field.*cls"):
+        Task.restore(**stored(cls=1))
+
+
 @pytest.mark.parametrize("field_name", ["created", "updated"])
 def test_restore_rejects_bad_stamp_text_naming_the_field(field_name: str):
     with pytest.raises(ValueError, match=field_name):

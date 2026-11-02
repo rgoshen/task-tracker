@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-01 18:03] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** storage (`src/task_tracker/storage.py`, `src/task_tracker/task.py`, `tests/test_storage.py`, `tests/test_task.py`, `tests/test_cli.py`)
+
+**Summary:**
+A corrupt task file no longer ends in a traceback in two cases that escaped the CLI's single `except`. A record with a `cls` key is now reported as an unknown field, and a file nested too deeply for `json.load` is reported as `<file>: nested too deeply to read`. Both are one-line errors with exit code 1, from `list` and from `add`, and the file is left alone.
+
+**Rationale:**
+`_from_record` spreads a stored record into `Task.restore(**record)`, so a key named `cls` collided with the classmethod's own first parameter and raised a `TypeError`. Making `cls` positional-only is the smallest fix at the root: the key lands in `record` and the existing unknown-field check rejects it.
+`json.load` raises `RecursionError` on a file nested 200,000 deep, which is not a `ValueError`, so `_read_records` maps it to the `ValueError` that names the file, as M2 does for every other bad file.
+Rejected: catching `TypeError` and `RecursionError` in `main`. That would hide programming mistakes behind the same message, and the contract that a bad file is always a `ValueError` would stay broken for any other caller of `load`. A fuzz of every field against 13 JSON values found no other exception type that escapes `Task.restore`.
+Seven tests were written first and seen failing with the raw `TypeError` and `RecursionError`: two in `test_storage.py`, one in `test_task.py`, and four end-to-end cases in `test_cli.py` (both commands, both shapes).
+
+**Bugfix Context:**
+Review comment 1 on PR #26. Root cause: `Task.restore(cls, **record)` shared a namespace between the classmethod's parameter and the stored field names, and `load` shared an exception contract with `json.load` that has one hole. Reproduced with `[{"cls": 1}]` and `[` repeated 200,000 times through `task-tracker list` and `task-tracker add`.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 1
+- Issue: #7 (PR #26, review comment 1)
+
 ## [2026-11-01 18:02] Commit Summary
 
 **Change Type:** Docs

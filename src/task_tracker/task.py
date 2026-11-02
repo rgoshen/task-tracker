@@ -84,13 +84,16 @@ class Task:  # pylint: disable=too-many-instance-attributes
             raise ValueError("date completed must not be in the future")
 
     @classmethod
-    def restore(cls, **record: Any) -> Self:
+    def restore(cls, /, **record: Any) -> Self:
         """Rebuild a task from a stored record, keeping its stored stamps.
 
         The constructor stamps `created` and `updated` with the clock, so it cannot
         build a task that already existed. This runs every other rule the
         constructor does and fills nothing in, so a record must hold every field
         and no other. The field list is the dataclass's own.
+
+        `cls` is positional-only so that a stored key named `cls` lands in `record`
+        and is reported as an unknown field, not raised as a TypeError.
         """
         names = {field.name for field in fields(cls)}
         if missing := names - record.keys():

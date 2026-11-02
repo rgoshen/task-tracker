@@ -35,6 +35,10 @@ def _read_records(path: Path) -> list[Any]:
     except ValueError as error:
         # JSONDecodeError and UnicodeDecodeError are both ValueErrors.
         raise ValueError(f"{path}: not valid JSON: {error}") from error
+    except RecursionError as error:
+        # json.load gives up on a file nested deeper than it can read. Like any
+        # other corrupt file, it is a ValueError that names the file.
+        raise ValueError(f"{path}: nested too deeply to read") from error
     # ValueError, not TypeError: M3's CLI catches one type for a bad file.
     if not isinstance(records, list):
         raise ValueError(f"{path}: must hold a list of tasks")  # noqa: TRY004
