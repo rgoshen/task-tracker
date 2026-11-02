@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-01 18:17] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`SUMMARY.md`)
+
+**Summary:**
+Four M3 entries now carry the minute of the commit that contains them: 14:25 became 14:19 (`feat(cli): add the add command`), 14:26 became 14:21 (`add the list command`), 14:27 became 14:22 (`report errors without a traceback`), and 14:28 became 14:24 (`record the M3 decisions`). The fifth, 14:17, was already right. Only the four headings changed.
+
+**Rationale:**
+Review comment 9 found that the stamps were written ahead of the commits, by 4 to 6 minutes, and a log of decisions is only a trustworthy record if its times are real. The times come from `git log --date=iso` for the commit that added each entry, so the mapping can be checked.
+Not changed: the file is still not strictly newest-first below the M3 block. The `14:30` entry came in with commit `20ad501`, made at 13:46, so the M2 entries around it were stamped later than their commits. They belong to PR #25, which is merged, and restamping them is a separate change to another milestone's record, so they are left as they are.
+From here on each entry is stamped with the clock at the time of writing.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 9
+- Issue: #7 (PR #26, review comment 9)
+
 ## [2026-11-01 18:16] Commit Summary
 
 **Change Type:** Docs
@@ -207,7 +226,7 @@ Two choices were made with the project owner before writing this: a UTC-offset `
 - `TODO.md`: 2026-11-01 Fix: PR #26 review
 - Issue: #7 (PR #26)
 
-## [2026-11-01 14:28] Commit Summary
+## [2026-11-01 14:24] Commit Summary
 
 **Change Type:** Docs
 
@@ -225,7 +244,7 @@ Issue #7 still shows the old checklist. It is a change on GitHub, so it waits fo
 - `TODO.md`: 2026-11-01 Feature: M3 First slice, add and list
 - Issue: #7
 
-## [2026-11-01 14:27] Commit Summary
+## [2026-11-01 14:22] Commit Summary
 
 **Change Type:** Feature
 
@@ -244,7 +263,7 @@ Four tests, written first and seen failing with the raw exception escaping `main
 - `TODO.md`: 2026-11-01 Feature: M3 First slice, add and list
 - Issue: #7
 
-## [2026-11-01 14:26] Commit Summary
+## [2026-11-01 14:21] Commit Summary
 
 **Change Type:** Feature
 
@@ -264,7 +283,7 @@ Eight tests, written first and seen failing on `invalid choice: 'list'`. Seven m
 - `TODO.md`: 2026-11-01 Feature: M3 First slice, add and list
 - Issue: #7
 
-## [2026-11-01 14:25] Commit Summary
+## [2026-11-01 14:19] Commit Summary
 
 **Change Type:** Feature
 
