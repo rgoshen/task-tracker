@@ -1,5 +1,31 @@
 # Summary
 
+## [2026-11-01 18:13] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+Every line the commands print now goes through `_printable`. Control characters, the C1 controls, and the line and paragraph separators are shown as escapes, so `add $'a\nb'` lists as one line ending `a\nb` and `$'evil\x1b[31mRED'` lists as `evil\x1b[31mRED` instead of sending the escape sequence to the terminal.
+Text that standard output cannot encode is shown as an escape too: with `PYTHONIOENCODING=ascii`, `café` prints as `caf\xe9` and exits 0 where `list` used to stop partway with a codec error. The stored name is unchanged.
+
+**Rationale:**
+A name is whatever was typed or whatever a shared file carries, and `README.md` expects lists to be shared, so it should not reach the terminal raw (global `CLAUDE.md`: "sanitize all outputs"). The review offered two places for the fix.
+Rejecting control characters in `Task` would make a single such name in a shared file turn the whole list unloadable, so the fix is at the output, the one place that has the danger.
+Only the categories that break a line or drive the terminal are escaped (`Cc`, `Zl`, `Zp`). `str.isprintable` was rejected as the test because it also flags format characters and non-ASCII spaces, which would damage a zero-width joiner in an emoji sequence or an ideographic space in a name written in another language.
+Encoding uses `backslashreplace` against the stream's own encoding, so the same function covers the surrogate-free but unencodable case.
+Known limit: a literal backslash is not doubled, so a name that really contains `\n` looks like one that contains a newline.
+Eight tests were written first and seen failing, and four deliberate breaks of the code are each caught (no `Zl`, no `Cc`, `replace` in place of `backslashreplace`, and over-escaping with `Zs` and `Cf`). The over-escaping break first survived, so the test for unchanged text was widened to a joiner and a wide space.
+
+**Bugfix Context:**
+Review comment 3 on PR #26. Root cause: `_describe` and the `add` message interpolated the name into the line unchanged.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 7
+- Issue: #7 (PR #26, review comment 3)
+
 ## [2026-11-01 18:11] Commit Summary
 
 **Change Type:** Fix

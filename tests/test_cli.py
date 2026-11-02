@@ -4,6 +4,7 @@
 # pylint: disable=missing-function-docstring
 
 import errno
+import io
 import os
 import subprocess
 import sys
@@ -403,3 +404,77 @@ def test_a_write_that_fails_after_add_saved_has_its_own_message(
     assert len(error.splitlines()) == 1
     # The task was saved before the output was written, and it stays saved.
     assert [task.name for task in load(project)] == ["Buy milk"]
+
+
+# --- review of PR #26: what a name can do to the terminal ---
+
+
+@pytest.mark.parametrize(
+    ("name", "shown"),
+    [
+        ("a\nb", "a\\nb"),
+        ("evil\x1b[31mRED", "evil\\x1b[31mRED"),
+        ("tab\there", "tab\\there"),
+        ("del\x7fchar", "del\\x7fchar"),
+        ("next\x85line", "next\\x85line"),
+        ("split\u2028here", "split\\u2028here"),
+    ],
+    ids=["newline", "escape-sequence", "tab", "delete", "c1-control", "line-separator"],
+)
+def test_control_characters_in_a_name_are_shown_as_escapes_on_one_line(
+    project: Path, capsys: pytest.CaptureFixture[str], name: str, shown: str
+):
+    # A name can come from a shared file (README: lists may be shared or synced),
+    # and a raw one could split a line or send an escape sequence to the terminal.
+    save([Task(1, name)], project)
+
+    main(["list"])
+    listed = capsys.readouterr().out
+
+    assert listed.splitlines() == [listed.rstrip("\n")]
+    assert listed.endswith(f"  {shown}\n")
+    assert "\x1b" not in listed
+
+
+def test_add_shows_a_name_with_a_line_break_as_an_escape(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    main(["add", "a\nb"])
+
+    assert capsys.readouterr().out == "Added task 1: a\\nb\n"
+    assert load(project)[0].name == "a\nb"
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["Café ☕", "family 👨\u200d👩", "full\u3000width"],
+    ids=["accent-and-symbol", "zero-width-joiner", "ideographic-space"],
+)
+def test_names_with_text_that_only_looks_unusual_are_shown_as_they_are(
+    project: Path, capsys: pytest.CaptureFixture[str], name: str
+):
+    # Only what breaks a line or drives the terminal is escaped. A joiner inside
+    # an emoji sequence and a wide space are text, and escaping them would damage
+    # names that are written in other languages.
+    save([Task(1, name)], project)
+
+    main(["list"])
+
+    assert capsys.readouterr().out.endswith(f"  {name}\n")
+
+
+def test_text_that_standard_output_cannot_encode_is_shown_as_escapes(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+):
+    # PYTHONIOENCODING=ascii, or a legacy Windows code page: `print` would raise
+    # UnicodeEncodeError partway through the listing.
+    save([Task(1, "Café ☕")], project)
+    buffer = io.BytesIO()
+    stdout = io.TextIOWrapper(buffer, encoding="ascii")
+    monkeypatch.setattr(sys, "stdout", stdout)
+
+    exit_code = main(["list"])
+
+    stdout.flush()
+    assert exit_code == 0
+    assert buffer.getvalue().endswith(b"  Caf\\xe9 \\u2615\n")

@@ -3,6 +3,7 @@
 import argparse
 import os
 import sys
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -66,6 +67,32 @@ def _list(_args: argparse.Namespace, path: Path) -> list[str]:
     return [_describe(task) for task in sorted(current, key=_current_order)]
 
 
+# Control characters, and the line and paragraph separators: they move the cursor,
+# send commands to the terminal, or split one line into two.
+_UNSAFE_CATEGORIES = frozenset({"Cc", "Zl", "Zp"})
+
+
+def _escape(char: str) -> str:
+    if unicodedata.category(char) in _UNSAFE_CATEGORIES:
+        return char.encode("unicode_escape").decode("ascii")
+    return char
+
+
+def _printable(line: str) -> str:
+    """Return `line` with what could break or drive the terminal shown as escapes.
+
+    A name is whatever was typed or whatever a shared file carries (the README
+    expects lists to be shared), so it is not printed raw: a newline would make one
+    task two lines, and an escape sequence would reach the terminal. Anything that
+    standard output cannot encode becomes an escape too, so a listing is not
+    stopped partway by a codec error. A literal backslash is left as it is, so it
+    can look like an escape.
+    """
+    escaped = "".join(map(_escape, line))
+    encoding = sys.stdout.encoding or "utf-8"
+    return escaped.encode(encoding, "backslashreplace").decode(encoding)
+
+
 def _show(lines: list[str], prog: str) -> int:
     """Print `lines` and return the exit code.
 
@@ -75,7 +102,7 @@ def _show(lines: list[str], prog: str) -> int:
     """
     try:
         for line in lines:
-            print(line)
+            print(_printable(line))
         # A pipe buffers, so a reader that has gone shows up at the flush.
         sys.stdout.flush()
     except BrokenPipeError:
