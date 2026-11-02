@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-01 18:18] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`CLAUDE.md`)
+
+**Summary:**
+The project `CLAUDE.md` now matches the code. "An early scaffold" and "a placeholder `main()` in `__init__.py`" became a description of the first slice: `main()` and the `add` and `list` commands live in `cli.py`, features 3 and 5 exist for the project list only, and the other five are named as not built. A line records the exit-code convention.
+The command example is `uv run task-tracker list`, with a note that a command is required, because a bare `task-tracker` now exits 2.
+
+**Rationale:**
+Review comment 10: the file is read at the start of every session, so a stale "none of the seven features" sends the next session looking for a placeholder that no longer exists. The global Definition of Done asks for documentation to be updated with the change, and `CLAUDE.md` is documentation.
+The exit-code line is the one fact a future change to `main` most needs and cannot guess from the code alone.
+The five features not built are listed by name so the file stays true until M4 to M9 change it, and the text says which milestones the code covers instead of counting tests or lines, which would go stale on the next commit.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 9
+- Issue: #7 (PR #26, review comment 10)
+
 ## [2026-11-01 18:17] Commit Summary
 
 **Change Type:** Docs
