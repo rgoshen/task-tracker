@@ -1,5 +1,30 @@
 # Summary
 
+## [2026-11-01 18:07] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+Every bad `--due` now gives one message and one exit code. `--due 2026-13-45` prints `argument --due/-D: expected YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS in local time, not '2026-13-45'` and exits 2.
+A value with a UTC offset (`2026-11-02T10:00:00Z`) gets the same message and exit 2, where it used to parse and then fail later with exit 1 and a message that did not name the flag. The old text named the parser (`invalid fromisoformat value`).
+
+**Rationale:**
+A small named converter, `_due`, replaces `type=datetime.fromisoformat`. It raises `argparse.ArgumentTypeError`, which argparse shows verbatim after the flag name, and rejects a timezone-aware result. The check repeats a one-line rule that `Task` already enforces (D6, naive local time).
+That is the price of one rule and one exit code for every bad `--due`; the project owner chose it over keeping exit 1 for offsets,
+which reverses the decision recorded in the plan and `TODO.md` and is updated in the docs commit that follows.
+Not changed: `fromisoformat` still accepts more than `README.md` promises (`20261102`, week dates, fractional seconds that `Task` truncates). A stricter parser would be a second spec to keep in step with the standard library, and accepting a superset harms no one.
+The test was written first and seen failing four ways: no format in the message, `fromisoformat` in the message, and both offsets not raising `SystemExit` at all.
+
+**Bugfix Context:**
+Review comment 5 on PR #26 (and the UTC-offset item of comment 7). Root cause: argparse names the converter in its default message, and the offset rule lived only in the model, so it surfaced after parsing with a different exit code.
+
+**References:**
+
+- `TODO.md`: 2026-11-01 Fix: PR #26 review, step 4
+- Issue: #7 (PR #26, review comments 5 and 7)
+
 ## [2026-11-01 18:06] Commit Summary
 
 **Change Type:** Fix

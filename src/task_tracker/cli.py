@@ -65,6 +65,25 @@ def _list(_args: argparse.Namespace, path: Path) -> None:
         print(_describe(task))
 
 
+def _due(text: str) -> datetime:
+    """Read `--due`: a date, or a date and time, in local time (D6).
+
+    Every bad value raises the same `ArgumentTypeError`, so argparse reports it
+    the same way: the flag, the expected form, and exit code 2. A UTC offset
+    parses but is not local time, so it is a bad value here too, not an error
+    that `Task` raises later with an exit code of 1.
+    """
+    try:
+        due = datetime.fromisoformat(text)
+    except ValueError:
+        due = None
+    if due is None or due.tzinfo is not None:
+        raise argparse.ArgumentTypeError(
+            f"expected YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS in local time, not {text!r}"
+        )
+    return due
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="task-tracker")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -83,7 +102,7 @@ def _build_parser() -> argparse.ArgumentParser:
     add.add_argument(
         "--due",
         "-D",
-        type=datetime.fromisoformat,
+        type=_due,
         metavar="DATETIME",
         help="YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, local time",
     )

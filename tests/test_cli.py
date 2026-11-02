@@ -76,15 +76,26 @@ def test_add_with_an_unknown_priority_exits_2_and_says_what_is_valid(
     assert not project.exists()
 
 
-def test_add_with_a_date_that_cannot_exist_exits_2_with_an_error_line(
-    project: Path, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    "due",
+    ["2026-13-45", "tomorrow", "2026-11-02T10:00:00Z", "2026-11-02T10:00:00+02:00"],
+    ids=["no-such-date", "not-a-date", "utc-offset-z", "utc-offset-numeric"],
+)
+def test_add_with_a_bad_due_date_exits_2_naming_the_flag_and_the_format(
+    project: Path, capsys: pytest.CaptureFixture[str], due: str
 ):
+    # A UTC offset parses, but D6 stores local time only, so it is a bad value too.
     with pytest.raises(SystemExit) as exit_info:
-        main(["add", "Pay rent", "--due", "2026-13-45"])
+        main(["add", "Pay rent", "--due", due])
 
     error = capsys.readouterr().err
     assert exit_info.value.code == 2
-    assert "2026-13-45" in error
+    error_line = error.splitlines()[-1]
+    assert "--due" in error_line
+    assert due in error_line
+    assert "YYYY-MM-DDTHH:MM:SS" in error_line
+    # Not the name of the function that did the parsing.
+    assert "fromisoformat" not in error
     assert "Traceback" not in error
     assert not project.exists()
 
