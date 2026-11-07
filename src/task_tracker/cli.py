@@ -220,6 +220,7 @@ def _build_parser() -> argparse.ArgumentParser:
     listing = commands.add_parser("list", help="list the current tasks")
     listing.add_argument(
         "--all",
+        "-a",
         action="store_true",
         dest="include_done",
         help="also list the done tasks, after the current ones",

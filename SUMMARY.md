@@ -1,5 +1,23 @@
 # Summary
 
+## [2026-11-07 12:58] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+Added `-a` as the short form of `list --all`. The parametrized test runs both forms and checks that each gives the same order.
+
+**Rationale:**
+The short form follows the options table in `TODO.md` and shares the `dest` of the long form, so the two cannot drift apart.
+The test is parametrized on the flag rather than repeated, so a new alias needs one entry in the list.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all
+- Issue: #8
+
 ## [2026-11-07 12:57] Commit Summary
 
 **Change Type:** Feature

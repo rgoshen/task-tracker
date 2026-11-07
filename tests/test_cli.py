@@ -234,6 +234,17 @@ def test_list_all_lists_only_done_tasks_while_plain_list_says_none_current(
     assert _listed_names(capsys) == ["old"]
 
 
+@pytest.mark.parametrize("flag", ["-a", "--all"])
+def test_list_short_and_long_all_flags_show_the_same_order(
+    project: Path, capsys: pytest.CaptureFixture[str], flag: str
+):
+    _save_main_case(project)
+
+    main(["list", flag])
+
+    assert _listed_names(capsys) == MAIN_CASE_ORDER
+
+
 def test_list_shows_current_tasks_by_due_date_then_priority(
     project: Path, capsys: pytest.CaptureFixture[str]
 ):
