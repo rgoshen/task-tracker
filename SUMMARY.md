@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-07 15:04] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`)
+
+**Summary:**
+Plan the review fixes for PR #29 (M5, `update`): a new `TODO.md` entry, "Fix: PR #29 review", with the order of the commits, the tests, and the trade-offs. No code changes.
+
+**Rationale:**
+The eight inline comments were each checked before any change: six were reproduced with the command in a scratch directory (a time zone change that blocks every update, a no-op update that rewrites the file, an ID such as `0_1` that is accepted) and two were confirmed from the source and the tests.
+Six are to be fixed. Two are fixed in part and answered with a reason, so their threads stay open for the reviewer.
+The plan also corrects a claim from step 1, that no command can make a task with a future `created`, `start`, or `stop`: `add` followed by a time zone change does.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #29 review
+- Issue: #9 (PR #29, review comments 1 to 8)
+
 ## [2026-11-07 14:44] Commit Summary
 
 **Change Type:** Docs

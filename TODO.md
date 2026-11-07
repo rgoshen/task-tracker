@@ -385,3 +385,44 @@ The six Given/When/Then items are in the M5 section of the plan. In addition:
 - **Clock set back.** `Task.update` stamps `updated` from the clock, and a clock earlier than `created` fails `updated must not be before created`. Accepted: one error line, exit 1, nothing saved.
 - **Lost writes.** `update` reads and rewrites the whole file, so a concurrent `add` or `update` can lose a change, as #27 describes for `add`. No lock, as in M2.
 - **Scope held back.** No `--description`, `--start`, `--stop`, no change to the layout of `cli.py` (M8), and no `--dir` or `--global` (M7).
+
+## [2026-11-07] Fix: PR #29 review
+
+**Objective:**
+Answer the eight inline comments on PR #29 (M5, `update`). Each claim was checked first. Six were reproduced in a scratch directory with the command, and two were confirmed from the source and the tests. Six are fixed (#1, #2, #3, #4, #6, #8). Two are fixed in part and answered with a reason for the rest (#5 and #7), so those two threads stay open for the reviewer.
+
+**Approach:**
+One test-first commit per comment on `feature/update-task`, each with its own `SUMMARY.md` entry, in this order:
+
+1. #4: the test that reads the real clock gets `fixed_clock` and asserts `updated`. Red: it fails against the real clock.
+2. #1: `Task.update` stamps `updated` as `max(now, the stored updated)`, and a new date completed as `max(now, stop)`. Red: a task created "in the future" (a time zone change) cannot be updated.
+3. #2: `Task.update` returns whether it changed anything, and `_update` skips `save` and prints `No change to task N: NAME` when it did not. Red: a hand-formatted file is rewritten.
+4. #3: a `_task_id` converter (ASCII digits, at least 1) for the `ID` argument, so every other form exits 2.
+5. #6: `help=` on every `update` option, with a test on the `-h` output.
+6. #7 (the part agreed): a shared `_PRIORITIES` list and one `--due` definition for `add` and `update`. Behavior is unchanged, so the existing tests are the safety net.
+7. #5 (the part agreed): the comment in the `update` date test says what the test pins.
+8. #8: `update` joins the corrupt-file cases, and a directory in place of the list is added for `update`.
+9. Docs: `README.md` for the no-change output, the clock rule, and the ID rule; this entry; the plan.
+
+**Tests:**
+
+- #1: a task whose `created`, `updated`, `start`, and `stop` are later than the clock can be renamed, keeps its stored `updated`, and can be marked `DONE` with a date completed equal to its `stop`. A clock between `created` and the stored `updated` does not move `updated` backwards. The same through `main`.
+  The model test that expected a refusal (`stop must not be after the date completed`) is replaced, because `update` can no longer produce a timeline error. The blank-name test still proves the rollback.
+- #2: `update` returns `True` after a change and `False` after none. Through `main`, a file written with `indent=4` stays byte-identical and the output is `No change to task 1: Buy milk`. The old test only used a file `save` had written, so a rewrite gave the same bytes and it passed either way.
+- #3: `+1`, `0_1`, an ID with spaces around it, the Arabic-Indic digit `١`, `-1`, `0`, `1.5`, and `one` each exit 2 and leave the file unchanged.
+- #6: the `update -h` output describes `--clear-due` and the other options.
+- #8: a corrupt file and a directory in place of the list each give exit 1, one error line, and an unchanged path.
+
+**Risks & Trade-offs:**
+
+- **#1: a clock behind the stored time, decided 2026-11-07.** `updated` never moves back, and a new date completed is never before `stop`. Before this, the strict rule made every `update` on such a task fail, naming `updated must not be before created`, and the only way out was to wait for the clock.
+  Cost: a task marked `DONE` while the clock is behind its `stop` gets a date completed equal to that `stop`, which can be later than the clock. `load` already accepts such a date, and the "not in the future" rule is for a date a caller gives.
+  This also corrects two earlier claims, in the plan for step 1 and in the PR text, that no command can make a task with a future `created`, `start`, or `stop`. `add` followed by a time zone change makes one.
+- **#2: skipping the write, decided 2026-11-07.** `README.md` says a value the task already has "changes nothing", so the file is not written either. This also leaves out the lost-write window of #27 for a command that changed nothing. Rejected: only correcting the sentence in `README.md`, which keeps a rewrite and a misleading `Updated task` line.
+  The output differs (`No change to task N: NAME`, exit 0) so a script can tell the two apart.
+- **#3: what an ID is, decided 2026-11-07.** ASCII digits, at least 1. `+1` is refused too, though it is a whole number, because `int` accepts forms (`0_1`, a space, non-ASCII digits) that the file never holds, and one strict rule is easier to state than a list of the forms that happen to work. The same converter serves `delete` in M6.
+- **#5, partly declined, decided 2026-11-07.** `Priority(args.priority)` and `Status(args.status)` in `_changes`, and a `TypedDict` for its result, are not added. `add` passes the checked strings the same way, `_build_parser` says why, and `Task` owns the conversion (a test pins it). `args` attributes are `Any`, so a `TypedDict` would check the keys and little else.
+  The comment on the date test is wrong and is fixed.
+- **#7, partly declined, decided 2026-11-07.** The test keeps its own copy of the "nothing to update" text on purpose: a test that imports the constant it checks cannot fail when the message is wrong. The message is not built from the parser, which would take more code than the five names it replaces.
+  After #1, `_settle_date_completed` (clamps to `stop`) and `_fill_in_defaults` (a new task is held to the clock) no longer apply one rule, so they are not merged.
+- **Scope held back.** No `--description`, `--start`, or `--stop`, and no change to the layout of `cli.py` (M8).
