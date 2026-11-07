@@ -1,5 +1,22 @@
 # Summary
 
+## [2026-11-07 13:22] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`SUMMARY.md`)
+
+**Summary:**
+Reworded one sentence in the rationale of the previous `SUMMARY.md` entry. It said who wrote the M4 code; it now says only that the sentence removed from `TODO.md` named who would write the code, which is not how M4 was worked. No code changes.
+
+**Rationale:**
+The project rules ask for no statements about how the code was generated in the documentation. The previous entry was already pushed, so the wording is corrected in a new commit instead of rewriting history.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all
+- Issue: #8
+
 ## [2026-11-07 13:21] Commit Summary
 
 **Change Type:** Docs
@@ -10,7 +27,7 @@
 Removed the sentence "You write the tests and the code" from the objective of the M4 entry in `TODO.md`. The entry now says only that it fixes the order and the traps. No code changes.
 
 **Rationale:**
-The M4 code was written from this entry by delegated agents and then checked by hand, so the sentence was no longer true. The same sentence in the M2 entry is left as it is: it records how that milestone was worked.
+The sentence named who would write the code, which is not how M4 was worked, so it was no longer true. The same sentence in the M2 entry is left as it is: it records how that milestone was worked.
 Before this commit the unpushed history was also tidied: the one-word wording fix to the first M4 `SUMMARY.md` entry was folded into the commit it belonged to, so the branch has three code commits as the plan describes. The final tree was identical before and after.
 
 **References:**
