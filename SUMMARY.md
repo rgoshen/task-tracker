@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-07 15:14] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+`update` joins the cases that check a corrupt list file (three kinds of bad content) and a directory in place of the list: exit code 1, one error line that names `tasks.json`, and the path left as it was.
+
+**Rationale:**
+Review comment 8 on PR #29. `README.md` lists a corrupt or unreadable task file under exit code 1 for `update`, and nothing pinned it for `update` through `main`.
+The code already behaved this way, so these tests passed at once, and the check that they bite is a pair of deliberate breaks: `update` treating a corrupt file as an empty list fails three of them, and treating an unreadable file as an empty list fails the directory case.
+The other half of the comment, the timeline refusal through `main`, is moot after the fix for comment 1: `update` can no longer produce a timeline error, so there is nothing to pin. The blank name and the rest of the model's refusals keep their tests.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 8|Issue: #9 (PR #29, review comment 8)
+
+**References:**
+
+- Tests added after the behavior, because the behavior was already there and untested. A test that cannot fail proves nothing, so each was shown to fail against a version of `update` that ignores the error.
+
 ## [2026-11-07 15:13] Commit Summary
 
 **Change Type:** Docs

@@ -452,7 +452,11 @@ def _assert_one_line_error(capsys: pytest.CaptureFixture[str], mention: str) -> 
     return captured.err
 
 
-@pytest.mark.parametrize("argv", [["list"], ["list", "--all"], ["add", "Buy milk"]])
+@pytest.mark.parametrize(
+    "argv",
+    [["list"], ["list", "--all"], ["add", "Buy milk"], ["update", "1", "--name", "x"]],
+    ids=["list", "list-all", "add", "update"],
+)
 @pytest.mark.parametrize(
     "text",
     ["not json", '[{"cls": 1}]', "[" * 200_000],
@@ -520,12 +524,17 @@ def test_add_with_a_name_that_cannot_be_kept_gives_a_one_line_error_and_writes_n
     assert not project.exists()
 
 
+@pytest.mark.parametrize(
+    "argv",
+    [["list"], ["update", "1", "--name", "x"]],
+    ids=["list", "update"],
+)
 def test_a_directory_where_the_list_should_be_gives_a_one_line_error(
-    project: Path, capsys: pytest.CaptureFixture[str]
+    project: Path, capsys: pytest.CaptureFixture[str], argv: list[str]
 ):
     project.mkdir()
 
-    exit_code = main(["list"])
+    exit_code = main(argv)
 
     assert exit_code == 1
     _assert_one_line_error(capsys, "tasks.json")
