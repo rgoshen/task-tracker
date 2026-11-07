@@ -40,11 +40,30 @@ def _changes(args: argparse.Namespace) -> dict[str, Any]:
     return changes
 
 
+_NOTHING_TO_UPDATE = (
+    "nothing to update: give at least one of --name, --priority, --status, --due, "
+    "--clear-due"
+)
+
+
+def _find(tasks: list[Task], task_id: int) -> Task:
+    """Return the task with `task_id`, or refuse the command if there is none."""
+    for task in tasks:
+        if task.id == task_id:
+            return task
+    raise ValueError(f"no task with ID {task_id}")
+
+
 def _update(args: argparse.Namespace, path: Path) -> list[str]:
     """Change task `args.id` and return the line to show."""
+    changes = _changes(args)
+    # Refused before the file is read, so a command that changes nothing (a
+    # forgotten or mistyped flag) cannot rewrite the file.
+    if not changes:
+        raise ValueError(_NOTHING_TO_UPDATE)
     tasks = load(path)
-    task = next(task for task in tasks if task.id == args.id)
-    task.update(**_changes(args))
+    task = _find(tasks, args.id)
+    task.update(**changes)
     # Every other task is written back as it was read.
     save(tasks, path)
     return [f"Updated task {task.id}: {task.name}"]

@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-07 14:41] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`update` now refuses two commands with a one-line error and exit code 1: one that names no option, and one whose ID matches no task. Both are checked before the file is written, and in the no-option case before it is read. The file is left byte for byte unchanged, and a missing file is not created.
+The module-level pylint suppression for `too-many-lines` is now needed, with the reason beside it.
+
+**Rationale:**
+A command that gives no change would otherwise exit 0 and print a success line, which hides a forgotten or mistyped flag, as decided for M5. An unknown ID is refused rather than skipped, so the user sees that nothing changed.
+The checks use `ValueError`, which `main` already turns into one error line and exit code 1, so the error path is not duplicated.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M5 Update, step 3
+- Issue: #9
+
 ## [2026-11-07 14:39] Commit Summary
 
 **Change Type:** Feature

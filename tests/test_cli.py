@@ -1,7 +1,9 @@
-"""Tests for the command line: `add` and `list`."""
+"""Tests for the command line: `add`, `list`, and `update`."""
 
 # Test names state the intent, so per-test docstrings would only repeat them.
 # pylint: disable=missing-function-docstring
+# The command tests share fixtures and helpers, so they stay in this one module.
+# pylint: disable=too-many-lines
 
 import io
 import json
@@ -997,4 +999,48 @@ def test_values_a_task_already_has_leave_the_file_unchanged(
 
     assert exit_code == 0
     assert capsys.readouterr().out == "Updated task 1: Buy milk\n"
+    assert project.read_bytes() == before
+
+
+NOTHING_TO_UPDATE = (
+    "nothing to update: give at least one of --name, --priority, --status, --due, "
+    "--clear-due"
+)
+
+
+def test_update_of_a_missing_id_exits_1_naming_it_and_leaves_the_file_unchanged(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    save([_stored(1, "Buy milk")], project)
+    before = project.read_bytes()
+
+    exit_code = main(["update", "99", "--name", "x"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "no task with ID 99")
+    assert project.read_bytes() == before
+
+
+def test_update_with_no_tasks_file_exits_1_and_creates_no_file(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    exit_code = main(["update", "1", "--name", "x"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "no task with ID 1")
+    assert not project.exists()
+
+
+@pytest.mark.parametrize("id_text", ["1", "99"])
+def test_update_with_no_option_exits_1_naming_the_options_and_leaves_the_file_alone(
+    project: Path, capsys: pytest.CaptureFixture[str], id_text: str
+):
+    # The option check comes first, so an ID that does not exist is not reported.
+    save([_stored(1, "Buy milk")], project)
+    before = project.read_bytes()
+
+    exit_code = main(["update", id_text])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, NOTHING_TO_UPDATE)
     assert project.read_bytes() == before
