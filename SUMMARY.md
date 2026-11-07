@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-07 16:28] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`delete` treats standard input that is not valid text as "no answer", and no longer calls every `RuntimeError` from `input` a missing answer. A closed standard input, output or error is now checked for before `input` is called.
+
+**Rationale:**
+Review comment 5 on PR #30, two of its three points.
+Too narrow: `input` raises `UnicodeDecodeError` for bytes that are not UTF-8. That is a `ValueError`, so `main` printed the codec message and exit 1 with nothing deleted, but not the `task N was not deleted` line the plan states. It joins `_NO_ANSWER`.
+Too wide: catching `RuntimeError` would also have hidden a `RecursionError` or `NotImplementedError` from inside `input` as a polite "no answer". The two cases wanted are the `lost sys.stdin` and `lost sys.stdout` errors, and `input` raises the same for a closed standard error, which was checked with Python 3.14.7.
+`_ask` tests for those three `None` streams before it calls `input`, and the catch is gone. A `RuntimeError` from anywhere else now stays a traceback, on purpose, and has a test.
+The third point, that Ctrl-C returns 1 and so does not stop a shell loop, is the recorded decision (one error line, exit 1, not 130). It is not changed here.
+Red first: the non-UTF-8 test failed with the codec message, the three stream tests with `input was called`, and the `RuntimeError` test with `DID NOT RAISE`. 373 tests pass, and the full CI-parity check passes.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10 (PR #30, review comment 5)
+
 ## [2026-11-07 16:26] Commit Summary
 
 **Change Type:** Refactor

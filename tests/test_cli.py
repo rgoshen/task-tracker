@@ -1325,21 +1325,27 @@ def test_delete_with_a_bad_id_exits_2_and_never_asks(
 
 
 @pytest.mark.parametrize(
-    "error_type",
-    [EOFError, RuntimeError, KeyboardInterrupt],
-    ids=["end-of-input", "closed-stream", "ctrl-c"],
+    "error",
+    [
+        EOFError(),
+        KeyboardInterrupt(),
+        # Standard input that is not UTF-8: `input` raises a ValueError, which
+        # `main` would otherwise print as a codec message with no word on the task.
+        UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte"),
+    ],
+    ids=["end-of-input", "ctrl-c", "not-utf-8"],
 )
 def test_a_prompt_that_gets_no_answer_deletes_nothing_and_says_so_in_one_line(
     project: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    error_type: type[BaseException],
+    error: BaseException,
 ):
     _save_three(project)
     before = project.read_bytes()
 
     def no_answer(prompt: str = "") -> str:
-        raise error_type
+        raise error
 
     monkeypatch.setattr("builtins.input", no_answer)
 
@@ -1348,6 +1354,45 @@ def test_a_prompt_that_gets_no_answer_deletes_nothing_and_says_so_in_one_line(
     assert exit_code == 1
     _assert_one_line_error(capsys, "task 2 was not deleted")
     assert project.read_bytes() == before
+
+
+@pytest.mark.parametrize("stream", ["stdin", "stdout", "stderr"])
+def test_a_closed_standard_stream_deletes_nothing_without_asking(
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    stream: str,
+):
+    # With descriptor 0, 1 or 2 closed at start-up the matching `sys` stream is
+    # `None`, and the real `input` would raise RuntimeError ("lost sys.stdin").
+    _save_three(project)
+    before = project.read_bytes()
+    _never_asked(monkeypatch)
+    errors_are_visible = stream != "stderr"
+    monkeypatch.setattr(sys, stream, None)
+
+    exit_code = main(["delete", "2"])
+
+    assert exit_code == 1
+    if errors_are_visible:
+        _assert_one_line_error(capsys, "task 2 was not deleted")
+    assert project.read_bytes() == before
+
+
+def test_a_runtime_error_that_is_not_a_closed_stream_is_not_called_no_answer(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+):
+    # A bug inside `input` must stay visible as the bug it is, not become a polite
+    # "no answer": only the three closed streams are known and handled.
+    _save_three(project)
+
+    def broken_input(prompt: str = "") -> str:
+        raise RuntimeError("something else broke")
+
+    monkeypatch.setattr("builtins.input", broken_input)
+
+    with pytest.raises(RuntimeError, match="something else broke"):
+        main(["delete", "2"])
 
 
 def test_delete_with_standard_input_at_its_end_gives_one_error_line(tmp_path: Path):

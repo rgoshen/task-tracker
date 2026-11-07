@@ -74,11 +74,12 @@ def _update(args: argparse.Namespace, path: Path) -> list[str]:
 
 _YES_ANSWERS = {"y", "yes"}
 # What `input` raises when nothing can answer: EOFError when input ended,
-# RuntimeError when a standard stream is closed, KeyboardInterrupt for Ctrl-C.
-# `main` catches none of them, so each would be a traceback. A name, not a tuple
-# in the `except`: ruff 0.16 drops the parentheses there (Python 3.14 allows
-# that), and the older mypy and flake8 that CI runs reject the result.
-_NO_ANSWER = (EOFError, RuntimeError, KeyboardInterrupt)
+# KeyboardInterrupt for Ctrl-C, and UnicodeDecodeError (a ValueError, so `main`
+# would print a codec message without a word about the task) for an answer that is
+# not valid text. A name, not a tuple in the `except`: ruff 0.16 drops the
+# parentheses there (Python 3.14 allows that), and the older mypy and flake8 that
+# CI runs reject the result.
+_NO_ANSWER = (EOFError, KeyboardInterrupt, UnicodeDecodeError)
 
 
 def _ask(prompt: str) -> str | None:
@@ -87,11 +88,14 @@ def _ask(prompt: str) -> str | None:
     What the caller did not do about it is the caller's to say, so this only
     reports that there was no answer.
     """
-    # Without standard output there is nothing to escape for, and `input` then
-    # raises RuntimeError itself, so the prompt is passed on as it is.
-    shown = _printable(prompt, sys.stdout) if sys.stdout is not None else prompt
+    # `input` raises RuntimeError ("lost sys.stdin") when a standard stream was
+    # closed at start-up. That is checked here and not caught: a RuntimeError from
+    # anywhere else (RecursionError, NotImplementedError) is a bug, and should
+    # stay one. `input` also looks at standard error, as it flushes it first.
+    if sys.stdin is None or sys.stdout is None or sys.stderr is None:
+        return None
     try:
-        return input(shown)
+        return input(_printable(prompt, sys.stdout))
     except _NO_ANSWER:
         return None
 
