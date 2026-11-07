@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-07 16:31] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+A real process is given `y` on its standard input (`echo y | task-tracker delete 1`) and deletes the task, exit 0, with the prompt and the result on standard output.
+
+**Rationale:**
+Review comments 4 and 3 on PR #30. The `stdin` parameter of `_run_in_a_new_process` had no caller, and the path it was added for, a script that answers the prompt, had no test. Comment 3 also showed that `README.md`, the plan and the PR text said a script cannot delete until `--yes` exists, which is not true; this test is the evidence for the corrected wording.
+The behavior was already there, so the test passes at once. To show that it can fail, `_ask` was changed to read the line and then answer "n" whatever it was: the test failed on the output, and nothing else was changed.
+The parameter keeps its default of `/dev/null`, so the other real-process tests behave as before. 377 tests pass.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10 (PR #30, review comments 3 and 4)
+
 ## [2026-11-07 16:30] Commit Summary
 
 **Change Type:** Fix

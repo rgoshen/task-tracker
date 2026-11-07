@@ -1549,6 +1549,29 @@ def test_add_after_a_delete_numbers_the_new_task_from_the_highest_remaining_id(
     assert (stored[-1].id, stored[-1].name) == (new_id, "New")
 
 
+def test_a_script_can_answer_the_prompt_on_standard_input(tmp_path: Path):
+    # `echo y | task-tracker delete 1`: the prompt reads standard input, so a script
+    # does not need a `--yes` flag to delete a task, only an answer to read.
+    save([Task(1, "Buy milk"), Task(2, "Walk dog")], tmp_path / "tasks.json")
+    read_end, write_end = os.pipe()
+
+    with _run_in_a_new_process(
+        tmp_path, ["delete", "1"], write_end, stdin=subprocess.PIPE
+    ) as child:
+        os.close(write_end)
+        assert child.stdin is not None
+        child.stdin.write("y\n")
+        child.stdin.close()
+        child.wait(timeout=30)
+
+    output = os.read(read_end, 4096).decode("utf-8")
+    os.close(read_end)
+    assert child.returncode == 0
+    assert output == "Delete task 1: Buy milk? [y/N] Deleted task 1: Buy milk\n"
+    assert (tmp_path / _ERRORS_FILE).read_text(encoding="utf-8") == ""
+    assert [task.id for task in load(tmp_path / "tasks.json")] == [2]
+
+
 def test_delete_with_standard_output_closed_gives_one_error_line(tmp_path: Path):
     # With descriptor 1 closed, `sys.stdout` is None and `input` cannot prompt.
     save([Task(1, "Buy milk")], tmp_path / "tasks.json")
