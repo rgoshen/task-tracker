@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-07 12:11] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** task and storage (`src/task_tracker/task.py`, `src/task_tracker/storage.py`, `tests/test_task.py`, `tests/test_storage.py`)
+
+**Summary:**
+`Task.restore` takes one argument, the record, instead of the record spread into keyword arguments. `Task.restore(record)` replaces `Task.restore(**record)`, so no stored key can collide with a parameter of the method, whichever parameters it gains later. The positional-only `cls` from the earlier fix and the paragraph that explained it are gone.
+The behavior seen from outside is the same: a key named `cls` or `record` is still reported as an unknown field.
+
+**Rationale:**
+Review comment 7 said that the `cls` collision was a symptom of spreading an untrusted dict into `**kwargs`, and that taking the mapping removes the class of bug and the special case. I first planned to answer it with a reason, and one of the reasons was wrong. I wrote that a mapping would reverse an earlier decision;
+the commit I had in mind is about the dataclass fields, and the one that made `restore` take `**record` (`db9f244`, from the review of PR #25) did it so that the dataclass is the single list of fields. A mapping keeps that, and its stated cost (no field list in the signature) is the same in both shapes.
+With that reason gone, what is left against the change is 20 mechanical edits to call sites, which pytest and the type checker verify, so I made the change. The plan in `TODO.md` is corrected to say so.
+The tests were converted first and seen failing (48 failures and 8 setup errors, all `takes 1 positional argument`). The `cls` test now also covers a key named `record`, the parameter's own name. The test that checks that positional fields are refused is renamed to say what it protects: a record is one argument, so the fields cannot be swapped.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #26 review, second round, step 10
+- Issue: #7 (PR #26, review comment 7)
+
 ## [2026-11-07 12:07] Commit Summary
 
 **Change Type:** Docs

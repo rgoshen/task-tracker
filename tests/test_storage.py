@@ -44,17 +44,19 @@ def _two_tasks() -> list[Task]:
     buy_milk = Task(1, "Buy milk", priority=Priority.HIGH, due=DUE)
     # Done in the past, which only `restore` can build.
     file_taxes = Task.restore(
-        id=2,
-        name="File taxes",
-        description="",
-        created=OPENED,
-        updated=FILED,
-        due=None,
-        date_completed=FILED,
-        status=Status.DONE,
-        priority=Priority.LOW,
-        start=OPENED,
-        stop=FILED,
+        {
+            "id": 2,
+            "name": "File taxes",
+            "description": "",
+            "created": OPENED,
+            "updated": FILED,
+            "due": None,
+            "date_completed": FILED,
+            "status": Status.DONE,
+            "priority": Priority.LOW,
+            "start": OPENED,
+            "stop": FILED,
+        }
     )
     return [buy_milk, file_taxes]
 

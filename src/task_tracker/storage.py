@@ -48,7 +48,7 @@ def _read_records(path: Path) -> list[Any]:
 def _from_record(record: object) -> Task:
     if not isinstance(record, dict):
         raise ValueError("must be an object")  # noqa: TRY004
-    return Task.restore(**record)
+    return Task.restore(record)
 
 
 def _restore_all(records: list[Any], path: Path) -> list[Task]:

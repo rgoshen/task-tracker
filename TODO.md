@@ -144,7 +144,7 @@ The seven Given/When/Then items are in the M2 section of the plan. In addition:
 - **Lost updates.** Two processes that load, change, and save at once: the last save wins. No lock, because this is a single-user CLI.
 - **Encoding.** Read and write with an explicit `encoding="utf-8"` so the file does not depend on the machine's locale. `json.dump` uses `ensure_ascii=False`, so non-ASCII text stays readable in the file; text that cannot be encoded fails the save and keeps the old file.
 - **Review of PR #25, decided 2026-11-01.** All eleven threads were accepted, some in part:
-  `restore` takes a record (`restore(**record)`) and reads the field list from the dataclass; a missing or unknown field is a `ValueError` raised by `Task`.
+  `restore` takes a record and reads the field list from the dataclass; a missing or unknown field is a `ValueError` raised by `Task`. It first took keyword arguments (`restore(**record)`); the second review of PR #26 made it one mapping argument (`restore(record)`), so a stored key cannot collide with a parameter.
   Null stamps and an `id` below 1 are rejected. `save` runs every record through the same rules as `load` before it creates a directory or a temporary file, so it cannot replace the last good file with one `load` rejects.
   `save` follows a symbolic link, keeps an existing file's mode, writes UTF-8 text and whole-second dates. No upper bound on `id`: integers are unbounded and the JSON parser already raises `ValueError` past 4300 digits.
 - **Scope held back.** No version field in the file (D5 kept a bare list), no ID assignment (M3), no sorting (M3 and M4). M8 revisits where the task-to-data conversion lives.
@@ -224,7 +224,7 @@ Same branch, `feature/add-and-list`. Test-first, one atomic commit per comment, 
 
 **Objective:**
 Answer nine more inline comments on PR #26, from a second code review, run after the first round was pushed. Each claim was reproduced before it was triaged: the exit code 120, the traceback with a closed standard output, the escape sequence in an error line, the bidirectional controls, and the 16.7 ms against 0.9 ms.
-Eight are fixed and one (#7, `Task.restore` taking a mapping) is answered with a reason.
+All nine are fixed. #7 (`Task.restore` taking a mapping) was first planned as an answer with a reason, but the main reason I gave for it was wrong (see step 10 and the last risk), so it is fixed as well.
 
 **Approach:**
 Same branch, `feature/add-and-list`. Test-first, one atomic commit per comment, each with its own `SUMMARY.md` entry.
@@ -238,6 +238,7 @@ Same branch, `feature/add-and-list`. Test-first, one atomic commit per comment, 
 7. `#6`: `--due` calls the model's date rule instead of repeating it. Commit: `refactor(cli): read --due with the model's date rule`.
 8. `#8`: an unencodable name is tested through `main`. Commit: `test(cli): pin the unencodable name at the command line`.
 9. Docs: the plan, `README.md`, and this entry record the changes. Commit: `docs(plan): record the second round of PR #26 review changes`.
+10. `#7`: `Task.restore` takes one mapping, not keyword arguments, so no stored key can collide with a parameter and the positional-only `/` is not needed. Commit: `refactor(task): restore takes one record`.
 
 **Tests:**
 
@@ -251,7 +252,9 @@ Same branch, `feature/add-and-list`. Test-first, one atomic commit per comment, 
 - **Coverage of the failure branches is measured in child processes**, so pytest-cov does not count them. The in-process figure for `cli.py` drops; the tests still fail when the branch breaks, which the deliberate breaks show.
 - **`as_naive_datetime` becomes public.** It was private to `task.py`. The gain is that the naive-time rule of D6 lives in one place; the docs that called the repetition a cost are corrected.
 - **U+061C is escaped although the comment did not list it.** It is the third Unicode bidirectional mark, next to U+200E and U+200F, and leaving it would make the rule incoherent. U+200D and U+3000 stay text.
-- **#7 is not changed.** A mapping argument touches 19 test call sites and reverses the keyword-only decision of the first review, for a parameter that does not exist. The comment calls the current fix correct.
+- **#7 was first not going to change, and does.** I planned to answer it with a reason, and the main reason was that a mapping argument would reverse an earlier decision. That was a mistake in my reading of the history:
+  the commit that made `restore` take `**record` (`db9f244`, from the review of PR #25) did it so that the dataclass is the one list of fields, and a mapping keeps that exactly. What remains against the change is churn, 20 call sites in the tests, which is mechanical and checked by the type checker;
+  for it, the whole class of key-against-parameter collisions goes away and so does the `/` special case.
 
 [dataclasses]: https://docs.python.org/3/library/dataclasses.html#mutable-default-values
 [pytest exit codes]: https://docs.pytest.org/en/stable/reference/exit-codes.html
