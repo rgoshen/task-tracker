@@ -73,29 +73,36 @@ def _update(args: argparse.Namespace, path: Path) -> list[str]:
 
 
 _YES_ANSWERS = {"y", "yes"}
+# What `input` raises when nothing can answer: EOFError when input ended,
+# RuntimeError when a standard stream is closed, KeyboardInterrupt for Ctrl-C.
+# `main` catches none of them, so each would be a traceback. A name, not a tuple
+# in the `except`: ruff 0.16 drops the parentheses there (Python 3.14 allows
+# that), and the older mypy and flake8 that CI runs reject the result.
+_NO_ANSWER = (EOFError, RuntimeError, KeyboardInterrupt)
 
 
-def _ask(prompt: str, task_id: int) -> str:
-    """Show `prompt` and return the answer. No answer is an error, never a delete."""
+def _ask(prompt: str) -> str | None:
+    """Show `prompt` and return the answer, or None when nothing can answer it.
+
+    What the caller did not do about it is the caller's to say, so this only
+    reports that there was no answer.
+    """
     # Without standard output there is nothing to escape for, and `input` then
     # raises RuntimeError itself, so the prompt is passed on as it is.
     shown = _printable(prompt, sys.stdout) if sys.stdout is not None else prompt
     try:
         return input(shown)
-    except (EOFError, RuntimeError, KeyboardInterrupt) as error:
-        # EOFError: input ended. RuntimeError: a standard stream is closed.
-        # KeyboardInterrupt: Ctrl-C. `main` catches none of them, so each would be a
-        # traceback; here they become the one error line that `main` prints.
-        raise ValueError(
-            f"no answer to the prompt: task {task_id} was not deleted"
-        ) from error
+    except _NO_ANSWER:
+        return None
 
 
 def _delete(args: argparse.Namespace, path: Path) -> list[str]:
     """Ask about task `args.id`, delete it only on a yes, and return the line to show."""
     tasks = load(path)
     task = _find(tasks, args.id)
-    answer = _ask(f"Delete task {task.id}: {task.name}? [y/N] ", task.id)
+    answer = _ask(f"Delete task {task.id}: {task.name}? [y/N] ")
+    if answer is None:
+        raise ValueError(f"no answer to the prompt: task {task.id} was not deleted")
     if answer.strip().lower() not in _YES_ANSWERS:
         return [f"Kept task {task.id}: {task.name}"]
     # The prompt waits on a person, so the list read above may be stale. Read it

@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 16:26] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** cli (`src/task_tracker/cli.py`)
+
+**Summary:**
+`_ask(prompt)` now returns the answer, or `None` when nothing can answer. `_delete` words the error (`no answer to the prompt: task N was not deleted`). The three exceptions that mean "no answer" are named once, in `_NO_ANSWER`.
+
+**Rationale:**
+Review comment 8 on PR #30. `_ask` took `task_id` only to say what `delete` did not do, so a second command that prompts could not reuse it. Returning `None` keeps the I/O helper free of the caller's wording; `_delete` already knows the task.
+The exceptions are a module constant and not a tuple in the `except`, because ruff 0.16 (the lockfile version) rewrites `except (A, B, C):` to `except A, B, C:` once there is no `as` name. That is valid on Python 3.14, but the mypy 2.1.0 and flake8 7.3.0 that CI runs reject it (`multiple exception types must be parenthesized`), while ruff 0.15.17 and black accept both forms.
+No `as` name was left to keep the parentheses, and a constant is also a name for the idea.
+Behavior is unchanged, so the existing delete tests are the safety net: 369 pass.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10 (PR #30, review comment 8)
+
 ## [2026-11-07 16:05] Commit Summary
 
 **Change Type:** Fix
