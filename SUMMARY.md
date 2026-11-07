@@ -1,5 +1,30 @@
 # Summary
 
+## [2026-11-07 12:04] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+The bidirectional formatting characters are escaped on output: the marks U+061C, U+200E and U+200F, the embeddings and overrides U+202A to U+202E, and the isolates U+2066 to U+2069. A name such as `invoice<U+202E>gpj.exe`, which a terminal that applies the Unicode bidirectional algorithm would draw as `invoiceexe.jpg`, now lists as `invoice‮gpj.exe`.
+The zero-width joiner and the wide space are still printed as text, so an emoji sequence and a name in another language are unchanged.
+
+**Rationale:**
+Review comment 4 pointed out that a name from a shared file could reorder how the rest of its line is displayed, which is the same threat the escaping answers for control characters. The comment listed 11 characters. I enumerated the Unicode data to check the set and added a twelfth, U+061C ARABIC LETTER MARK, the third bidirectional mark beside U+200E and U+200F:
+leaving it out would have made the rule cover two of the three marks, for no reason. U+070F, also a format character with a right-to-left class, is not a bidirectional control and is left as text.
+The tests were written first. Eleven failed: four names through `list` and seven range edges. The cases next to each range (including U+200D, U+2010, U+061B and U+061D) pass before and after, and keep the rule from growing.
+Seven deliberate changes to the new ranges (dropping U+061C, shortening or shifting each of the two ranges, shortening the marks, and widening a range over U+200D) are each caught.
+The comment above the pattern now says why each group is escaped. Its claim of "about 20 times faster" was corrected to "an order of magnitude", which is what I measured (16.7 ms to 1.3 ms for 3000 lines).
+
+**Bugfix Context:**
+Review comment 4 on PR #26. Root cause: the escaped set was chosen as the Unicode categories `Cc`, `Zl` and `Zp`, and the bidirectional controls are in `Cf`, a category that also holds the joiner that must stay text.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #26 review, second round, step 6
+- Issue: #7 (PR #26, review comment 4)
+
 ## [2026-11-07 12:03] Commit Summary
 
 **Change Type:** Refactor

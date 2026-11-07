@@ -543,8 +543,23 @@ def test_discarding_standard_output_leaves_no_descriptor_open(
         ("del\x7fchar", "del\\x7fchar"),
         ("next\x85line", "next\\x85line"),
         ("split\u2028here", "split\\u2028here"),
+        ("a\u202eb", "a\\u202eb"),
+        ("a\u2066b", "a\\u2066b"),
+        ("a\u200eb", "a\\u200eb"),
+        ("a\u061cb", "a\\u061cb"),
     ],
-    ids=["newline", "escape-sequence", "tab", "delete", "c1-control", "line-separator"],
+    ids=[
+        "newline",
+        "escape-sequence",
+        "tab",
+        "delete",
+        "c1-control",
+        "line-separator",
+        "right-to-left-override",
+        "isolate",
+        "left-to-right-mark",
+        "arabic-letter-mark",
+    ],
 )
 def test_control_characters_in_a_name_are_shown_as_escapes_on_one_line(
     project: Path, capsys: pytest.CaptureFixture[str], name: str, shown: str
@@ -563,8 +578,38 @@ def test_control_characters_in_a_name_are_shown_as_escapes_on_one_line(
 
 @pytest.mark.parametrize(
     "char",
-    ["\x00", "\x1f", "\x7f", "\x80", "\x9f", "\u2028", "\u2029"],
-    ids=["nul", "unit-separator", "delete", "first-c1", "last-c1", "line", "paragraph"],
+    [
+        "\x00",
+        "\x1f",
+        "\x7f",
+        "\x80",
+        "\x9f",
+        "\u2028",
+        "\u2029",
+        "\u061c",
+        "\u200e",
+        "\u200f",
+        "\u202a",
+        "\u202e",
+        "\u2066",
+        "\u2069",
+    ],
+    ids=[
+        "nul",
+        "unit-separator",
+        "delete",
+        "first-c1",
+        "last-c1",
+        "line",
+        "paragraph",
+        "arabic-letter-mark",
+        "left-to-right-mark",
+        "right-to-left-mark",
+        "first-embedding",
+        "last-override",
+        "first-isolate",
+        "last-isolate",
+    ],
 )
 def test_the_first_and_last_character_of_each_escaped_range_is_escaped(char: str):
     escape = char.encode("unicode_escape").decode("ascii")
@@ -574,8 +619,18 @@ def test_the_first_and_last_character_of_each_escaped_range_is_escaped(char: str
 
 @pytest.mark.parametrize(
     "char",
-    [" ", "~", "\xa0", "\u2027", "\u202f"],
-    ids=["space", "tilde", "no-break-space", "hyphenation-point", "narrow-no-break"],
+    [" ", "~", "\xa0", "\u2027", "\u202f", "\u061b", "\u061d", "\u200d", "\u2010"],
+    ids=[
+        "space",
+        "tilde",
+        "no-break-space",
+        "hyphenation-point",
+        "narrow-no-break",
+        "arabic-semicolon",
+        "arabic-end-of-text",
+        "zero-width-joiner",
+        "hyphen",
+    ],
 )
 def test_the_character_next_to_an_escaped_range_is_left_alone(char: str):
     assert _printable(f"a{char}b", io.StringIO()) == f"a{char}b"

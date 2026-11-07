@@ -68,12 +68,21 @@ def _list(_args: argparse.Namespace, path: Path) -> list[str]:
     return [_describe(task) for task in sorted(current, key=_current_order)]
 
 
-# Control characters, and the line and paragraph separators: they move the cursor,
-# send commands to the terminal, or split one line into two. These ranges are the
-# Unicode categories Cc (C0, DEL and C1), Zl and Zp: compared over every code point
-# there is no difference, and one scan of a line is about 20 times faster than a
-# category lookup for each character.
-_UNSAFE = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")
+# What is escaped, because it moves the cursor, sends commands to the terminal,
+# splits one line into two, or reorders how the rest of a line is displayed:
+# - the control characters (Unicode category Cc: C0, DEL and C1);
+# - the line and paragraph separators (Zl, Zp);
+# - the bidirectional marks, embeddings, overrides and isolates (Unicode Standard
+#   Annex 9), which a name from a shared file could use to make a line read in
+#   another order than it is stored.
+# The first two groups equal the categories over every code point, and one scan of
+# the line is an order of magnitude faster than a category lookup for each
+# character. The zero-width joiner and the wide space are not here: they are text.
+_UNSAFE = re.compile(
+    r"[\x00-\x1f\x7f-\x9f"  # Cc
+    r"\u2028\u2029"  # Zl, Zp
+    r"\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]"  # bidirectional controls
+)
 
 
 def _escape(match: re.Match[str]) -> str:
