@@ -26,11 +26,15 @@ def _now() -> datetime:
     return datetime.now().replace(microsecond=0)  # noqa: DTZ005
 
 
-def _as_naive_datetime(name: str, value: object) -> datetime | None:
+def as_naive_datetime(name: str, value: object) -> datetime | None:
     """Turn an ISO 8601 string, a date, or a datetime into one form.
 
     The result is a naive local datetime with whole seconds, so `isoformat()`
     always reads `YYYY-MM-DDTHH:MM:SS`. A bare date means midnight (Q6).
+
+    Public because the command line reads `--due` with this same rule (D6), so the
+    rule has one home. A value that is not a date, or has a UTC offset, raises
+    `ValueError` naming `name`.
     """
     if value is None:
         return None
@@ -148,7 +152,7 @@ class Task:  # pylint: disable=too-many-instance-attributes
             if value is None and name not in _OPTIONAL_DATETIMES:
                 # ValueError, not TypeError: a null in the file must reach the loader.
                 raise ValueError(f"{name} must be a date or ISO 8601 text")
-            setattr(self, name, _as_naive_datetime(name, value))
+            setattr(self, name, as_naive_datetime(name, value))
 
     def _fill_in_defaults(self, now: datetime) -> None:
         if self.status is Status.DONE and self.date_completed is None:

@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 12:05] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** cli and task (`src/task_tracker/cli.py`, `src/task_tracker/task.py`)
+
+**Summary:**
+`--due` is read with the rule `Task` already applies to every date, instead of a second copy of it. `_due` calls `as_naive_datetime` (the helper in `task.py`, no longer private) and only translates its `ValueError` into the `ArgumentTypeError` that gives the message and exit code 2. Behavior is unchanged: the same 249 tests pass.
+
+**Rationale:**
+Review comment 6 found that `_due` re-implemented what `_as_naive_datetime` does: parse an ISO 8601 text, reject a UTC offset, drop the microseconds. I had recorded the repetition as a known cost ("two places to change if D6 changes"), and the review showed the cost was avoidable. The helper only needed a public name; its docstring now says why. Rejected:
+leaving the copy because the code is only three lines, since a rule repeated in two files drifts the first time D6 changes.
+The test for the refactor is the existing set, which pins the behavior from outside: four bad values, a UTC offset, a timed value, and the short flags. Two deliberate breaks show it still has teeth: a rule that accepts offsets is caught by the CLI tests and the model tests, and a `_due` that does not translate the error is caught by the message checks.
+The docs that call the repetition a cost (`TODO.md`, the plan) are corrected in the docs commit that closes this round.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #26 review, second round, step 7
+- Issue: #7 (PR #26, review comment 6)
+
 ## [2026-11-07 12:04] Commit Summary
 
 **Change Type:** Fix

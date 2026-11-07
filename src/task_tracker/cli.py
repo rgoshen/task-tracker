@@ -11,7 +11,7 @@ from typing import TextIO
 from task_tracker.priority import Priority
 from task_tracker.status import Status
 from task_tracker.storage import load, save
-from task_tracker.task import Task
+from task_tracker.task import Task, as_naive_datetime
 
 # D2: the project list is `tasks.json` in the current directory.
 _LIST_FILE = "tasks.json"
@@ -165,16 +165,17 @@ def _show(lines: list[str], prog: str) -> int:
 def _due(text: str) -> datetime:
     """Read `--due`: a date, or a date and time, in local time (D6).
 
-    Every bad value raises the same `ArgumentTypeError`, so argparse reports it
-    the same way: the flag, the expected form, and exit code 2. A UTC offset
-    parses but is not local time, so it is a bad value here too, not an error
-    that `Task` raises later with an exit code of 1.
+    The rule is the one `Task` applies to any date, so it is not repeated here.
+    What this adds is the way a bad value is reported: every one raises the same
+    `ArgumentTypeError`, so argparse names the flag and the expected form and
+    exits with 2, a UTC offset included, where `Task` alone would give exit code 1.
     """
     try:
-        due = datetime.fromisoformat(text)
+        due = as_naive_datetime("due", text)
     except ValueError:
         due = None
-    if due is None or due.tzinfo is not None:
+    # `None` is for the type checker: a text is never None.
+    if due is None:
         raise argparse.ArgumentTypeError(
             f"expected YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS in local time, not {text!r}"
         )
