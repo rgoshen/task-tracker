@@ -265,7 +265,7 @@ You write the tests and the code; this entry fixes the order and the traps.
 **Approach:**
 Branch `feature/list-all` (from `develop`, after M3 merged as PR #26). Test-first, one atomic commit per step, each with its own `SUMMARY.md` entry. The change stays in `src/task_tracker/cli.py` and `tests/test_cli.py`. Standard library only, so `uv.lock` does not change. `_current_order` stays as it is, and the M3 tests are its safety net.
 
-1. `--all` on the `list` subparser (`action="store_true"`). Red: `list --all` exits 2 because argparse does not know the flag. Green: the current tasks in `_current_order`, then the done tasks by date completed, then ID. Commit: `feat(cli): add list --all`.
+1. `--all` on the `list` subparser (`action="store_true"`, `dest="include_done"`). Red: `list --all` exits 2 because argparse does not know the flag. Green: the current tasks in `_current_order`, then the done tasks by date completed, then ID. Commit: `feat(cli): add list --all`.
 2. `-a`, the short form from the options table. Red: `list -a` exits 2. Commit: `feat(cli): add the -a short flag for list --all`.
 3. The empty case: `list --all` over a missing or empty file says `No tasks in <path>`, and plain `list` keeps `No current tasks in <path>`. Commit: `feat(cli): say no tasks when list --all finds none`.
 4. Docs: tick the M4 boxes in the plan and issue #8, record the decisions below in both, and update the project state in `CLAUDE.md` (features 3, 4, and 5 exist). Commit: `docs(plan): record the M4 decisions`.
@@ -284,12 +284,14 @@ The two Given/When/Then items are in the M4 section of the plan. In addition:
 
 **Risks & Trade-offs:**
 
-- **Sort key of the done half, proposed 2026-11-07 (veto any).** `(date_completed, id)`: the same "ID settles ties" rule as M3, so the order never depends on how the file was written.
-  `Task` guarantees that a `DONE` task has a date completed, but the field's type is `datetime | None`, so pyright rejects the bare comparison. Decide how to satisfy it without hiding a broken record: reusing the `datetime.max` stand-in from `_current_order` would quietly sort such a record last.
-- **The list line stays as M3 made it.** It shows the due date, not the date completed, so a reader cannot see why F precedes D. Rejected for now: a completed column, which changes a line format that tests pin and that the spec does not ask for. Cheap to add later.
-- **Empty wording, proposed.** `No current tasks in <path>` is wrong under `--all`, where done tasks count, so `--all` says `No tasks in <path>`. Rejected: one message for both, which would mislead in one of them.
+- **Sort key of the done half, decided 2026-11-07.** `(date_completed, id)`: the same "ID settles ties" rule as M3, so the order never depends on how the file was written. The half is only the `DONE` tasks, so none of them lacks a date completed.
+  Rejected: sorting the done half by the M3 key (due date, priority, ID). It would give one key for both halves, but it contradicts `README.md` feature 4 and issue #8, most done tasks have no due date and would fall to priority (meaningless for finished work) and ID (creation order), and nothing would read `date_completed`.
+- **Typing of that key, decided 2026-11-07.** `Task` guarantees that a `DONE` task has a date completed (the constructor fills it in, `restore` and `load` reject a record without one), but the field's type is `datetime | None`, so pyright rejects the bare comparison. An `assert task.date_completed is not None` states the invariant for the type checker and adds no branch to cover.
+  Rejected: the `datetime.max` stand-in from `_current_order`, which is dead code here and would quietly sort a broken record last, and a `ValueError`, which is an unreachable branch that needs a forged task to cover. `python -O` strips the assert, and the comparison then fails with a `TypeError` instead, still loudly.
+- **The list line stays as M3 made it, decided 2026-11-07.** It shows the due date, not the date completed, so a reader cannot see why F precedes D. Rejected for now: a completed column under `--all` (two line formats depending on a flag) and in every list (it changes a format that tests pin, and plain `list` would carry a column that is always empty). Cheap to add later.
+- **Empty wording, decided 2026-11-07.** `No current tasks in <path>` is wrong under `--all`, where done tasks count, so `--all` says `No tasks in <path>` and plain `list` keeps its message. Rejected: one message for both, which would mislead under `--all`, and a hint at `--all` in plain `list`, which is behavior the spec never asked for.
 - **No header or divider between the halves** (M3: no header, one line per task). The status column tells them apart. A divider would break "one line per task" for anyone who parses the output.
-- **Flag name in the code.** argparse derives `dest` from the first long option string ([argparse dest]), so `--all` becomes `args.all`. It shadows nothing, but `dest="include_done"` would read better where `_list` branches on it. Your choice.
+- **Flag name in the code, decided 2026-11-07.** argparse derives `dest` from the first long option string ([argparse dest]), so `--all` would become `args.all`. The flag gets `dest="include_done"`, which says what it does where `_list` branches on it and does not read like the built-in `all()`. The cost is one keyword argument, and a name that differs from the flag text.
 - **Clock changes.** Date completed is naive local time (D6), so a clock set back could reorder tasks completed in the repeated hour. Accepted, as in M2.
 - **Scope held back.** No filtering beyond `--all`, no `--dir` or `--global` (M7), and no change to the layout of `cli.py` (M8).
 

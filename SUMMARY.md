@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-07 12:52] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`)
+
+**Summary:**
+Recorded the four M4 decisions in the `TODO.md` entry, changing "proposed" to "decided" and adding what was rejected.
+The done tasks sort by date completed, then ID. The sort key states the "a done task has a date completed" invariant with an `assert` for the type checker.
+The list line stays as M3 made it. `list --all` over an empty file says `No tasks in <path>`. The flag's value is named `include_done`. No code changes.
+
+**Rationale:**
+The project owner went through each proposal and chose the recommended option every time.
+The one that got discussion was the order of the done tasks: sorting them by the M3 key (due date, priority, ID) would reuse one key for both halves, but it contradicts `README.md` feature 4 and issue #8.
+Most done tasks also have no due date, so they would fall to priority and ID, which say nothing about finished work.
+The `assert` was chosen over a `datetime.max` stand-in (dead code that would sort a broken record last) and a `ValueError` (an unreachable branch that needs a forged task to cover). `python -O` strips it, and the comparison then fails with a `TypeError`, which is still loud.
+The plan, `README.md`, and issue #8 are not edited here: no decision changed their text, because the spec's order stands. They are updated in step 4 of the entry, with the ticked boxes.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all
+- Issue: #8
+
 ## [2026-11-07 12:36] Commit Summary
 
 **Change Type:** Docs
