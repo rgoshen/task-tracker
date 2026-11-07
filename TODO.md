@@ -178,7 +178,7 @@ The nine Given/When/Then items are in the M3 section of the plan. In addition:
   A reader that closes the pipe early also ends with 1, quietly, and a failed write of the output prints `cannot write the output` and returns 1 (PR #26 review).
 - **One `except` in `main`, decided 2026-11-01.** It catches `ValueError` (from `Task` and `load`) and `OSError` and prints `task-tracker: error: <message>`. M2 already made every corrupt-file failure a `ValueError` naming the file, so no custom exception class is needed yet.
 - **`--due` is read by `_due`, a converter around `datetime.fromisoformat`.** A malformed value exits 2 as the plan says. A value with a UTC offset also exits 2: it parses, but D6 stores local time only. Changed 2026-11-01 in the review of PR #26; it first exited 1 from `Task`, with a message that did not name the flag.
-  The converter repeats the naive-time rule that `Task` enforces, which is the cost of one rule and one exit code.
+  The converter first repeated the naive-time rule that `Task` enforces. In the second review round it started to call `as_naive_datetime`, the helper `Task` uses, so the rule (D6) lives in one place and the converter only translates the error.
 - **Priority rank comes from the enum's definition order** (`CRITICAL` first), not from the string value, which sorts `MEDIUM` after `LOW` (Review Focus 1). A test pins the order, so reordering the enum fails loudly.
 - **Q3 and `description`, decided 2026-11-01.** `add` does not set `start`, `stop`, or `description`, and `list` does not show `start` or `stop`: they stay plain fields with their defaults until a milestone needs them. Cheap to add later; each would need a short flag the options table does not assign yet.
 - **List line.** One line per task: ID, status, priority, due date (`-` when there is none), name. No header, no color. Every datetime prints through `isoformat()`, the form M2 stores.
@@ -213,7 +213,7 @@ Same branch, `feature/add-and-list`. Test-first, one atomic commit per comment, 
 
 **Risks & Trade-offs:**
 
-- **Offset `--due` now exits 2, decided 2026-11-01.** The converter repeats the one-line naive-time rule that `Task` already enforces (D6). The cost is two places to change if D6 changes; the gain is one rule and one exit code for every bad `--due`.
+- **Offset `--due` now exits 2, decided 2026-11-01.** The converter first repeated the one-line naive-time rule that `Task` enforces (D6), at the cost of two places to change. The second review round removed that cost: it calls `as_naive_datetime` now, and the gain is one rule and one exit code for every bad `--due`.
 - **A superset of ISO 8601 is still accepted** (`20261102`, week dates, fractional seconds that are truncated). Rejected: a stricter parser, which would be a second spec to keep in step with `fromisoformat`.
 - **Control characters are escaped on output, not rejected by `Task`.** One such name in a shared file would otherwise make the whole list unloadable. A literal backslash followed by `n` prints the same as an escaped newline.
 - **Surrogates are rejected by `Task`**, so a file that holds one is now a corrupt file naming its record, where `list` used to abort partway.

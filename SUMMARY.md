@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-07 12:07] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `README.md`, `TODO.md`)
+
+**Summary:**
+Recorded what the second round of review changed. The plan gains two checked Given/When/Then items (the error line and the bidirectional controls; a failed write and a closed standard output) and two "Decided" bullets, and its escaping bullet now lists the bidirectional controls and says the error line is escaped too.
+`README.md` says that text-direction controls are escaped and that a closed standard output ends with exit code 0.
+The statements that called the `--due` converter a repetition of the naive-time rule ("two places to change") are corrected in `TODO.md` and the plan: it calls `as_naive_datetime` now.
+
+**Rationale:**
+The project `CLAUDE.md` says to update the plan and `README.md` together with a decision. Three decisions changed in this round: the `--due` rule lives in one place, the escaped set grew, and a closed output stream is a success. The earlier text for the first would have misled the next reader into thinking the cost was still there.
+The `TODO.md` entry for the first review round is kept as the record of what was decided then, with a sentence that says what changed after it, instead of being rewritten.
+Issue #7 does not need an edit: its acceptance criteria are the original nine and are all ticked.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #26 review, second round, step 9
+- Issue: #7 (PR #26)
+
 ## [2026-11-07 12:06] Commit Summary
 
 **Change Type:** Fix
