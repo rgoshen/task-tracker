@@ -256,6 +256,44 @@ Same branch, `feature/add-and-list`. Test-first, one atomic commit per comment, 
   the commit that made `restore` take `**record` (`db9f244`, from the review of PR #25) did it so that the dataclass is the one list of fields, and a mapping keeps that exactly. What remains against the change is churn, 20 call sites in the tests, which is mechanical and checked by the type checker;
   for it, the whole class of key-against-parameter collisions goes away and so does the `/` special case.
 
+## [2026-11-07] Feature: M4 List all
+
+**Objective:**
+Make `uv run task-tracker list --all` (short `-a`) show every task: the current ones first in the M3 order, then the completed ones by date completed, oldest first. Covers issue #8 and the M4 section of `docs/implementation-plan.md`. Feature 4 of `README.md`, project-level list only: `--dir` and `--global` arrive in M7.
+You write the tests and the code; this entry fixes the order and the traps.
+
+**Approach:**
+Branch `feature/list-all` (from `develop`, after M3 merged as PR #26). Test-first, one atomic commit per step, each with its own `SUMMARY.md` entry. The change stays in `src/task_tracker/cli.py` and `tests/test_cli.py`. Standard library only, so `uv.lock` does not change. `_current_order` stays as it is, and the M3 tests are its safety net.
+
+1. `--all` on the `list` subparser (`action="store_true"`). Red: `list --all` exits 2 because argparse does not know the flag. Green: the current tasks in `_current_order`, then the done tasks by date completed, then ID. Commit: `feat(cli): add list --all`.
+2. `-a`, the short form from the options table. Red: `list -a` exits 2. Commit: `feat(cli): add the -a short flag for list --all`.
+3. The empty case: `list --all` over a missing or empty file says `No tasks in <path>`, and plain `list` keeps `No current tasks in <path>`. Commit: `feat(cli): say no tasks when list --all finds none`.
+4. Docs: tick the M4 boxes in the plan and issue #8, record the decisions below in both, and update the project state in `CLAUDE.md` (features 3, 4, and 5 exist). Commit: `docs(plan): record the M4 decisions`.
+5. Done when the tests pass locally, coverage on changed code is at least 80%, the CI-version linters and the Markdown linters are clean locally, and `list --all` works in a scratch directory. Pushing and opening the PR into `develop` wait for the project owner.
+
+**Tests:**
+The two Given/When/Then items are in the M4 section of the plan. In addition:
+
+- Build the done tasks with `Task.restore` and a full record, not the constructor. The constructor stamps `created` with the clock and rejects a date completed before it, so a task completed on 2026-10-10 cannot be built that way (the same trap as M2 step 3). The record must also keep `created <= start <= stop <= date_completed`, so all four sit before 2026-10-05.
+- The done half orders by date completed, not by ID. With A to E at IDs 1 to 5 and F at ID 6, F (completed first) must come before D (ID 4); an ID order would give D, F and fail.
+- Two done tasks with the same date completed list the lower ID first, even when the file holds them the other way round (the M3 tie rule).
+- A done task with the earliest due date still comes after every current task.
+- `list -a` and `list --all` print the same output, and both equal the expected order.
+- Plain `list` still leaves the done tasks out. A file with only done tasks lists them under `--all`, and plain `list` still says `No current tasks in <path>`.
+- A corrupt list file gives the same one-line error and exit 1 under `--all`; add `["list", "--all"]` to the existing parametrized case.
+
+**Risks & Trade-offs:**
+
+- **Sort key of the done half, proposed 2026-11-07 (veto any).** `(date_completed, id)`: the same "ID settles ties" rule as M3, so the order never depends on how the file was written.
+  `Task` guarantees that a `DONE` task has a date completed, but the field's type is `datetime | None`, so pyright rejects the bare comparison. Decide how to satisfy it without hiding a broken record: reusing the `datetime.max` stand-in from `_current_order` would quietly sort such a record last.
+- **The list line stays as M3 made it.** It shows the due date, not the date completed, so a reader cannot see why F precedes D. Rejected for now: a completed column, which changes a line format that tests pin and that the spec does not ask for. Cheap to add later.
+- **Empty wording, proposed.** `No current tasks in <path>` is wrong under `--all`, where done tasks count, so `--all` says `No tasks in <path>`. Rejected: one message for both, which would mislead in one of them.
+- **No header or divider between the halves** (M3: no header, one line per task). The status column tells them apart. A divider would break "one line per task" for anyone who parses the output.
+- **Flag name in the code.** argparse derives `dest` from the first long option string ([argparse dest]), so `--all` becomes `args.all`. It shadows nothing, but `dest="include_done"` would read better where `_list` branches on it. Your choice.
+- **Clock changes.** Date completed is naive local time (D6), so a clock set back could reorder tasks completed in the repeated hour. Accepted, as in M2.
+- **Scope held back.** No filtering beyond `--all`, no `--dir` or `--global` (M7), and no change to the layout of `cli.py` (M8).
+
+[argparse dest]: https://docs.python.org/3/library/argparse.html#dest
 [dataclasses]: https://docs.python.org/3/library/dataclasses.html#mutable-default-values
 [pytest exit codes]: https://docs.pytest.org/en/stable/reference/exit-codes.html
 [JSONDecodeError]: https://docs.python.org/3/library/json.html#json.JSONDecodeError

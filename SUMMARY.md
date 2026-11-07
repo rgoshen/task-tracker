@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-07 12:36] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`)
+
+**Summary:**
+Added the plan for M4, `list --all`, to `TODO.md`: five steps (the `--all` flag, the `-a` short flag, the empty-list wording, the docs, the local checks), the tests to write, and the risks. No code changes.
+
+**Rationale:**
+The project rules ask for the plan before any code, on a branch cut from `develop`. M3 merged as PR #26, so the branch starts from a `develop` that has `add` and `list`.
+The entry fixes the traps before the tests are written. The done tasks must be built with `Task.restore`, because the constructor rejects a date completed before `created`. The done half must sort by date completed, then ID, and a test with the later ID completed first would fail an ID order.
+The sort key, the list line, the empty-list wording, and the name of the flag's destination are proposed with reasons and left open for the project owner to veto, as in the M2 and M3 entries.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all
+- Issue: #8
+
 ## [2026-11-07 12:11] Commit Summary
 
 **Change Type:** Refactor
