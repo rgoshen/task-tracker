@@ -1131,3 +1131,126 @@ def test_update_help_explains_each_argument(
     row += list(takewhile(lambda line: line.startswith(" " * 10), lines[start + 1 :]))
     assert exit_info.value.code == 0
     assert explanation in " ".join(" ".join(row).split())
+
+
+# --- M6: delete ---
+
+
+def _answer_with(monkeypatch: pytest.MonkeyPatch, reply: str) -> list[str]:
+    """Patch `input` to answer `reply`; return the list that collects each prompt."""
+    prompts: list[str] = []
+
+    def fake_input(prompt: str = "") -> str:
+        prompts.append(prompt)
+        return reply
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    return prompts
+
+
+def _save_three(path: Path) -> None:
+    save([_stored(1, "Buy milk"), _stored(2, "Walk dog"), _stored(3, "Pay rent")], path)
+
+
+def _records(path: Path) -> list[dict[str, object]]:
+    """The stored records as written, so a comparison is of the file itself."""
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_delete_yes_removes_only_the_named_task(
+    project: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    # Given three stored tasks and a person who answers yes
+    _save_three(project)
+    before = _records(project)
+    _answer_with(monkeypatch, "y")
+
+    # When task 2 is deleted
+    exit_code = main(["delete", "2"])
+
+    # Then tasks 1 and 3 are stored exactly as they were
+    assert exit_code == 0
+    assert capsys.readouterr().out == "Deleted task 2: Walk dog\n"
+    assert _records(project) == [before[0], before[2]]
+
+
+def test_delete_no_keeps_every_task_and_leaves_the_file_bytes_alone(
+    project: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    # Hand-formatted with indent=4, which `save` never writes: a rewrite would change
+    # the bytes, so an unchanged file proves the file was not written.
+    _save_three(project)
+    project.write_text(json.dumps(_records(project), indent=4), encoding="utf-8")
+    before = project.read_bytes()
+    _answer_with(monkeypatch, "n")
+
+    exit_code = main(["delete", "2"])
+
+    assert exit_code == 0
+    assert capsys.readouterr().out == "Kept task 2: Walk dog\n"
+    assert project.read_bytes() == before
+
+
+@pytest.mark.parametrize("reply", ["y", "n"])
+def test_delete_asks_with_the_id_and_the_name_before_it_changes_anything(
+    project: Path, monkeypatch: pytest.MonkeyPatch, reply: str
+):
+    _save_three(project)
+    prompts = _answer_with(monkeypatch, reply)
+
+    main(["delete", "2"])
+
+    assert prompts == ["Delete task 2: Walk dog? [y/N] "]
+
+
+@pytest.mark.parametrize(
+    ("reply", "deleted"),
+    [
+        ("y", True),
+        ("Y", True),
+        ("yes", True),
+        ("YES", True),
+        ("  yes  ", True),
+        ("n", False),
+        ("no", False),
+        ("", False),
+        ("maybe", False),
+        ("yy", False),
+    ],
+    ids=["y", "Y", "yes", "YES", "padded-yes", "n", "no", "empty", "maybe", "yy"],
+)
+def test_only_a_yes_deletes_the_task(
+    project: Path, monkeypatch: pytest.MonkeyPatch, reply: str, deleted: bool
+):
+    _save_three(project)
+    _answer_with(monkeypatch, reply)
+
+    exit_code = main(["delete", "2"])
+
+    assert exit_code == 0
+    assert [task.id for task in load(project)] == ([1, 3] if deleted else [1, 2, 3])
+
+
+def test_a_control_character_in_the_name_is_shown_as_an_escape_on_one_line(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+):
+    save([_stored(1, "Buy\nmilk")], project)
+    prompts = _answer_with(monkeypatch, "n")
+
+    main(["delete", "1"])
+
+    assert prompts == ["Delete task 1: Buy\\nmilk? [y/N] "]
+
+
+def test_deleting_the_only_task_leaves_an_empty_list_that_list_reports(
+    project: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    save([_stored(1, "Buy milk")], project)
+    _answer_with(monkeypatch, "y")
+
+    assert main(["delete", "1"]) == 0
+    assert _records(project) == []
+    capsys.readouterr()
+
+    assert main(["list"]) == 0
+    assert "No current tasks in" in capsys.readouterr().out

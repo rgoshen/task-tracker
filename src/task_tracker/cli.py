@@ -72,6 +72,20 @@ def _update(args: argparse.Namespace, path: Path) -> list[str]:
     return [f"Updated task {task.id}: {task.name}"]
 
 
+_YES_ANSWERS = {"y", "yes"}
+
+
+def _delete(args: argparse.Namespace, path: Path) -> list[str]:
+    """Ask about task `args.id`, delete it only on a yes, and return the line to show."""
+    tasks = load(path)
+    task = _find(tasks, args.id)
+    prompt = _printable(f"Delete task {task.id}: {task.name}? [y/N] ", sys.stdout)
+    if input(prompt).strip().lower() not in _YES_ANSWERS:
+        return [f"Kept task {task.id}: {task.name}"]
+    save([other for other in tasks if other.id != task.id], path)
+    return [f"Deleted task {task.id}: {task.name}"]
+
+
 # Highest priority first. The rank is the enum's definition order, because the
 # string values sort CRITICAL, HIGH, LOW, MEDIUM (Review Focus 1).
 _PRIORITY_RANK = {priority: rank for rank, priority in enumerate(Priority)}
@@ -319,6 +333,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="remove the due date (cannot be used with --due)",
     )
     update.set_defaults(run=_update)
+    delete = commands.add_parser("delete", help="delete a task, after asking")
+    delete.add_argument("id", type=_task_id, help="ID of the task to delete")
+    delete.set_defaults(run=_delete)
     return parser
 
 

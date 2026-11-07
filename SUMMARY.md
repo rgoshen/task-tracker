@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 15:51] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** CLI (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+Add the `delete ID` command. It loads the task list, finds the task, and asks `Delete task ID: name? [y/N]` through `input`.
+Only `y` or `yes` (any case, spaces around the answer allowed) deletes the task and saves the rest.
+Any other answer keeps the task, prints `Kept task ID: name`, and leaves the file unwritten.
+The prompt text goes through `_printable`, so a control character in a name is shown as an escape on one line.
+
+**Rationale:**
+Step 1 of M6 (`TODO.md`: 2026-11-07 Feature: M6 Delete). The prompt comes with the command, so no delete happens without a yes. The answer rule and the prompt text were settled on 2026-11-07. The file is read once here; a later step re-reads it after the answer, because the prompt waits on a person and the list can change meanwhile.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 1
+- Issue: #10
+
 ## [2026-11-07 15:55] Commit Summary
 
 **Change Type:** Docs
