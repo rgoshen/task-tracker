@@ -1267,7 +1267,10 @@ def _never_asked(monkeypatch: pytest.MonkeyPatch) -> None:
     """Patch `input` so that any call fails the test."""
 
     def fail(prompt: str = "") -> str:
-        pytest.fail(f"input was called with {prompt!r}")
+        # A plain `raise`, not `pytest.fail`: the CI type checker runs without pytest
+        # installed, sees `pytest.fail` as `Any`, and then reports a missing return.
+        # `main` catches only `ValueError` and `OSError`, so this reaches the test.
+        raise AssertionError(f"input was called with {prompt!r}")
 
     monkeypatch.setattr("builtins.input", fail)
 

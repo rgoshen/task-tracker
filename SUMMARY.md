@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-07 16:05] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+The test double that fails the test when `input` is called now raises `AssertionError` instead of calling `pytest.fail`.
+
+**Rationale:**
+The `Lint` job on PR #30 failed in `PYTHON_MYPY` with `tests/test_cli.py:1269: Missing return statement`. The function is annotated `-> str` and its only statement was `pytest.fail(...)`. With pytest installed, that call is typed `NoReturn`, so mypy accepts it. The CI run installs no pytest, so the call is `Any` and the function seems to fall off its end.
+My earlier local run of mypy installed pytest (`uvx --with pytest mypy`), so it could not see this. It is now run with no extra packages, as CI does it, and fails before the change and passes after it. With pytest installed it still passes.
+A plain `raise` has no return path under either setup. `main` catches only `ValueError` and `OSError`, so the `AssertionError` still reaches the test. Checked by making `delete` ask before it looks the task up: the missing-ID, no-file and prompt tests fail.
+
+**Bugfix Context:**
+Root cause: a local check that did not match the CI environment. The fix is in the test double, and the local recipe is corrected.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10 (PR #30)
+
 ## [2026-11-07 15:59] Commit Summary
 
 **Change Type:** Docs
