@@ -1,5 +1,30 @@
 # Summary
 
+## [2026-11-07 12:01] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+The error line is escaped like the rest of the output. A stored record with the key `key<ESC>[2J<newline>second line` used to make `task-tracker list` write the escape sequence to the terminal and a second line to standard error; the error now reads `unknown field(s): key\x1b[2J\nsecond line` on one line.
+All text the program writes goes through one function, `_say(line, stream)`, which escapes it for that stream.
+One related case is fixed with it: when standard error is closed, `print(file=None)` wrote the error to standard output, into the output another program may be reading. `_say` now writes nothing to a closed stream.
+
+**Rationale:**
+The output escaping answered a real threat (`README.md` expects lists to be shared), but only for standard output. `Task.restore` builds `unknown field(s)` from the record's own keys, so the other sink had the same exposure and broke the "one line" promise for errors as well.
+The review offered two shapes, and the one chosen is a small `_say(text, stream)` for both streams, not a second call to `_printable` at each print, so a future print cannot forget it. `_printable` now takes the stream, because the encoding to fall back from belongs to the stream it is written to.
+Two tests were written first and seen failing: the hostile key (two lines, raw escape) and the closed standard error (the message appeared on standard output). Three deliberate breaks of the code: the closed-stream guard is caught, and an unescaped error in `main` is caught.
+An unescaped "cannot write the output" line is not caught, because that message holds only the operating system's error text and has nothing to escape; it uses `_say` anyway so that the program has one way of writing.
+
+**Bugfix Context:**
+Review comment 3 on PR #26. Root cause: escaping was applied by one caller of `print` and not by the other.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #26 review, second round, step 4
+- Issue: #7 (PR #26, review comment 3)
+
 ## [2026-11-07 12:00] Commit Summary
 
 **Change Type:** Fix

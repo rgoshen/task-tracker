@@ -4,6 +4,7 @@
 # pylint: disable=missing-function-docstring
 
 import io
+import json
 import os
 import subprocess
 import sys
@@ -279,13 +280,15 @@ def test_list_with_nothing_current_says_so_and_names_the_file_it_read(
     assert str(project) in out
 
 
-def _assert_one_line_error(capsys: pytest.CaptureFixture[str], mention: str) -> None:
+def _assert_one_line_error(capsys: pytest.CaptureFixture[str], mention: str) -> str:
+    """Check the error that was printed and return it for further checks."""
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err.startswith("task-tracker: error: ")
     assert mention in captured.err
     # One line, and no traceback.
     assert len(captured.err.splitlines()) == 1
+    return captured.err
 
 
 @pytest.mark.parametrize("argv", [["list"], ["add", "Buy milk"]])
@@ -305,6 +308,38 @@ def test_a_corrupt_list_file_gives_a_one_line_error_and_is_left_alone(
     assert exit_code == 1
     _assert_one_line_error(capsys, "tasks.json")
     assert project.read_text(encoding="utf-8") == text
+
+
+def test_a_key_in_a_stored_record_cannot_drive_the_terminal_through_the_error(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    # "unknown field(s)" repeats the record's own keys. The file may be shared, so a
+    # key with an escape sequence and a line break must not reach the terminal raw.
+    save([Task(1, "x")], project)
+    records = json.loads(project.read_text(encoding="utf-8"))
+    records[0]["key\x1b[2J\nsecond line"] = 1
+    project.write_text(json.dumps(records), encoding="utf-8")
+
+    exit_code = main(["list"])
+
+    assert exit_code == 1
+    error = _assert_one_line_error(capsys, "unknown field")
+    assert "\x1b" not in error
+    assert "key\\x1b[2J\\nsecond line" in error
+
+
+def test_an_error_has_nowhere_to_go_when_standard_error_is_closed(
+    project: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+):
+    # `print(file=None)` writes to standard output, which would put an error into
+    # the output that another program is reading.
+    project.write_text("not json", encoding="utf-8")
+    monkeypatch.setattr(sys, "stderr", None)
+
+    exit_code = main(["list"])
+
+    assert exit_code == 1
+    assert capsys.readouterr().out == ""
 
 
 def test_add_with_a_blank_name_gives_a_one_line_error_and_writes_nothing(

@@ -6,6 +6,7 @@ import sys
 import unicodedata
 from datetime import datetime
 from pathlib import Path
+from typing import TextIO
 
 from task_tracker.priority import Priority
 from task_tracker.status import Status
@@ -78,19 +79,32 @@ def _escape(char: str) -> str:
     return char
 
 
-def _printable(line: str) -> str:
+def _printable(line: str, stream: TextIO) -> str:
     """Return `line` with what could break or drive the terminal shown as escapes.
 
     A name is whatever was typed or whatever a shared file carries (the README
     expects lists to be shared), so it is not printed raw: a newline would make one
     task two lines, and an escape sequence would reach the terminal. Anything that
-    standard output cannot encode becomes an escape too, so a listing is not
-    stopped partway by a codec error. A literal backslash is left as it is, so it
-    can look like an escape.
+    `stream` cannot encode becomes an escape too, so a listing is not stopped
+    partway by a codec error. A literal backslash is left as it is, so it can look
+    like an escape.
     """
     escaped = "".join(map(_escape, line))
-    encoding = sys.stdout.encoding or "utf-8"
+    encoding = stream.encoding or "utf-8"
     return escaped.encode(encoding, "backslashreplace").decode(encoding)
+
+
+def _say(line: str, stream: TextIO | None) -> None:
+    """Print one escaped line to `stream`, the only way the program writes text.
+
+    Standard output and standard error both reach a terminal, and an error message
+    can repeat text from the task file (a key in a record, for one), so both go
+    through `_printable`. A closed stream is `None`, and `print(file=None)` would
+    write to standard output instead, so it is skipped here.
+    """
+    if stream is None:
+        return
+    print(_printable(line, stream), file=stream)
 
 
 def _discard_stdout() -> None:
@@ -123,7 +137,7 @@ def _show(lines: list[str], prog: str) -> int:
         return 0
     try:
         for line in lines:
-            print(_printable(line))
+            _say(line, sys.stdout)
         # A pipe buffers, so a reader that has gone shows up at the flush.
         sys.stdout.flush()
     except BrokenPipeError:
@@ -133,7 +147,7 @@ def _show(lines: list[str], prog: str) -> int:
         return 1
     except OSError as error:
         _discard_stdout()
-        print(f"{prog}: error: cannot write the output: {error}", file=sys.stderr)
+        _say(f"{prog}: error: cannot write the output: {error}", sys.stderr)
         return 1
     return 0
 
@@ -199,6 +213,6 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, OSError) as error:
         # `Task` and `load` raise ValueError for a blank name or a corrupt file
         # (M2 made it the one type); OSError is a file that cannot be read or written.
-        print(f"{parser.prog}: error: {error}", file=sys.stderr)
+        _say(f"{parser.prog}: error: {error}", sys.stderr)
         return 1
     return _show(lines, parser.prog)
