@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 13:43] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`)
+
+**Summary:**
+The Commands section of `README.md` now documents `list --all`. The example block gains `uv run task-tracker list --all`.
+A new bullet says what the flag shows (every task, the current ones first in the usual order, then the done ones by date completed and ID), that the lines are unchanged so the date completed is not shown, and the `No tasks in <path>` message.
+It also says that plain `list` keeps its own message, including when every task is done.
+
+**Rationale:**
+The review of PR #28 pointed out that this section is where a user learns the commands, and it never mentioned the flag. The feature list and the options table already named `--all`, which is why the PR description said no change was needed; that was wrong, because they are a spec and a table, not usage. The description is corrected too.
+The earlier `SUMMARY.md` entry for the plan and `CLAUDE.md` has the same wrong sentence; it is corrected in the commit for the review comment about issue #8.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 6
+- Issue: #8 (PR #28, PR-level comment)
+
 ## [2026-11-07 13:42] Commit Summary
 
 **Change Type:** Docs
