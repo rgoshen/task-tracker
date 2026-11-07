@@ -308,12 +308,25 @@ Branch `feature/update-task`. Covers feature 6.
 
 Branch `feature/delete-task`. Covers feature 7.
 
-- [ ] Given tasks 1, 2, 3, when `delete 2`, then tasks 1 and 3 remain with their IDs unchanged.
-- [ ] Given no task 99, when `delete 99`, then the exit code is 1, stderr names 99, and the file is unchanged.
-- [ ] Given tasks 1, 2, 3, when `delete 3` then `add "New"`, then the new task's ID is 3 (D5: highest + 1 reuses the freed ID).
-- [ ] Given `delete 2` and the answer "n" (patch `input` with `monkeypatch`), then nothing is deleted. Given the answer "y", then task 2 is deleted. In both cases the prompt includes task 2's name (Q5).
+- [x] Given tasks 1, 2, 3, when `delete 2`, then tasks 1 and 3 remain with their IDs unchanged.
+- [x] Given no task 99, when `delete 99`, then the exit code is 1, stderr names 99, and the file is unchanged.
+- [x] Given tasks 1, 2, 3, when `delete 3` then `add "New"`, then the new task's ID is 3 (D5: highest + 1 reuses the freed ID).
+- [x] Given `delete 2` and the answer "n" (patch `input` with `monkeypatch`), then nothing is deleted. Given the answer "y", then task 2 is deleted. In both cases the prompt includes task 2's name (Q5).
 
-**Think about:** the prompt exists to catch a reused ID, so what must it print? Scripts cannot answer a prompt; a `--yes` flag is deferred until you need one.
+**Think about:** the prompt exists to catch a reused ID, so what must it print? A script can answer the prompt on standard input (`echo y | task-tracker delete 1`); a `--yes` flag is deferred until you need one.
+
+**Decided (2026-11-07):**
+
+- The prompt prints the ID and the name: `Delete task 2: Buy milk? [y/N]`, then a space. The name is the check against a reused ID (D5), and it is escaped like every other printed name.
+- `delete 99` fails before any prompt: exit 1, stderr names 99, the file is unchanged. `ID` follows the same rule as `update` (ASCII digits, at least 1; anything else exits 2).
+- `y` or `yes`, in any case, deletes. Anything else, the empty answer included, keeps the task, and the file is not written. Declining prints `Kept task 2: Buy milk` and exits 0. Success prints `Deleted task 2: Buy milk`.
+- When there is no way to answer (standard input empty, at its end, not valid text, or closed; standard output or error closed; Ctrl-C), the command exits 1 with one error line and deletes nothing. A script with input to read can answer, as in `echo y | task-tracker delete 1`; `--yes` stays deferred (Q5), because it would save the pipe and not add a capability.
+- After the answer the list is read again, and the task is deleted only if it still equals the one that was shown. Otherwise nothing is deleted and one error line says why. Rejected: reading once before the prompt, which would lose a task that another command stored while the person was typing (#27).
+- The prompt goes to standard output, through `input(prompt)`. With standard output redirected to a file it is not visible, which is accepted. Rejected: standard error, which would move the tests off the `input` argument.
+- Confirmed by the project owner: the default answer is no, `yes` is accepted next to `y`, declining exits 0, and the second read.
+- Box 3 (`delete 3` then `add`) gives ID 3 under "highest + 1" and under a count of the remaining tasks, so it cannot tell them apart. The case that pins D5 is the gap: `delete 2` then `add` gives 4, where a count gives 3 and collides with task 3.
+- From the review of PR #30: undecodable input counts as no answer, and `RuntimeError` is not caught (the closed streams are checked first). On a terminal an empty line goes to standard error before the error. An error return flushes standard output and discards it if that fails, so a prompt written to a pipe nobody reads cannot make the exit code 120.
+  A `delete` with standard output closed exits 1, because the prompt needs it.
 
 ### M7. Global list
 

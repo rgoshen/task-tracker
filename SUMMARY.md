@@ -1,5 +1,342 @@
 # Summary
 
+## [2026-11-07 16:33] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `TODO.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Bring the documents in line with what `delete` does after the review of PR #30. A script can answer the prompt on standard input; `delete` with standard output closed exits 1; the closed-stream and undecodable cases are described as the code handles them; and the ID-reuse step names the gap case. `TODO.md` gets a "Fix: PR #30 review" entry.
+
+**Rationale:**
+Review comments 2, 3 and 11 on PR #30, and the changes in the commits before this one.
+Comment 2: the output-closed sentence in `README.md` said the commands finish with exit code 0, and it now lists `delete` among them. Reproduced: `delete 1 >&-` exits 1, because the prompt needs standard output. The sentence now names the three commands that do exit 0, and `delete`.
+Comment 3: `README.md`, the plan and `TODO.md` said a script cannot delete until `--yes` exists. `echo y | task-tracker delete 1` deleted the task, exit 0, and a test now pins it. The text says what is true: a script with input to read can answer, and `--yes` would save the pipe and add no capability.
+Comment 11: step 4 of the M6 entry described a red test that cannot happen. After `delete 3` two tasks remain, so a count gives 3, the same as highest + 1. The gap case (`delete 2`, then `add` gives 4) is the one that fails against a count, and the plan now says that plan box 3 is met by a case that cannot tell the rules apart.
+The decisions the review left in place (Ctrl-C exit 1, the prompt on standard output) are written down with their cost, and the commit-type question (comment 10) is recorded as declined, with the reason.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #30 review
+- Issue: #10 (PR #30, review comments 2, 3 and 11)
+
+## [2026-11-07 16:32] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+`delete` joins the cases that check a corrupt list file (three kinds of bad content) and a directory in place of the list. Two new tests cover the second read and the write: the list becomes corrupt or a directory while the prompt is open, and `save` raises `OSError`. Each gives exit 1, one error line, and the file left as it was.
+
+**Rationale:**
+Review comment 9 on PR #30. The plan says the bad-input rule is pinned in M3, M5 and M6, and M5 got a commit for it. `_delete` has two reads and a write that can each raise `ValueError` or `OSError`, and none had a test.
+The behavior was already there, so these pass at once; each was checked against a deliberate break of `_delete`. The first read ignoring a bad file fails the four joined cases. The second read ignoring it fails the corrupt case. Skipping `save` fails the delete tests, and swallowing an `OSError` from `save` fails the new save test.
+One result is weaker than it looks: with the second read broken, the directory case still passes, because the `save` onto a directory fails with an `OSError` that gives the same one line. That case still pins "a list that stops being a file gives one error line", but only the corrupt case pins the second read. 384 tests pass.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10 (PR #30, review comment 9)
+
+## [2026-11-07 16:31] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+A real process is given `y` on its standard input (`echo y | task-tracker delete 1`) and deletes the task, exit 0, with the prompt and the result on standard output.
+
+**Rationale:**
+Review comments 4 and 3 on PR #30. The `stdin` parameter of `_run_in_a_new_process` had no caller, and the path it was added for, a script that answers the prompt, had no test. Comment 3 also showed that `README.md`, the plan and the PR text said a script cannot delete until `--yes` exists, which is not true; this test is the evidence for the corrected wording.
+The behavior was already there, so the test passes at once. To show that it can fail, `_ask` was changed to read the line and then answer "n" whatever it was: the test failed on the output, and nothing else was changed.
+The parameter keeps its default of `/dev/null`, so the other real-process tests behave as before. 377 tests pass.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10 (PR #30, review comments 3 and 4)
+
+## [2026-11-07 16:30] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+When a command ends with an error, `main` now flushes standard output first and, if that fails, points it at devnull. A prompt written to a pipe nobody reads no longer turns the exit code into 120.
+
+**Rationale:**
+Review comment 1 on PR #30. `input` writes the prompt to a pipe whose reader has gone, swallows the flush error, and leaves the bytes in the buffer. `main` then printed the error and returned 1, and the flush at interpreter exit failed again: `Exception ignored while flushing sys.stdout` and exit code 120. Reproduced before the change with a child whose stdout reader was already closed.
+This is the case `_discard_stdout` documents, but it was only used on the success path in `_show`. The fix is in the error path of `main`, and not in `_ask`, because the prompt is also in the buffer when the second `load`, the "changed while the prompt was open" check, or `save` raise after it. A flush that works costs nothing, and a command only builds its lines, so no output is lost.
+Red first: `assert 120 == 1` in a real child process. Removing the call makes that one test fail again, and nothing else. 376 tests pass.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10 (PR #30, review comment 1)
+
+## [2026-11-07 16:29] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+When nobody can answer the prompt and standard input is a terminal, an empty line goes to standard error first, so the error starts on its own line.
+
+**Rationale:**
+Review comment 6 on PR #30. A terminal echoes `^C` or `^D` after the prompt and leaves the cursor there. Reproduced in a pty before the change: Ctrl-D printed `[y/N] ^D`, two backspaces and the error on the same line, and Ctrl-C did the same. The earlier PR text recorded this for Ctrl-D only.
+The newline goes to standard error, where the error goes, and only when `sys.stdin.isatty()`. With a pipe or `/dev/null` nobody is typing, so the error stays the one line the other tests assert.
+Red first: the two terminal tests (a stdin stub whose `isatty` is true, with `input` raising `EOFError` and `KeyboardInterrupt`) failed on the missing leading newline. After the change the same two keys were run through a real pty, with a controlling terminal so that Ctrl-C raises SIGINT: each ends `\r\ntask-tracker: error: ...`, exit 1. 375 tests pass.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10 (PR #30, review comment 6)
+
+## [2026-11-07 16:28] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`delete` treats standard input that is not valid text as "no answer", and no longer calls every `RuntimeError` from `input` a missing answer. A closed standard input, output or error is now checked for before `input` is called.
+
+**Rationale:**
+Review comment 5 on PR #30, two of its three points.
+Too narrow: `input` raises `UnicodeDecodeError` for bytes that are not UTF-8. That is a `ValueError`, so `main` printed the codec message and exit 1 with nothing deleted, but not the `task N was not deleted` line the plan states. It joins `_NO_ANSWER`.
+Too wide: catching `RuntimeError` would also have hidden a `RecursionError` or `NotImplementedError` from inside `input` as a polite "no answer". The two cases wanted are the `lost sys.stdin` and `lost sys.stdout` errors, and `input` raises the same for a closed standard error, which was checked with Python 3.14.7.
+`_ask` tests for those three `None` streams before it calls `input`, and the catch is gone. A `RuntimeError` from anywhere else now stays a traceback, on purpose, and has a test.
+The third point, that Ctrl-C returns 1 and so does not stop a shell loop, is the recorded decision (one error line, exit 1, not 130). It is not changed here.
+Red first: the non-UTF-8 test failed with the codec message, the three stream tests with `input was called`, and the `RuntimeError` test with `DID NOT RAISE`. 373 tests pass, and the full CI-parity check passes.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10 (PR #30, review comment 5)
+
+## [2026-11-07 16:26] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** cli (`src/task_tracker/cli.py`)
+
+**Summary:**
+`_ask(prompt)` now returns the answer, or `None` when nothing can answer. `_delete` words the error (`no answer to the prompt: task N was not deleted`). The three exceptions that mean "no answer" are named once, in `_NO_ANSWER`.
+
+**Rationale:**
+Review comment 8 on PR #30. `_ask` took `task_id` only to say what `delete` did not do, so a second command that prompts could not reuse it. Returning `None` keeps the I/O helper free of the caller's wording; `_delete` already knows the task.
+The exceptions are a module constant and not a tuple in the `except`, because ruff 0.16 (the lockfile version) rewrites `except (A, B, C):` to `except A, B, C:` once there is no `as` name. That is valid on Python 3.14, but the mypy 2.1.0 and flake8 7.3.0 that CI runs reject it (`multiple exception types must be parenthesized`), while ruff 0.15.17 and black accept both forms.
+No `as` name was left to keep the parentheses, and a constant is also a name for the idea.
+Behavior is unchanged, so the existing delete tests are the safety net: 369 pass.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10 (PR #30, review comment 8)
+
+## [2026-11-07 16:05] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+The test double that fails the test when `input` is called now raises `AssertionError` instead of calling `pytest.fail`.
+
+**Rationale:**
+The `Lint` job on PR #30 failed in `PYTHON_MYPY` with `tests/test_cli.py:1269: Missing return statement`. The function is annotated `-> str` and its only statement was `pytest.fail(...)`. With pytest installed, that call is typed `NoReturn`, so mypy accepts it. The CI run installs no pytest, so the call is `Any` and the function seems to fall off its end.
+My earlier local run of mypy installed pytest (`uvx --with pytest mypy`), so it could not see this. It is now run with no extra packages, as CI does it, and fails before the change and passes after it. With pytest installed it still passes.
+A plain `raise` has no return path under either setup. `main` catches only `ValueError` and `OSError`, so the `AssertionError` still reaches the test. Checked by making `delete` ask before it looks the task up: the missing-ID, no-file and prompt tests fail.
+
+**Bugfix Context:**
+Root cause: a local check that did not match the CI environment. The fix is in the test double, and the local recipe is corrected.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10 (PR #30)
+
+## [2026-11-07 15:59] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `CLAUDE.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Document the `delete` command. `README.md` gets the usage line, a `delete ID` entry (the prompt, the answers, the two output lines, the exit codes, and the missing-answer and changed-while-prompting errors), and `delete` joins the stored-before-printing and lost-write notes. `CLAUDE.md` now says features 3 to 7 exist and M1 to M6 are built. The four M6 boxes in the plan are ticked.
+
+**Rationale:**
+Each box was ticked against a test that passes: the first and fourth by the yes and no tests, the second by the missing-ID and bad-ID tests, and the third by the ID-reuse test. That test passes under both "highest + 1" and a count for `delete 3`, so the gap case (`delete 2`, then `add` gives 4) is what pins the rule; it was shown to fail against a count.
+The `README.md` text first said that after `delete 3` the next `add` gets ID 3. That holds only when 3 is the highest ID, so it now says that deleting the highest-numbered task frees its ID.
+`delete` saves before `_show` prints, as `add` and `update` do, so it belongs in the note about output errors.
+Two earlier entries had times I guessed instead of reading from the clock (15:40 and 15:55). They now carry the commit times, 15:36 and 15:42.
+Issue #10 is not changed in this commit. It still needs the "Decided" block, which waits for the project owner.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 5
+- Issue: #10
+
+## [2026-11-07 15:58] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+Rename the unused `prompt` argument of the two `input` replacements that another writer uses to `_prompt`, and say in the comment of the ID-reuse test which case tells "highest + 1" from a count.
+
+**Rationale:**
+The CI linters were run on the four M6 commits before the push. Pylint 4.0.6 reported `unused-argument` (W0613) on both replacements and would have failed the `Lint` job. The leading underscore is the form pylint accepts, and `input` is called with the prompt as its only argument, so the name does not matter to the caller.
+The comment said a count would number both new tasks 3. That is only true for the gap case: after `delete 3` a count and "highest + 1" agree, which is why the gap case is the one that can fail.
+Checked after the change: pylint 10.00, black, isort, flake8, and mypy clean at the CI versions, JSCPD 0 clones, 369 tests pass.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10
+
+## [2026-11-07 15:56] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+Pin that `add` after a `delete` numbers the new task from the highest remaining ID (D5).
+Deleting task 3 and adding a task gives ID 3 again.
+Deleting task 2 and adding a task gives ID 4, not 3, so the gap is not reused.
+No source code changed.
+
+**Rationale:**
+Step 4 of M6 (`TODO.md`: 2026-11-07 Feature: M6 Delete).
+The highest-ID case passes with the current code, and so does a count-based rule, so the gap case is the one that tells them apart.
+Numbering by count was tried as a temporary mutant: the gap case failed with a duplicate-ID error, and the existing numbering test failed too. The mutant was then reverted.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 4
+- Issue: #10
+
+## [2026-11-07 15:54] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** CLI (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+After a yes, `delete` reads the task list again and deletes task `ID` only if it still equals the task that was shown.
+A task another writer added while the prompt was open is kept.
+If the task was renamed, changed, or removed meanwhile, `delete` prints one error line, exits 1, and deletes nothing.
+
+**Rationale:**
+Step 3 of M6 (`TODO.md`: 2026-11-07 Feature: M6 Delete).
+The prompt waits on a person, so the list read before it can be minutes old, and saving it would drop a task added from another terminal.
+`Task` is a dataclass, so `==` compares every field.
+The rest of the file is saved as it was read after the answer.
+The remaining window between that read and the save is the same as for every other command (#27).
+
+**Bugfix Context (if applicable):**
+The first version of `delete` saved the list read before the prompt.
+Any task another process added while the prompt was open was lost on a yes.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 3
+- Issue: #10
+
+## [2026-11-07 15:53] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** CLI (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+Refuse a `delete` that names no task or gets no answer.
+An unknown ID exits 1 before the prompt is shown.
+An answer that cannot be read (end of input, a closed standard stream, or Ctrl-C) exits 1 with one error line saying the task was not deleted, and no traceback.
+The list of bad IDs that `update` already tested is now one shared constant, and `delete` uses it too.
+
+**Rationale:**
+Step 2 of M6 (`TODO.md`: 2026-11-07 Feature: M6 Delete).
+The three exceptions are caught only around the `input` call, because `main` handles just `ValueError` and `OSError`.
+A closed standard output has no stream for the prompt, so the prompt is passed on as it is and `input` raises `RuntimeError` itself.
+The shared list keeps the duplicated test cases out of the copypaste check (JSCPD, threshold 0).
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 2
+- Issue: #10
+
+## [2026-11-07 15:51] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** CLI (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+Add the `delete ID` command. It loads the task list, finds the task, and asks `Delete task ID: name? [y/N]` through `input`.
+Only `y` or `yes` (any case, spaces around the answer allowed) deletes the task and saves the rest.
+Any other answer keeps the task, prints `Kept task ID: name`, and leaves the file unwritten.
+The prompt text goes through `_printable`, so a control character in a name is shown as an escape on one line.
+
+**Rationale:**
+Step 1 of M6 (`TODO.md`: 2026-11-07 Feature: M6 Delete). The prompt comes with the command, so no delete happens without a yes. The answer rule and the prompt text were settled on 2026-11-07. The file is read once here; a later step re-reads it after the answer, because the prompt waits on a person and the list can change meanwhile.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 1
+- Issue: #10
+
+## [2026-11-07 15:42] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Settle the open points left in the M6 plan. The four defaults are confirmed: the default answer is no, `yes` is accepted, declining exits 0, and the list is read again after the answer. Ctrl-C and a closed standard output now join the "no way to answer" case instead of being listed as not handled. The prompt stays on standard output.
+
+**Rationale:**
+The project owner answered three questions on 2026-11-07.
+
+- Ctrl-C raises `KeyboardInterrupt`, which `main` does not catch, so the prompt would end in a traceback. It shares the handler with `EOFError` and `RuntimeError` and exits 1, not the usual 130: nothing has changed by then, and one code is easier to state.
+- A closed standard output (`>&-`) was checked with Python 3.14.7 and raises `RuntimeError: lost sys.stdout`, so the same handler already covers it. The earlier plan called it "not handled" without having checked what it did.
+- The prompt goes to standard output through `input(prompt)`. A redirected output hides it, which is accepted. Rejected: standard error, which moves the tests off the `input` argument and adds a second way to write text next to `_say`.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete
+- Issue: #10
+
+## [2026-11-07 15:36] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Plan M6, the `delete` command. `TODO.md` gets the M6 entry with its steps, tests, and trade-offs. The plan's M6 section gets a "Decided (2026-11-07)" block that answers its "Think about" paragraph: what the prompt prints, what a script gets, and what happens when nothing can answer.
+
+**Rationale:**
+The prompt exists to catch a reused ID (D5), so it prints the ID and the name, escaped like every other name. The decisions that go beyond the four plan boxes are the ones a review would otherwise find later:
+
+- `input` raises `EOFError` or `RuntimeError` when there is no terminal, and `main` catches neither, so a script would get a traceback. Both become one error line with exit 1. Checked with Python 3.14.7.
+- A prompt waits on a person, so a list read before it can be stale when the save comes. The list is read again after the answer, and only a task equal to the one shown is deleted. Rejected: one read (a concurrent `add` would be lost for as long as the person takes) and a lock held across the prompt.
+- Four points are taken as defaults and marked as such in both files: the default answer is no, `yes` is accepted, declining exits 0, and the second read.
+
+Ctrl-C at the prompt and a closed standard output while prompting are named as not handled. Issue #10 is not changed in this commit. Its text is copied from the plan, so it needs the same "Decided" block once the project owner agrees.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete
+- Issue: #10
+
 ## [2026-11-07 15:15] Commit Summary
 
 **Change Type:** Docs

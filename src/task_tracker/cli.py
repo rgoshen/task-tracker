@@ -72,6 +72,60 @@ def _update(args: argparse.Namespace, path: Path) -> list[str]:
     return [f"Updated task {task.id}: {task.name}"]
 
 
+_YES_ANSWERS = {"y", "yes"}
+# What `input` raises when nothing can answer: EOFError when input ended,
+# KeyboardInterrupt for Ctrl-C, and UnicodeDecodeError (a ValueError, so `main`
+# would print a codec message without a word about the task) for an answer that is
+# not valid text. A name, not a tuple in the `except`: ruff 0.16 drops the
+# parentheses there (Python 3.14 allows that), and the older mypy and flake8 that
+# CI runs reject the result.
+_NO_ANSWER = (EOFError, KeyboardInterrupt, UnicodeDecodeError)
+
+
+def _ask(prompt: str) -> str | None:
+    """Show `prompt` and return the answer, or None when nothing can answer it.
+
+    What the caller did not do about it is the caller's to say, so this only
+    reports that there was no answer.
+    """
+    # `input` raises RuntimeError ("lost sys.stdin") when a standard stream was
+    # closed at start-up. That is checked here and not caught: a RuntimeError from
+    # anywhere else (RecursionError, NotImplementedError) is a bug, and should
+    # stay one. `input` also looks at standard error, as it flushes it first.
+    if sys.stdin is None or sys.stdout is None or sys.stderr is None:
+        return None
+    try:
+        return input(_printable(prompt, sys.stdout))
+    except _NO_ANSWER:
+        # A terminal echoes `^C` or `^D` after the prompt and leaves the cursor
+        # there, so the error would run on from it. It goes to standard error, where
+        # the error goes, and is skipped when nobody is typing.
+        if sys.stdin.isatty():
+            _say("", sys.stderr)
+        return None
+
+
+def _delete(args: argparse.Namespace, path: Path) -> list[str]:
+    """Ask about task `args.id`, delete it only on a yes, and return the line to show."""
+    tasks = load(path)
+    task = _find(tasks, args.id)
+    answer = _ask(f"Delete task {task.id}: {task.name}? [y/N] ")
+    if answer is None:
+        raise ValueError(f"no answer to the prompt: task {task.id} was not deleted")
+    if answer.strip().lower() not in _YES_ANSWERS:
+        return [f"Kept task {task.id}: {task.name}"]
+    # The prompt waits on a person, so the list read above may be stale. Read it
+    # again, and delete only the task that was shown; the rest is saved as read now.
+    tasks = load(path)
+    if task not in tasks:
+        raise ValueError(
+            f"task {task.id} changed or was removed while the prompt was open: "
+            "nothing was deleted"
+        )
+    save([other for other in tasks if other.id != task.id], path)
+    return [f"Deleted task {task.id}: {task.name}"]
+
+
 # Highest priority first. The rank is the enum's definition order, because the
 # string values sort CRITICAL, HIGH, LOW, MEDIUM (Review Focus 1).
 _PRIORITY_RANK = {priority: rank for rank, priority in enumerate(Priority)}
@@ -192,6 +246,23 @@ def _discard_stdout() -> None:
         os.dup2(devnull, sys.stdout.fileno())
     finally:
         os.close(devnull)
+
+
+def _release_stdout() -> None:
+    """Leave nothing in standard output for the flush at exit to fail on again.
+
+    The commands only build their lines and `_show` prints them, so an error means
+    that no output was meant to be written. The exception is a prompt: `input`
+    swallows a failed flush and leaves its bytes in the buffer, and the flush at
+    exit then fails the same way (exit code 120). Flushing here finds out, and
+    `_discard_stdout` is its answer.
+    """
+    if sys.stdout is None:
+        return
+    try:
+        sys.stdout.flush()
+    except OSError:
+        _discard_stdout()
 
 
 def _show(lines: list[str], prog: str) -> int:
@@ -319,6 +390,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="remove the due date (cannot be used with --due)",
     )
     update.set_defaults(run=_update)
+    delete = commands.add_parser("delete", help="delete a task, after asking")
+    delete.add_argument("id", type=_task_id, help="ID of the task to delete")
+    delete.set_defaults(run=_delete)
     return parser
 
 
@@ -337,6 +411,7 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, OSError) as error:
         # `Task` and `load` raise ValueError for a blank name or a corrupt file
         # (M2 made it the one type); OSError is a file that cannot be read or written.
+        _release_stdout()
         _say(f"{parser.prog}: error: {error}", sys.stderr)
         return 1
     return _show(lines, parser.prog)

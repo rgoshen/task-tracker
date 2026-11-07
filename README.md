@@ -81,13 +81,14 @@ Every option has a long and a short form.
 
 ## Commands
 
-### Adding, listing and updating tasks
+### Adding, listing, updating and deleting tasks
 
 ```bash
 uv run task-tracker add "Pay rent" --priority HIGH --due 2026-11-02
 uv run task-tracker list
 uv run task-tracker list --all
 uv run task-tracker update 1 --status DONE
+uv run task-tracker delete 1
 ```
 
 - `add NAME` stores a task in `tasks.json` in the current directory and prints its ID. `--priority` (`-p`) takes `CRITICAL`, `HIGH`, `MEDIUM`, or `LOW` and defaults to `LOW`. `--due` (`-D`) takes `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SS`, in local time: a value with a UTC offset is refused.
@@ -100,11 +101,17 @@ uv run task-tracker update 1 --status DONE
   Giving a task the values it already has changes nothing: the file is not written, `updated` does not move, and the line is `No change to task ID: NAME` (exit code 0). Moving a task to `DONE` sets its date completed to now, or to its stop time if the clock is behind it (after a change of time zone, for one). `updated` likewise never moves back.
   Moving a `DONE` task to `TO_DO` or `IN_PROGRESS` clears it, and `DONE` to `DONE` keeps the original. `created`, the ID, `description`, `start`, and `stop` cannot be changed by `update`.
   A change the task rules refuse, or an `update` with no option to change, is refused and the file is left unchanged.
+- `delete ID` removes one stored task from `tasks.json` in the current directory. It first asks `Delete task 2: Buy milk? [y/N]`, with the ID and the name, because an ID can be reused: deleting the highest-numbered task frees its ID, so the next `add` gets it again, and the name is the check that you mean the right task.
+  Answer `y` or `yes` in any case to delete; any other answer, an empty one included, keeps the task. The line is `Deleted task 2: Buy milk` or `Kept task 2: Buy milk`, and a kept task leaves the file unchanged.
+  The prompt goes to standard output, so it is not visible when standard output is redirected to a file. A script can answer on standard input (`echo y | task-tracker delete 1`); a `--yes` flag is not built.
+  With no answer (standard input empty, at its end, not valid text or closed; standard output or error closed; Ctrl-C), nothing is deleted and the command exits with code 1. On a terminal the error starts on its own line.
+  If the task changed or was removed while the prompt was open, nothing is deleted and the command exits with code 1.
 - Exit codes: 0 on success, 2 for a bad option value (an unknown priority or status, a `--due` that is not a local date or date and time, an ID that is not a whole number of 1 or more, or `--due` given with `--clear-due`).
-  1 for anything else that goes wrong (a blank name or one UTF-8 cannot hold, a change the task rules refuse, no task with the given ID, an `update` with no option to change, a corrupt or unreadable task file, an output that cannot be written).
+  1 for anything else that goes wrong (a blank name or one UTF-8 cannot hold, a change the task rules refuse, no task with the given ID, an `update` with no option to change, no answer to a `delete` prompt, a task that changed while `delete` was prompting, a corrupt or unreadable task file, an output that cannot be written).
   An error prints one line on standard error and never a traceback.
-- `add` and `update` store the task before they print, so an error about the output means the change is stored. A reader that closes the pipe early (`task-tracker list | head -1`) ends the output quietly, with exit code 1. With standard output closed (`task-tracker list >&-`) there is nowhere to print, and the commands finish with exit code 0.
-- Two `add` or `update` commands running at the same moment can lose a change: each reads and rewrites the whole list, and there is no lock yet ([#27](https://github.com/rgoshen/task-tracker/issues/27)).
+- `add`, `update` and `delete` store their change before they print, so an error about the output means the change is stored. A reader that closes the pipe early (`task-tracker list | head -1`) ends the output quietly, with exit code 1. With standard output closed (`task-tracker list >&-`) there is nowhere to print, and `add`, `update` and `list` finish with exit code 0.
+  `delete` needs standard output for its prompt, so with it closed `delete` exits with code 1 and deletes nothing.
+- Two `add`, `update` or `delete` commands running at the same moment can lose a change: each reads and rewrites the whole list, and there is no lock yet ([#27](https://github.com/rgoshen/task-tracker/issues/27)).
 
 ### Running GitHub Actions locally
 
