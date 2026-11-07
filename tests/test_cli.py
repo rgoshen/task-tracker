@@ -342,13 +342,20 @@ def test_an_error_has_nowhere_to_go_when_standard_error_is_closed(
     assert capsys.readouterr().out == ""
 
 
-def test_add_with_a_blank_name_gives_a_one_line_error_and_writes_nothing(
-    project: Path, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize(
+    ("name", "mention"),
+    [("", "name must not be blank"), ("bad \udcff", "name must be valid UTF-8 text")],
+    ids=["blank", "not-valid-utf-8"],
+)
+def test_add_with_a_name_that_cannot_be_kept_gives_a_one_line_error_and_writes_nothing(
+    project: Path, capsys: pytest.CaptureFixture[str], name: str, mention: str
 ):
-    exit_code = main(["add", ""])
+    # A byte that is not valid UTF-8 on the command line reaches Python as a lone
+    # surrogate, and `save` writes UTF-8, so the name is refused before any file.
+    exit_code = main(["add", name])
 
     assert exit_code == 1
-    _assert_one_line_error(capsys, "name")
+    _assert_one_line_error(capsys, mention)
     assert not project.exists()
 
 

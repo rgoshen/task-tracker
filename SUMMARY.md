@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-07 12:06] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+The checked plan item for a name that UTF-8 cannot hold now has a test at the command line. The test that covered a blank name is parametrized with a second case: `main(["add", "bad \udcff"])` exits 1, prints one line saying `name must be valid UTF-8 text`, and writes no file. No production code changes.
+
+**Rationale:**
+Review comment 8 noticed that the M3 plan ticks "`add` with a name that UTF-8 cannot hold exits 1 and writes nothing", while the only tests for it were in `test_task.py` and `test_storage.py`, which check the model and the file. Nothing proved that the command line turns the model's refusal into the promised result.
+The behavior was already right, as the comment said, so the test passes as soon as it is written. It was checked the other way round instead: removing the name check from `Task` makes this case fail first, ahead of the model and storage tests.
+The blank-name test was widened instead of copied, so the two cases share one body. Its name now says what both have in common: a name that cannot be kept.
+
+**Bugfix Context:**
+Review comment 8 on PR #26. A gap in the tests, not a defect in the program.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #26 review, second round, step 8
+- Issue: #7 (PR #26, review comment 8)
+
 ## [2026-11-07 12:05] Commit Summary
 
 **Change Type:** Refactor
