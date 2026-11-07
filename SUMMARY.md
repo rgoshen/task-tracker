@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-07 16:32] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+`delete` joins the cases that check a corrupt list file (three kinds of bad content) and a directory in place of the list. Two new tests cover the second read and the write: the list becomes corrupt or a directory while the prompt is open, and `save` raises `OSError`. Each gives exit 1, one error line, and the file left as it was.
+
+**Rationale:**
+Review comment 9 on PR #30. The plan says the bad-input rule is pinned in M3, M5 and M6, and M5 got a commit for it. `_delete` has two reads and a write that can each raise `ValueError` or `OSError`, and none had a test.
+The behavior was already there, so these pass at once; each was checked against a deliberate break of `_delete`. The first read ignoring a bad file fails the four joined cases. The second read ignoring it fails the corrupt case. Skipping `save` fails the delete tests, and swallowing an `OSError` from `save` fails the new save test.
+One result is weaker than it looks: with the second read broken, the directory case still passes, because the `save` onto a directory fails with an `OSError` that gives the same one line. That case still pins "a list that stops being a file gives one error line", but only the corrupt case pins the second read. 384 tests pass.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10 (PR #30, review comment 9)
+
 ## [2026-11-07 16:31] Commit Summary
 
 **Change Type:** Fix

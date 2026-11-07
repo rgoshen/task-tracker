@@ -10,7 +10,7 @@ import json
 import os
 import subprocess
 import sys
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import datetime, timedelta
@@ -454,8 +454,14 @@ def _assert_one_line_error(capsys: pytest.CaptureFixture[str], mention: str) -> 
 
 @pytest.mark.parametrize(
     "argv",
-    [["list"], ["list", "--all"], ["add", "Buy milk"], ["update", "1", "--name", "x"]],
-    ids=["list", "list-all", "add", "update"],
+    [
+        ["list"],
+        ["list", "--all"],
+        ["add", "Buy milk"],
+        ["update", "1", "--name", "x"],
+        ["delete", "1"],
+    ],
+    ids=["list", "list-all", "add", "update", "delete"],
 )
 @pytest.mark.parametrize(
     "text",
@@ -526,8 +532,8 @@ def test_add_with_a_name_that_cannot_be_kept_gives_a_one_line_error_and_writes_n
 
 @pytest.mark.parametrize(
     "argv",
-    [["list"], ["update", "1", "--name", "x"]],
-    ids=["list", "update"],
+    [["list"], ["update", "1", "--name", "x"], ["delete", "1"]],
+    ids=["list", "update", "delete"],
 )
 def test_a_directory_where_the_list_should_be_gives_a_one_line_error(
     project: Path, capsys: pytest.CaptureFixture[str], argv: list[str]
@@ -1520,6 +1526,69 @@ def test_a_task_changed_while_the_prompt_is_open_is_not_deleted(
         capsys, "task 2 changed or was removed while the prompt was open"
     )
     assert project.read_bytes() == written[0]
+
+
+def _make_corrupt(path: Path) -> None:
+    path.write_text("not json", encoding="utf-8")
+
+
+def _make_a_directory(path: Path) -> None:
+    path.unlink()
+    path.mkdir()
+
+
+def _snapshot(path: Path) -> bytes | None:
+    """The bytes of a list file, or None once it has become a directory."""
+    return path.read_bytes() if path.is_file() else None
+
+
+@pytest.mark.parametrize(
+    "break_the_list",
+    [_make_corrupt, _make_a_directory],
+    ids=["corrupt", "directory"],
+)
+def test_a_list_that_cannot_be_read_after_the_answer_gives_one_error_line(
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    break_the_list: Callable[[Path], None],
+):
+    # Given another writer that breaks the list while the prompt is open
+    _save_three(project)
+    left: list[bytes | None] = []
+
+    def another_writer_breaks_the_list(_prompt: str = "") -> str:
+        break_the_list(project)
+        left.append(_snapshot(project))
+        return "y"
+
+    monkeypatch.setattr("builtins.input", another_writer_breaks_the_list)
+
+    exit_code = main(["delete", "2"])
+
+    # Then the second read fails like any other: one line, and that file is left
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "tasks.json")
+    assert _snapshot(project) == left[0]
+
+
+def test_a_save_that_fails_leaves_the_list_as_it_was_and_gives_one_error_line(
+    project: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    _save_three(project)
+    before = project.read_bytes()
+    _answer_with(monkeypatch, "y")
+
+    def full_disk(_tasks: list[Task], _path: Path) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr("task_tracker.cli.save", full_disk)
+
+    exit_code = main(["delete", "2"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "disk full")
+    assert project.read_bytes() == before
 
 
 @pytest.mark.parametrize(
