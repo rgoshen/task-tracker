@@ -237,6 +237,21 @@ def test_list_all_orders_done_tasks_completed_on_one_day_by_the_time(
     assert _listed_names(capsys) == ["early", "late"]
 
 
+def test_list_all_reports_a_done_task_without_a_date_completed_as_one_line(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+):
+    # `load` refuses such a record, so the broken task is handed over directly. It
+    # stands for a rule `Task` breaks one day, and the sort must not hide it.
+    broken = Task(7, "broken")
+    broken.status = Status.DONE
+    monkeypatch.setattr("task_tracker.cli.load", lambda _path: [broken])
+
+    exit_code = main(["list", "--all"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "task 7")
+
+
 def test_list_all_puts_done_task_due_first_after_every_current_task(
     project: Path, capsys: pytest.CaptureFixture[str]
 ):

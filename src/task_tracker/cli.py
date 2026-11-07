@@ -62,8 +62,10 @@ def _describe(task: Task) -> str:
 
 def _done_order(task: Task) -> tuple[datetime, int]:
     """Sort key for the done tasks: date completed, then ID (M4)."""
-    # A DONE task always has a date completed; the assert tells pyright so.
-    assert task.date_completed is not None
+    # `Task` and `load` already refuse a DONE task without a date completed. This
+    # says so again in every mode (`python -O` removes an assert), and tells pyright.
+    if task.date_completed is None:
+        raise ValueError(f"task {task.id} is DONE but has no date completed")
     return (task.date_completed, task.id)
 
 

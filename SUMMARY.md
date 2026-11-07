@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-07 13:53] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+The sort key for the done tasks now raises a `ValueError` for a DONE task without a date completed, where it used an `assert`. `main` turns that into the usual one-line error on standard error and exit code 1. Before, the same task gave a traceback, and under `python -O` it sorted without any error.
+
+**Rationale:**
+Review comment 2 on PR #28 showed that the assert is removed by `python -O`, and that the comparison then fails only when a broken record is mixed with a good one. The project owner chose the exception over the assert, because it is the same in every mode and reuses the error path `main` already has.
+The new test hands the command a DONE task with no date completed, which `load` refuses to build, so the task is passed in directly. It failed first with a bare `AssertionError` from `main`, and a version of the branch that returns instead of raising fails it. I also ran the command under `python -O` with the asserts confirmed stripped: one error line and exit code 1.
+The cost is a branch that real data cannot reach, which the new test covers.
+
+**Bugfix Context:**
+Not reachable with stored data today, because `Task` and `load` refuse such a record. The change makes the sort say so by itself in every mode, if that rule is ever broken.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 8
+- Issue: #8 (PR #28, review comment 2)
+
 ## [2026-11-07 13:44] Commit Summary
 
 **Change Type:** Docs
@@ -51,6 +73,7 @@ Corrected what the documents said about the done-order `assert` under `python -O
 **Rationale:**
 Review comment 2 on PR #28 reported this, and it was reproduced first: under `python -O` one done task without a date completed sorted as `[1]`, two as `[1, 2]`, and only a mix with a good record raised.
 The assert stays. The guarantee is `Task._validate`, which runs on construction and in `restore`, so a broken record cannot reach the sort; the assert only tells the type checker. The decision was made with the wrong sentence among its pros and cons, so the project owner is asked to confirm it.
+Superseded: the review of PR #28 replaced the `assert` with a `ValueError` (see the 13:53 entry).
 The other part of the comment, a typed accessor on `Task`, is not done: there is one reader today, and the reasons are in the `TODO.md` entry for this review.
 
 **References:**
@@ -146,6 +169,7 @@ Added the plan for answering the review of PR #28 to `TODO.md`: seven steps, one
 
 **Rationale:**
 The project rules ask for the plan before any fix. Each claim in the review was checked first, and one of them showed that a sentence I wrote earlier was wrong: under `python -O` the done-order assert does not always fail loudly. The plan records that, keeps the assert, and asks the project owner to confirm the choice with the corrected facts.
+Superseded: the review of PR #28 replaced the `assert` with a `ValueError` (see the 13:53 entry).
 Two comments are answered in part with a reason (an accessor on `Task`, and a shared module for the stored record), so their threads stay open for the reviewer.
 
 **References:**
@@ -258,6 +282,7 @@ The existing plain-list ordering test now builds its file with the same shared h
 **Rationale:**
 The done half sorts by `(date_completed, id)`, not by the M3 key, as `TODO.md` decides. Most done tasks have no due date, and the ID settles ties the same way it does in M3.
 The `assert` tells pyright that a DONE task has a date completed. It adds no branch to cover.
+Superseded: the review of PR #28 replaced the `assert` with a `ValueError` (see the 13:53 entry).
 The done tests build their tasks with `Task.restore`, because the constructor cannot store a past completion date.
 
 **References:**
@@ -274,6 +299,7 @@ The done tests build their tasks with `Task.restore`, because the constructor ca
 **Summary:**
 Recorded the four M4 decisions in the `TODO.md` entry, changing "proposed" to "decided" and adding what was rejected.
 The done tasks sort by date completed, then ID. The sort key states the "a done task has a date completed" invariant with an `assert` for the type checker.
+Superseded: the review of PR #28 replaced the `assert` with a `ValueError` (see the 13:53 entry).
 The list line stays as M3 made it. `list --all` over an empty file says `No tasks in <path>`. The flag's value is named `include_done`. No code changes.
 
 **Rationale:**
@@ -281,6 +307,7 @@ The project owner went through each proposal and chose the recommended option ev
 The one that got discussion was the order of the done tasks: sorting them by the M3 key (due date, priority, ID) would reuse one key for both halves, but it contradicts `README.md` feature 4 and issue #8.
 Most done tasks also have no due date, so they would fall to priority and ID, which say nothing about finished work.
 The `assert` was chosen over a `datetime.max` stand-in (dead code that would sort a broken record last) and a `ValueError` (an unreachable branch that needs a forged task to cover). `python -O` strips it, and a broken record would then sort without an error unless it is compared with a good one (corrected in the review of PR #28). It cannot reach the sort, because `Task` checks the date on every load.
+Superseded: the review of PR #28 replaced the `assert` with a `ValueError` (see the 13:53 entry).
 The plan, `README.md`, and issue #8 are not edited here: no decision changed their text, because the spec's order stands. They are updated in step 4 of the entry, with the ticked boxes.
 
 **References:**
