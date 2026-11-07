@@ -1,5 +1,23 @@
 # Summary
 
+## [2026-11-07 13:37] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`)
+
+**Summary:**
+Added the plan for answering the review of PR #28 to `TODO.md`: seven steps, one per comment, the tests each needs, and what is declined and why. No code changes.
+
+**Rationale:**
+The project rules ask for the plan before any fix. Each claim in the review was checked first, and one of them showed that a sentence I wrote earlier was wrong: under `python -O` the done-order assert does not always fail loudly. The plan records that, keeps the assert, and asks the project owner to confirm the choice with the corrected facts.
+Two comments are answered in part with a reason (an accessor on `Task`, and a shared module for the stored record), so their threads stay open for the reviewer.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review
+- Issue: #8 (PR #28)
+
 ## [2026-11-07 13:22] Commit Summary
 
 **Change Type:** Docs

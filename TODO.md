@@ -295,6 +295,39 @@ The two Given/When/Then items are in the M4 section of the plan. In addition:
 - **Clock changes.** Date completed is naive local time (D6), so a clock set back could reorder tasks completed in the repeated hour. Accepted, as in M2.
 - **Scope held back.** No filtering beyond `--all`, no `--dir` or `--global` (M7), and no change to the layout of `cli.py` (M8).
 
+## [2026-11-07] Fix: PR #28 review
+
+**Objective:**
+Answer the six inline comments and the one PR-level comment on PR #28 (M4, `list --all`). Each claim was checked first: the stale top-level help, the behavior of the assert under `python -O`, the `stored()` call that would build a done record, and the gap in the done-order tests.
+Five are fixed (#1, #3, #5, #6, and the PR-level `README.md` comment). Two are fixed in part and answered with a reason for the rest (#2 and #4), so those two threads stay open for the reviewer.
+
+**Approach:**
+Same branch, `feature/list-all`. Test-first where behavior changes, one atomic commit per comment, each with its own `SUMMARY.md` entry. Pushing waits until the last commit; fixed threads are resolved after the push.
+
+1. #1, the top-level help: red test that `task-tracker --help` names `--all`; green: the help text for `list`. Commit: `fix(cli): name --all in the help for list`.
+2. #3, one message built once: a `scope` word picks `tasks` or `current tasks`. The output is the same, so the existing empty-list tests are the safety net, and a swapped wording must fail them. Commit: `refactor(cli): build the empty-list message once`.
+3. #4, the third copy of the record: `_done` takes its fields from `asdict(Task(...))` and overrides only what a done task changes. Commit: `test(cli): take the done record's fields from Task`.
+4. #5, the full timestamp: two done tasks completed on one day, the lower ID later in the day. Passing at once, so it is mutation-checked: cutting the key to the day must fail it. Commit: `test(cli): pin that the done half sorts on the full timestamp`.
+5. #2, the claim about `python -O`, corrected in this file, in `SUMMARY.md`, and in the PR description. Commit: `docs(plan): correct what python -O does to the done-order assert`.
+6. PR-level comment, `README.md`: the Commands section documents `list --all`, `-a`, the empty message, and the done half's order. Commit: `docs(readme): document list --all`.
+7. #6, issue #8 and stale statements: issue #8 gains the five extra items and the three decisions (a change on GitHub), and the two statements in the 13:03 `SUMMARY.md` entry that the review made false are corrected. Commit: `docs(summary): correct two statements the review made stale`.
+
+**Tests:**
+
+- Top-level `--help` names `--all` next to `list`.
+- Two done tasks completed on the same day, the lower ID at 17:00 and the higher at 09:00, list the 09:00 one first. A mutant that cuts the key to `.date()` fails it.
+- The empty-list wording for `list` and `list --all` is covered by the existing tests; a mutant that swaps the two words fails them.
+
+**Risks & Trade-offs:**
+
+- **The `python -O` claim was wrong, found 2026-11-07.** I wrote that without the assert the comparison "fails with a `TypeError`, still loudly". Run under `python -O`, one DONE task with no date completed sorts without error, two sort by ID, and only a mix with a good one raises.
+  The decision to use the assert was made with that sentence among its pros and cons, so the owner is asked to confirm it with the corrected facts.
+  It stands for now: the guarantee is `Task._validate`, which runs on construction and in `restore`, so on every `load`, and a broken record cannot reach `_done_order`. The assert only tells the type checker.
+- **No accessor or narrower type on `Task` for `date_completed`, declined in part of #2.** There is one consumer. `update` writes the field and `delete` does not read it. A typed accessor changes the M1 model for one caller and is decided against on 2026-11-07; M8 revisits the layout. Rejected for now, not forever: a second reader of the field is the point to reopen it.
+- **`stored()` is not moved into a shared module, declined in part of #4.** The call the comment suggests cannot build these records: `stored()` has `created` on 2026-10-10 at 09:00, after the dates completed here, and `restore` refuses a date completed before `created`. Making it work overrides nine of eleven fields. Moving it also edits the M1 tests, outside this diff.
+  What is fixed is the new code's copy: `_done` takes the field list from the dataclass. The older copies in `test_task.py` and `test_storage.py` remain.
+- **Scope held back.** No change to `Task`, no change to the older tests, no new `tests/` helper module.
+
 [argparse dest]: https://docs.python.org/3/library/argparse.html#dest
 [dataclasses]: https://docs.python.org/3/library/dataclasses.html#mutable-default-values
 [pytest exit codes]: https://docs.pytest.org/en/stable/reference/exit-codes.html
