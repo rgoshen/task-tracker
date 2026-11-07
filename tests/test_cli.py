@@ -880,6 +880,7 @@ def test_update_to_done_sets_date_completed_to_the_clock(project: Path):
     assert (stored.status, stored.date_completed) == (Status.DONE, CLOCK)
 
 
+@pytest.mark.usefixtures("fixed_clock")
 @pytest.mark.parametrize("status", ["TO_DO", "IN_PROGRESS"])
 def test_update_away_from_done_clears_date_completed(project: Path, status: str):
     save([_done(1, "Buy milk", OCT_5)], project)
@@ -889,6 +890,7 @@ def test_update_away_from_done_clears_date_completed(project: Path, status: str)
     stored = load(project)[0]
     assert exit_code == 0
     assert (stored.status, stored.date_completed) == (Status(status), None)
+    assert stored.updated == CLOCK
 
 
 @pytest.mark.usefixtures("fixed_clock")

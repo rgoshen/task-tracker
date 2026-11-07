@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 15:05] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+The test that moves a DONE task back to TO_DO or IN_PROGRESS now runs with the fixed clock and checks that `updated` is the clock reading.
+
+**Rationale:**
+Review comment 4 on PR #29: the test read the real clock through `Task.update`, so it passed only because the wall clock is later than the stored dates, and it did not check `updated` at all. Every other state-changing `update` test already uses `fixed_clock`.
+It failed first on the new assertion, with the real time where the fixed clock reading should be, and passes with the fixture.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 1|Issue: #9 (PR #29, review comment 4)
+
+**References:**
+
+- Without the fixture the test depended on the date it was run, which the project's rule for deterministic tests forbids. It never failed, which is why it went unnoticed.
+
 ## [2026-11-07 15:04] Commit Summary
 
 **Change Type:** Docs
