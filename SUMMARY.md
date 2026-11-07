@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 14:33] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+`Task.update` changes an existing task's name, priority, status, and due date. Its arguments are keyword-only. `None` means "not given" for name, priority, and status, while `due` uses the existing `_UNSET` marker so that `None` can clear the date.
+The method reads the clock once, moves `updated` only when a field changes, and sets or clears date completed with the status (Q4). When the result breaks a rule, every field is restored from a snapshot before the error is raised.
+Passing `id`, `created`, `updated`, `description`, `start`, or `stop` raises `TypeError`, because the method has no such parameter.
+
+**Rationale:**
+The update rule sits beside `_now` and `_validate`, so the command added in a later step stays thin and the model can be tested without argparse. The rejected alternative, the command assigning fields itself, would need the clock and the validation copied or moved out of the model. `TODO.md` records it.
+A snapshot with restore is used instead of checking the change first, because the timeline rules already check a whole task. Running them on the changed task and undoing on failure reuses every rule without a second copy.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M5 Update, step 1
+- Issue: #9
+
 ## [2026-11-07 14:26] Commit Summary
 
 **Change Type:** Docs
