@@ -548,14 +548,20 @@ _ERRORS_FILE = "errors.txt"
 
 @contextmanager
 def _run_in_a_new_process(
-    folder: Path, argv: list[str], stdout: int, *, close_stdout: bool = False
+    folder: Path,
+    argv: list[str],
+    stdout: int,
+    *,
+    close_stdout: bool = False,
+    stdin: int = subprocess.DEVNULL,
 ) -> Iterator[subprocess.Popen[str]]:
     """Run `task-tracker` with `argv` in `folder`; wait for it when the block ends.
 
     Its standard error goes to `errors.txt` in `folder`, so a test reads exactly
-    what a terminal would have shown. With `close_stdout` the shell closes
-    descriptor 1 before it starts the program, as cron and some service managers
-    do, and `stdout` is not used.
+    what a terminal would have shown. Its standard input is empty unless `stdin`
+    says otherwise. With `close_stdout` the shell closes descriptor 1 before it
+    starts the program, as cron and some service managers do, and `stdout` is not
+    used.
     """
     # The console script does the same: it passes the return value to sys.exit.
     code = "import sys, task_tracker; sys.exit(task_tracker.main(sys.argv[1:]))"
@@ -567,6 +573,7 @@ def _run_in_a_new_process(
         subprocess.Popen(
             command,
             cwd=folder,
+            stdin=stdin,
             stdout=stdout,
             stderr=error_file,
             text=True,
@@ -961,33 +968,33 @@ def test_due_and_clear_due_together_exit_2_and_leave_the_file_unchanged(
     assert project.read_bytes() == before
 
 
+# Each (name, text) pair is an ID that `_task_id` refuses. Shared by `update` and
+# `delete`, so both commands are checked against one list.
+BAD_ID_CASES = [
+    ("id-word", "one"),
+    ("id-part", "1.5"),
+    ("id-plus-sign", "+1"),
+    ("id-underscore", "0_1"),
+    ("id-spaces", " 1 "),
+    ("id-arabic-indic-digit", "\u0661"),
+    ("id-negative", "-1"),
+    ("id-zero", "0"),
+]
+
+
 @pytest.mark.parametrize(
     ("argv", "mention"),
     [
         (["1", "--status", "DOING"], "--status"),
         (["1", "--priority", "URGENT"], "--priority"),
         (["1", "--due", "tomorrow"], "--due"),
-        (["one", "--name", "x"], "whole number"),
-        (["1.5", "--name", "x"], "whole number"),
-        (["+1", "--name", "x"], "whole number"),
-        (["0_1", "--name", "x"], "whole number"),
-        ([" 1 ", "--name", "x"], "whole number"),
-        (["\u0661", "--name", "x"], "whole number"),
-        (["-1", "--name", "x"], "whole number"),
-        (["0", "--name", "x"], "whole number"),
+        *[([text, "--name", "x"], "whole number") for _, text in BAD_ID_CASES],
     ],
     ids=[
         "unknown-status",
         "unknown-priority",
         "due-not-a-date",
-        "id-word",
-        "id-part",
-        "id-plus-sign",
-        "id-underscore",
-        "id-spaces",
-        "id-arabic-indic-digit",
-        "id-negative",
-        "id-zero",
+        *[name for name, _ in BAD_ID_CASES],
     ],
 )
 def test_a_bad_option_value_exits_2_naming_it_and_leaves_the_file_unchanged(
@@ -1254,3 +1261,121 @@ def test_deleting_the_only_task_leaves_an_empty_list_that_list_reports(
 
     assert main(["list"]) == 0
     assert "No current tasks in" in capsys.readouterr().out
+
+
+def _never_asked(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Patch `input` so that any call fails the test."""
+
+    def fail(prompt: str = "") -> str:
+        pytest.fail(f"input was called with {prompt!r}")
+
+    monkeypatch.setattr("builtins.input", fail)
+
+
+def test_delete_of_a_missing_id_exits_1_naming_it_and_never_asks(
+    project: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    _save_three(project)
+    before = project.read_bytes()
+    _never_asked(monkeypatch)
+
+    exit_code = main(["delete", "99"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "no task with ID 99")
+    assert project.read_bytes() == before
+
+
+def test_delete_with_no_tasks_file_exits_1_and_creates_no_file(
+    project: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    _never_asked(monkeypatch)
+
+    exit_code = main(["delete", "1"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "no task with ID 1")
+    assert not project.exists()
+
+
+@pytest.mark.parametrize(
+    "id_text",
+    [text for _, text in BAD_ID_CASES],
+    ids=[name for name, _ in BAD_ID_CASES],
+)
+def test_delete_with_a_bad_id_exits_2_and_never_asks(
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    id_text: str,
+):
+    _save_three(project)
+    before = project.read_bytes()
+    _never_asked(monkeypatch)
+
+    with pytest.raises(SystemExit) as exit_info:
+        main(["delete", id_text])
+
+    assert exit_info.value.code == 2
+    assert "whole number" in capsys.readouterr().err.splitlines()[-1]
+    assert project.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "error_type",
+    [EOFError, RuntimeError, KeyboardInterrupt],
+    ids=["end-of-input", "closed-stream", "ctrl-c"],
+)
+def test_a_prompt_that_gets_no_answer_deletes_nothing_and_says_so_in_one_line(
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    error_type: type[BaseException],
+):
+    _save_three(project)
+    before = project.read_bytes()
+
+    def no_answer(prompt: str = "") -> str:
+        raise error_type
+
+    monkeypatch.setattr("builtins.input", no_answer)
+
+    exit_code = main(["delete", "2"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "task 2 was not deleted")
+    assert project.read_bytes() == before
+
+
+def test_delete_with_standard_input_at_its_end_gives_one_error_line(tmp_path: Path):
+    # A real process with standard input at `/dev/null`, as a script or cron runs it.
+    save([Task(1, "Buy milk")], tmp_path / "tasks.json")
+    before = (tmp_path / "tasks.json").read_bytes()
+
+    with _run_in_a_new_process(tmp_path, ["delete", "1"], subprocess.DEVNULL) as child:
+        child.wait(timeout=30)
+
+    error = (tmp_path / _ERRORS_FILE).read_text(encoding="utf-8")
+    assert child.returncode == 1
+    assert error == (
+        "task-tracker: error: no answer to the prompt: task 1 was not deleted\n"
+    )
+    assert (tmp_path / "tasks.json").read_bytes() == before
+
+
+def test_delete_with_standard_output_closed_gives_one_error_line(tmp_path: Path):
+    # With descriptor 1 closed, `sys.stdout` is None and `input` cannot prompt.
+    save([Task(1, "Buy milk")], tmp_path / "tasks.json")
+    before = (tmp_path / "tasks.json").read_bytes()
+
+    with _run_in_a_new_process(
+        tmp_path, ["delete", "1"], subprocess.DEVNULL, close_stdout=True
+    ) as child:
+        child.wait(timeout=30)
+
+    error = (tmp_path / _ERRORS_FILE).read_text(encoding="utf-8")
+    assert child.returncode == 1
+    assert error.count("\n") == 1
+    assert error.startswith("task-tracker: error: ")
+    assert "Traceback" not in error
+    assert (tmp_path / "tasks.json").read_bytes() == before

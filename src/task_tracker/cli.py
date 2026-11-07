@@ -75,12 +75,28 @@ def _update(args: argparse.Namespace, path: Path) -> list[str]:
 _YES_ANSWERS = {"y", "yes"}
 
 
+def _ask(prompt: str, task_id: int) -> str:
+    """Show `prompt` and return the answer. No answer is an error, never a delete."""
+    # Without standard output there is nothing to escape for, and `input` then
+    # raises RuntimeError itself, so the prompt is passed on as it is.
+    shown = _printable(prompt, sys.stdout) if sys.stdout is not None else prompt
+    try:
+        return input(shown)
+    except (EOFError, RuntimeError, KeyboardInterrupt) as error:
+        # EOFError: input ended. RuntimeError: a standard stream is closed.
+        # KeyboardInterrupt: Ctrl-C. `main` catches none of them, so each would be a
+        # traceback; here they become the one error line that `main` prints.
+        raise ValueError(
+            f"no answer to the prompt: task {task_id} was not deleted"
+        ) from error
+
+
 def _delete(args: argparse.Namespace, path: Path) -> list[str]:
     """Ask about task `args.id`, delete it only on a yes, and return the line to show."""
     tasks = load(path)
     task = _find(tasks, args.id)
-    prompt = _printable(f"Delete task {task.id}: {task.name}? [y/N] ", sys.stdout)
-    if input(prompt).strip().lower() not in _YES_ANSWERS:
+    answer = _ask(f"Delete task {task.id}: {task.name}? [y/N] ", task.id)
+    if answer.strip().lower() not in _YES_ANSWERS:
         return [f"Kept task {task.id}: {task.name}"]
     save([other for other in tasks if other.id != task.id], path)
     return [f"Deleted task {task.id}: {task.name}"]

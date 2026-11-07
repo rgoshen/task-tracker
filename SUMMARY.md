@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-07 15:53] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** CLI (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+Refuse a `delete` that names no task or gets no answer.
+An unknown ID exits 1 before the prompt is shown.
+An answer that cannot be read (end of input, a closed standard stream, or Ctrl-C) exits 1 with one error line saying the task was not deleted, and no traceback.
+The list of bad IDs that `update` already tested is now one shared constant, and `delete` uses it too.
+
+**Rationale:**
+Step 2 of M6 (`TODO.md`: 2026-11-07 Feature: M6 Delete).
+The three exceptions are caught only around the `input` call, because `main` handles just `ValueError` and `OSError`.
+A closed standard output has no stream for the prompt, so the prompt is passed on as it is and `input` raises `RuntimeError` itself.
+The shared list keeps the duplicated test cases out of the copypaste check (JSCPD, threshold 0).
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 2
+- Issue: #10
+
 ## [2026-11-07 15:51] Commit Summary
 
 **Change Type:** Feature
