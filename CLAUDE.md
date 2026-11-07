@@ -4,9 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-`task-tracker` is a Python 3.14 CLI for task management, currently an early scaffold.
-`README.md` is the product spec (task fields, status/priority enums, the seven features); the code implements only the task model and storage so far (M1, M2), none of the seven features.
-What exists: a placeholder `main()` in `src/task_tracker/__init__.py`, the `Status` / `Priority` `StrEnum`s, the `Task` dataclass in `src/task_tracker/task.py` (with `Task.restore` for rebuilding a stored task), and `load` / `save` in `src/task_tracker/storage.py`.
+`task-tracker` is a Python 3.14 CLI for task management, grown in vertical slices, one milestone at a time.
+`README.md` is the product spec (task fields, status/priority enums, the seven features); the code implements the task model, storage, and the first slice of commands so far (M1 to M3).
+Of the seven features, 3 (`list`, the current tasks) and 5 (`add`) exist, for the project list in `./tasks.json` only. The other five (install, the `--dir` and `--global` flags, `list --all`, `update`, `delete`) are not built.
+What exists: `main()` and the `add` and `list` commands in `src/task_tracker/cli.py` (`__init__.py` reexports `main`), the `Status` / `Priority` `StrEnum`s, the `Task` dataclass in `src/task_tracker/task.py` (with `Task.restore` for rebuilding a stored task), and `load` / `save` in `src/task_tracker/storage.py`.
+`main` returns the exit code and the console script passes it to `sys.exit`: 0 on success, 2 for a bad option value (argparse), 1 for anything else that goes wrong, with one `task-tracker: error:` line and no traceback.
 
 Labels are reconciled (Q1): users type and see the enum names (`TO_DO`, `IN_PROGRESS`, `DONE`; `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`), and `Priority.MED` was renamed `MEDIUM` to match `README.md` (M1).
 
@@ -18,7 +20,7 @@ Package management is `uv`; the Python version is pinned in `.python-version` (3
 
 ```bash
 uv sync                               # create .venv, install project + dev tools
-uv run task-tracker                   # run the CLI (entry point: task_tracker:main)
+uv run task-tracker list              # run the CLI (entry point: task_tracker:main; a command is required)
 uv run ruff check .                   # lint (add --fix to autofix)
 uv run ruff format .                  # format
 uv run pyright                        # type check

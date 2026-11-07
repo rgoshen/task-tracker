@@ -1,6 +1,5 @@
 """Task tracker package entry point."""
 
+from task_tracker.cli import main
 
-def main() -> None:
-    """Print a greeting from task-tracker."""
-    print("Hello from task-tracker!")
+__all__ = ["main"]

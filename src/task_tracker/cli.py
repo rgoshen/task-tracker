@@ -1,0 +1,229 @@
+"""The command line: argument parsing and the commands that use the task file."""
+
+import argparse
+import os
+import re
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import TextIO
+
+from task_tracker.priority import Priority
+from task_tracker.status import Status
+from task_tracker.storage import load, save
+from task_tracker.task import Task, as_naive_datetime
+
+# D2: the project list is `tasks.json` in the current directory.
+_LIST_FILE = "tasks.json"
+
+
+def _add(args: argparse.Namespace, path: Path) -> list[str]:
+    """Store the new task and return the lines to show."""
+    tasks = load(path)
+    # D5: highest + 1, not a count, so a gap left by a delete is not reused.
+    next_id = max((task.id for task in tasks), default=0) + 1
+    task = Task(next_id, args.name, priority=args.priority, due=args.due)
+    save([*tasks, task], path)
+    return [f"Added task {task.id}: {task.name}"]
+
+
+# Highest priority first. The rank is the enum's definition order, because the
+# string values sort CRITICAL, HIGH, LOW, MEDIUM (Review Focus 1).
+_PRIORITY_RANK = {priority: rank for rank, priority in enumerate(Priority)}
+_STATUS_WIDTH = max(map(len, Status))
+_PRIORITY_WIDTH = max(map(len, Priority))
+# Every datetime prints as YYYY-MM-DDTHH:MM:SS (D6), 19 characters.
+_DATETIME_WIDTH = 19
+
+
+def _current_order(task: Task) -> tuple[datetime, int, int]:
+    """Sort key for the current tasks: due date, priority, then ID.
+
+    `datetime.max` stands in for a missing due date, so those tasks sort after
+    every task that has one (Q2). A stored date has whole seconds, so it can never
+    equal it. The ID settles ties, so the order does not depend on how the file
+    was written.
+    """
+    # D6 chose naive local time on purpose, so DTZ901 does not apply to `max`.
+    return (
+        task.due or datetime.max,  # noqa: DTZ901
+        _PRIORITY_RANK[task.priority],
+        task.id,
+    )
+
+
+def _describe(task: Task) -> str:
+    due = task.due.isoformat() if task.due else "-"
+    return (
+        f"{task.id:>4}  {task.status:<{_STATUS_WIDTH}}  "
+        f"{task.priority:<{_PRIORITY_WIDTH}}  {due:<{_DATETIME_WIDTH}}  {task.name}"
+    )
+
+
+def _list(_args: argparse.Namespace, path: Path) -> list[str]:
+    """Return the lines to show: the current tasks, or that there are none."""
+    current = [task for task in load(path) if task.status is not Status.DONE]
+    if not current:
+        return [f"No current tasks in {path}"]
+    return [_describe(task) for task in sorted(current, key=_current_order)]
+
+
+# What is escaped, because it moves the cursor, sends commands to the terminal,
+# splits one line into two, or reorders how the rest of a line is displayed:
+# - the control characters (Unicode category Cc: C0, DEL and C1);
+# - the line and paragraph separators (Zl, Zp);
+# - the bidirectional marks, embeddings, overrides and isolates (Unicode Standard
+#   Annex 9), which a name from a shared file could use to make a line read in
+#   another order than it is stored.
+# The first two groups equal the categories over every code point, and one scan of
+# the line is an order of magnitude faster than a category lookup for each
+# character. The zero-width joiner and the wide space are not here: they are text.
+_UNSAFE = re.compile(
+    r"[\x00-\x1f\x7f-\x9f"  # Cc
+    r"\u2028\u2029"  # Zl, Zp
+    r"\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]"  # bidirectional controls
+)
+
+
+def _escape(match: re.Match[str]) -> str:
+    return match.group().encode("unicode_escape").decode("ascii")
+
+
+def _printable(line: str, stream: TextIO) -> str:
+    """Return `line` with what could break or drive the terminal shown as escapes.
+
+    A name is whatever was typed or whatever a shared file carries (the README
+    expects lists to be shared), so it is not printed raw: a newline would make one
+    task two lines, and an escape sequence would reach the terminal. Anything that
+    `stream` cannot encode becomes an escape too, so a listing is not stopped
+    partway by a codec error. A literal backslash is left as it is, so it can look
+    like an escape.
+    """
+    escaped = _UNSAFE.sub(_escape, line)
+    encoding = stream.encoding or "utf-8"
+    return escaped.encode(encoding, "backslashreplace").decode(encoding)
+
+
+def _say(line: str, stream: TextIO | None) -> None:
+    """Print one escaped line to `stream`, the only way the program writes text.
+
+    Standard output and standard error both reach a terminal, and an error message
+    can repeat text from the task file (a key in a record, for one), so both go
+    through `_printable`. A closed stream is `None`, and `print(file=None)` would
+    write to standard output instead, so it is skipped here.
+    """
+    if stream is None:
+        return
+    print(_printable(line, stream), file=stream)
+
+
+def _discard_stdout() -> None:
+    """Point standard output at devnull, so that nothing is left to flush again.
+
+    A write that failed leaves its bytes in the buffer, and Python flushes stdout
+    once more at exit. That flush fails the same way, prints "Exception ignored",
+    and turns the exit code into 120. The retry succeeds against devnull (the
+    recipe in the `signal` module's SIGPIPE note). The extra descriptor is closed
+    once `dup2` has made its copy.
+    """
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    try:
+        os.dup2(devnull, sys.stdout.fileno())
+    finally:
+        os.close(devnull)
+
+
+def _show(lines: list[str], prog: str) -> int:
+    """Print `lines` and return the exit code.
+
+    The commands only build their lines. Printing is here, outside the `try` in
+    `main`, so a failure to write is never reported as a problem with the data,
+    and `add` has already saved by the time it can happen.
+    """
+    if sys.stdout is None:
+        # Descriptor 1 was closed when the program started (cron and some service
+        # managers do this), so there is no stream. `print` itself treats that as
+        # "nowhere to write"; the command has still done its work.
+        return 0
+    try:
+        for line in lines:
+            _say(line, sys.stdout)
+        # A pipe buffers, so a reader that has gone shows up at the flush.
+        sys.stdout.flush()
+    except BrokenPipeError:
+        # The reader stopped early, as `head` does. That is not worth a message.
+        # The recipe in the `signal` module's SIGPIPE note also exits with 1.
+        _discard_stdout()
+        return 1
+    except OSError as error:
+        _discard_stdout()
+        _say(f"{prog}: error: cannot write the output: {error}", sys.stderr)
+        return 1
+    return 0
+
+
+def _due(text: str) -> datetime:
+    """Read `--due`: a date, or a date and time, in local time (D6).
+
+    The rule is the one `Task` applies to any date, so it is not repeated here.
+    What this adds is the way a bad value is reported: every one raises the same
+    `ArgumentTypeError`, so argparse names the flag and the expected form and
+    exits with 2, a UTC offset included, where `Task` alone would give exit code 1.
+    """
+    try:
+        due = as_naive_datetime("due", text)
+    except ValueError:
+        due = None
+    # `None` is for the type checker: a text is never None.
+    if due is None:
+        raise argparse.ArgumentTypeError(
+            f"expected YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS in local time, not {text!r}"
+        )
+    return due
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="task-tracker")
+    commands = parser.add_subparsers(dest="command", required=True)
+    add = commands.add_parser("add", help="add a task")
+    add.add_argument("name")
+    # No `type=`: argparse converts before it checks `choices`, so a converter
+    # would fail first with a message that lists nothing. The choices are plain
+    # strings because argparse prints each one with `repr`, and `Task` turns the
+    # checked string into a `Priority`.
+    add.add_argument(
+        "--priority",
+        "-p",
+        choices=[priority.value for priority in Priority],
+        default=Priority.LOW,
+    )
+    add.add_argument(
+        "--due",
+        "-D",
+        type=_due,
+        metavar="DATETIME",
+        help="YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, local time",
+    )
+    add.set_defaults(run=_add)
+    commands.add_parser("list", help="list the current tasks").set_defaults(run=_list)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the command in `argv` (the process arguments by default).
+
+    The return value is the exit code: the console script passes it to
+    `sys.exit`. A bad option value exits 2 inside argparse. Anything else that
+    goes wrong at runtime prints one line to standard error and returns 1, and so
+    does a reader that closes the pipe early, quietly.
+    """
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    try:
+        lines = args.run(args, Path.cwd() / _LIST_FILE)
+    except (ValueError, OSError) as error:
+        # `Task` and `load` raise ValueError for a blank name or a corrupt file
+        # (M2 made it the one type); OSError is a file that cannot be read or written.
+        _say(f"{parser.prog}: error: {error}", sys.stderr)
+        return 1
+    return _show(lines, parser.prog)

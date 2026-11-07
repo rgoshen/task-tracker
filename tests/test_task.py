@@ -145,6 +145,18 @@ def test_non_string_name_is_rejected_with_value_error():
         Task(id=1, name=None)  # type: ignore[arg-type]
 
 
+def test_a_name_that_utf8_cannot_hold_is_rejected():
+    # A command-line argument with an undecodable byte reaches Python as a lone
+    # surrogate (surrogateescape), and `save` writes UTF-8, which cannot hold it.
+    with pytest.raises(ValueError, match="name must be valid UTF-8 text"):
+        Task(1, "bad \udcff")
+
+
+def test_a_description_that_utf8_cannot_hold_is_rejected():
+    with pytest.raises(ValueError, match="description must be valid UTF-8 text"):
+        Task(1, "Buy milk", description="bad \udcff")
+
+
 def test_name_is_stored_without_surrounding_whitespace():
     assert Task(id=1, name="  Buy milk  ").name == "Buy milk"
 
@@ -313,7 +325,7 @@ def stored(**overrides: Any) -> dict[str, Any]:
 def test_restore_keeps_the_stored_created_and_updated():
     updated = STORED_CREATED + timedelta(days=1)
 
-    task = Task.restore(**stored(updated=updated))
+    task = Task.restore(stored(updated=updated))
 
     assert task.created == STORED_CREATED
     assert task.updated == updated
@@ -322,7 +334,7 @@ def test_restore_keeps_the_stored_created_and_updated():
 def test_restore_accepts_a_task_that_was_done_in_the_past():
     # The constructor cannot build this: its created is always now.
     task = Task.restore(
-        **stored(
+        stored(
             status=Status.DONE,
             updated=STORED_DONE,
             stop=STORED_DONE,
@@ -334,7 +346,8 @@ def test_restore_accepts_a_task_that_was_done_in_the_past():
     assert task.date_completed == STORED_DONE
 
 
-def test_restore_takes_keyword_arguments_only():
+def test_restore_takes_one_record_not_separate_fields():
+    # Fields given one by one could be swapped without anyone noticing.
     with pytest.raises(TypeError):
         # Passing positional arguments is the point of the test.
         # pylint: disable-next=too-many-function-args
@@ -354,7 +367,7 @@ def test_restore_needs_every_field_and_fills_none_in(missing: list[str], message
         del record[name]
 
     with pytest.raises(ValueError, match=message):
-        Task.restore(**record)
+        Task.restore(record)
 
 
 @pytest.mark.parametrize("field_name", list(stored()))
@@ -364,25 +377,42 @@ def test_restore_requires_each_field_in_turn(field_name: str):
     del record[field_name]
 
     with pytest.raises(ValueError, match=f"missing field.*{field_name}"):
-        Task.restore(**record)
+        Task.restore(record)
 
 
 def test_restore_rejects_a_field_the_task_does_not_have():
     # `save` rewrites the whole record, so a field ignored here would be deleted.
     with pytest.raises(ValueError, match="unknown field.*colour"):
-        Task.restore(**stored(colour="red"))
+        Task.restore(stored(colour="red"))
+
+
+@pytest.mark.parametrize("field_name", ["name", "description"])
+def test_restore_rejects_text_that_utf8_cannot_hold(field_name: str):
+    # JSON accepts an escaped lone surrogate, so a file can hold one.
+    with pytest.raises(ValueError, match=f"{field_name} must be valid UTF-8 text"):
+        Task.restore(stored(**{field_name: "bad \ud83d"}))
+
+
+@pytest.mark.parametrize("key", ["cls", "record"])
+def test_restore_rejects_a_key_named_like_a_parameter_as_unknown_not_as_a_clash(
+    key: str,
+):
+    # The record is one argument, not spread into keyword arguments, so no stored
+    # key can collide with a parameter. A key named `cls` once raised a TypeError.
+    with pytest.raises(ValueError, match=f"unknown field.*{key}"):
+        Task.restore(stored(**{key: 1}))
 
 
 @pytest.mark.parametrize("field_name", ["created", "updated"])
 def test_restore_rejects_bad_stamp_text_naming_the_field(field_name: str):
     with pytest.raises(ValueError, match=field_name):
-        Task.restore(**stored(**{field_name: "not a date"}))
+        Task.restore(stored(**{field_name: "not a date"}))
 
 
 @pytest.mark.parametrize("field_name", ["created", "updated"])
 def test_restore_rejects_a_timezone_aware_stamp(field_name: str):
     with pytest.raises(ValueError, match=field_name):
-        Task.restore(**stored(**{field_name: AWARE_DAY}))
+        Task.restore(stored(**{field_name: AWARE_DAY}))
 
 
 @pytest.mark.parametrize(
@@ -443,7 +473,7 @@ def test_restore_rejects_each_broken_timeline_link(
     overrides: dict[str, Any], message: str
 ):
     with pytest.raises(ValueError, match=message):
-        Task.restore(**stored(**overrides))
+        Task.restore(stored(**overrides))
 
 
 @pytest.mark.usefixtures("readings")
@@ -452,7 +482,7 @@ def test_restore_accepts_stamps_later_than_the_clock():
     # skewed clock is fixed. A file that was valid when it was saved must still load.
     later = FIRST_READING + timedelta(hours=1)
 
-    task = Task.restore(**stored(created=later, updated=later, start=later, stop=later))
+    task = Task.restore(stored(created=later, updated=later, start=later, stop=later))
 
     assert task.created == task.updated == later
 
@@ -461,9 +491,7 @@ def test_restore_accepts_stamps_later_than_the_clock():
 def test_restore_accepts_a_date_completed_later_than_the_clock():
     later = FIRST_READING + timedelta(hours=1)
 
-    task = Task.restore(
-        **stored(status=Status.DONE, updated=later, date_completed=later)
-    )
+    task = Task.restore(stored(status=Status.DONE, updated=later, date_completed=later))
 
     assert task.date_completed == later
 
@@ -471,13 +499,13 @@ def test_restore_accepts_a_date_completed_later_than_the_clock():
 def test_restore_rejects_a_done_task_without_a_date_completed():
     # The constructor would fill in "now". A stored DONE task always has its date.
     with pytest.raises(ValueError, match="DONE task must have a date completed"):
-        Task.restore(**stored(status=Status.DONE))
+        Task.restore(stored(status=Status.DONE))
 
 
 @pytest.mark.parametrize("status", [Status.TO_DO, Status.IN_PROGRESS])
 def test_restore_rejects_a_date_completed_on_a_task_that_is_not_done(status: Status):
     with pytest.raises(ValueError, match="only a DONE task"):
-        Task.restore(**stored(status=status, date_completed=STORED_DONE))
+        Task.restore(stored(status=status, date_completed=STORED_DONE))
 
 
 @pytest.mark.parametrize("bad_id", ["1", 1.5, True, None])
@@ -490,7 +518,7 @@ def test_an_id_that_is_not_an_int_is_rejected(bad_id: object):
 @pytest.mark.parametrize("bad_id", ["1", 1.5, True, None])
 def test_restore_rejects_an_id_that_is_not_an_int(bad_id: object):
     with pytest.raises(ValueError, match="id must be an int"):
-        Task.restore(**stored(id=bad_id))
+        Task.restore(stored(id=bad_id))
 
 
 @pytest.mark.parametrize("bad_description", [5, None, ["a"]])
@@ -502,7 +530,7 @@ def test_a_description_that_is_not_text_is_rejected(bad_description: object):
 @pytest.mark.parametrize("bad_description", [5, None, ["a"]])
 def test_restore_rejects_a_description_that_is_not_text(bad_description: object):
     with pytest.raises(ValueError, match="description must be a string"):
-        Task.restore(**stored(description=bad_description))
+        Task.restore(stored(description=bad_description))
 
 
 # --- review of PR #25: values a hand-edited file can hold ---
@@ -512,7 +540,7 @@ def test_restore_rejects_a_description_that_is_not_text(bad_description: object)
 def test_restore_rejects_a_missing_stamp_naming_the_field(field_name: str):
     # A hand-edited file can hold null. Only due and date completed may be empty.
     with pytest.raises(ValueError, match=f"{field_name} must be a date"):
-        Task.restore(**stored(**{field_name: None}))
+        Task.restore(stored(**{field_name: None}))
 
 
 @pytest.mark.parametrize("field_name", ["start", "stop"])
@@ -531,4 +559,4 @@ def test_an_id_below_one_is_rejected(bad_id: int):
 @pytest.mark.parametrize("bad_id", [0, -5])
 def test_restore_rejects_an_id_below_one(bad_id: int):
     with pytest.raises(ValueError, match="id must be 1 or more"):
-        Task.restore(**stored(id=bad_id))
+        Task.restore(stored(id=bad_id))

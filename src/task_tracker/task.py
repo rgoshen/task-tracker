@@ -1,5 +1,6 @@
 """The task record."""
 
+from collections.abc import Mapping
 from dataclasses import KW_ONLY, dataclass, field, fields
 from datetime import date, datetime, time
 from typing import Any, Self
@@ -26,11 +27,15 @@ def _now() -> datetime:
     return datetime.now().replace(microsecond=0)  # noqa: DTZ005
 
 
-def _as_naive_datetime(name: str, value: object) -> datetime | None:
+def as_naive_datetime(name: str, value: object) -> datetime | None:
     """Turn an ISO 8601 string, a date, or a datetime into one form.
 
     The result is a naive local datetime with whole seconds, so `isoformat()`
     always reads `YYYY-MM-DDTHH:MM:SS`. A bare date means midnight (Q6).
+
+    Public because the command line reads `--due` with this same rule (D6), so the
+    rule has one home. A value that is not a date, or has a UTC offset, raises
+    `ValueError` naming `name`.
     """
     if value is None:
         return None
@@ -47,6 +52,21 @@ def _as_naive_datetime(name: str, value: object) -> datetime | None:
     if value.tzinfo is not None:
         raise ValueError(f"{name} must be a naive local datetime")
     return value.replace(microsecond=0)
+
+
+def _require_utf8_text(name: str, text: str) -> None:
+    """Refuse text that UTF-8 cannot hold, because `save` writes UTF-8.
+
+    An undecodable byte in a command-line argument becomes a lone surrogate
+    (`surrogateescape`), and JSON accepts an escaped one, so such text can arrive
+    from either side. Refusing it here makes it a clear error at the door, and a
+    file that holds it a corrupt file that names the record, instead of a codec
+    error from partway through a listing or a save.
+    """
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        raise ValueError(f"{name} must be valid UTF-8 text") from None
 
 
 # README.md "Task object" defines 11 fields; pylint's default limit is 7.
@@ -84,13 +104,17 @@ class Task:  # pylint: disable=too-many-instance-attributes
             raise ValueError("date completed must not be in the future")
 
     @classmethod
-    def restore(cls, **record: Any) -> Self:
+    def restore(cls, record: Mapping[str, Any]) -> Self:
         """Rebuild a task from a stored record, keeping its stored stamps.
 
         The constructor stamps `created` and `updated` with the clock, so it cannot
         build a task that already existed. This runs every other rule the
         constructor does and fills nothing in, so a record must hold every field
         and no other. The field list is the dataclass's own.
+
+        The record is one argument, not spread into keyword arguments, so a stored
+        key can never collide with a parameter: a key named `cls` is an unknown
+        field like any other, whatever parameters `restore` gains later.
         """
         names = {field.name for field in fields(cls)}
         if missing := names - record.keys():
@@ -119,6 +143,8 @@ class Task:  # pylint: disable=too-many-instance-attributes
             raise ValueError("name must not be blank")
         if not isinstance(self.description, str):
             raise ValueError("description must be a string")  # noqa: TRY004
+        _require_utf8_text("name", self.name)
+        _require_utf8_text("description", self.description)
         self.status = Status(self.status)
         self.priority = Priority(self.priority)
         for name in _DATETIME_FIELDS:
@@ -128,7 +154,7 @@ class Task:  # pylint: disable=too-many-instance-attributes
             if value is None and name not in _OPTIONAL_DATETIMES:
                 # ValueError, not TypeError: a null in the file must reach the loader.
                 raise ValueError(f"{name} must be a date or ISO 8601 text")
-            setattr(self, name, _as_naive_datetime(name, value))
+            setattr(self, name, as_naive_datetime(name, value))
 
     def _fill_in_defaults(self, now: datetime) -> None:
         if self.status is Status.DONE and self.date_completed is None:
