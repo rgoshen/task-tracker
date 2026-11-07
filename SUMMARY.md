@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 13:03] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `CLAUDE.md`, `SUMMARY.md`)
+
+**Summary:**
+Closed out M4 in the docs. The M4 section of the plan gains five Given/When/Then items (done tasks with one date completed, a done task due first, only done tasks, the empty-list wording, a corrupt file), a record of the three decisions, and all seven boxes ticked.
+The project `CLAUDE.md` now says that features 3, 4, and 5 exist and that M1 to M4 are built. One earlier `SUMMARY.md` entry said the options table lives in `TODO.md`; it is in `README.md`, and the entry is corrected.
+
+**Rationale:**
+The project `CLAUDE.md` says to update the plan, the matching issue, and `README.md` together when a milestone changes. `README.md` needs no edit: feature 4 already describes this order, and the options table already lists `--all` and `-a`.
+Each box was ticked only after a passing test covered it. The full suite (262 tests), coverage (97%, with the output-failure branches counted in child processes as before), and the linters CI runs on Python and Markdown were run on this commit's parent, and `list --all` was run by hand in a scratch directory.
+Issue #8 still has its boxes unticked: editing it is a change on GitHub, and it waits for the project owner.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all, step 4
+- Issue: #8
+
 ## [2026-11-07 12:59] Commit Summary
 
 **Change Type:** Feature
@@ -29,7 +49,7 @@ The wording is chosen after the lines are built, so the message check stays in o
 Added `-a` as the short form of `list --all`. The parametrized test runs both forms and checks that each gives the same order.
 
 **Rationale:**
-The short form follows the options table in `TODO.md` and shares the `dest` of the long form, so the two cannot drift apart.
+The short form follows the options table in `README.md` and shares the `dest` of the long form, so the two cannot drift apart.
 The test is parametrized on the flag rather than repeated, so a new alias needs one entry in the list.
 
 **References:**

@@ -260,10 +260,21 @@ Suggested seam: `main(argv: list[str] | None = None) -> int`, so tests call `mai
 
 Branch `feature/list-all`. Covers feature 4.
 
-- [ ] Given A, B, C, E from M3 plus done tasks D (completed 2026-10-10) and F (completed 2026-10-05), when `list --all`, then the order is C, B, A, E, F, D.
-- [ ] Given the same tasks, when `list -a`, then the output equals `list --all`.
+- [x] Given A, B, C, E from M3 plus done tasks D (completed 2026-10-10) and F (completed 2026-10-05), when `list --all`, then the order is C, B, A, E, F, D.
+- [x] Given the same tasks, when `list -a`, then the output equals `list --all`.
+- [x] Given two done tasks with the same date completed, stored with the higher ID first, when `list --all`, then the lower ID comes first.
+- [x] Given a done task with an earlier due date than every open task, when `list --all`, then it still comes after all the open tasks.
+- [x] Given a file with only done tasks, when `list --all`, then they are listed by date completed; when `list`, then it prints `No current tasks in <path>` and exits 0.
+- [x] Given no file, when `list --all`, then it prints `No tasks in <path>` and exits 0; when `list`, then it still prints `No current tasks in <path>`.
+- [x] Given a corrupt project file, when `list --all`, then a one-line error is printed, the exit code is 1, and the file is unchanged.
 
 **Think about:** can the first half reuse the M3 ordering instead of repeating it?
+
+**Decided (2026-11-07):**
+
+- The done half sorts by date completed, then ID, the same tie rule as M3. Rejected: the M3 key (due date, priority, ID), because `README.md` feature 4 and issue #8 say completed date, and most done tasks have no due date.
+- The list line stays as M3 made it: ID, status, priority, due date, and name. A reader cannot see date completed from the line, which is accepted for now.
+- `list --all` over an empty or missing file prints `No tasks in <path>`, because done tasks count under `--all`. Plain `list` keeps `No current tasks in <path>`.
 
 ### M5. Update
 
