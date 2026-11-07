@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-07 12:00] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`task-tracker list >&-` and `task-tracker add x >&-`, with descriptor 1 closed, no longer end in an `AttributeError` traceback. They finish with exit code 0 and print nothing, because there is nowhere to print to. For `add` this matters most: the task was saved first and the traceback came after it.
+
+**Rationale:**
+When descriptor 1 is closed at start, which happens under cron and some service managers, `sys.stdout` is `None`. `print` treats that as "nowhere to write", but `_printable` read `sys.stdout.encoding` first, and `_show` would have failed on `sys.stdout.flush()` next. The review named the first; the guard at the top of `_show` covers both with one `if sys.stdout is None:
+return 0`. The exit code is 0 because the command did its work and a program with no output stream has not failed. Rejected: `getattr(sys.stdout, "encoding", None)` in `_printable` alone, which fixes the first line and leaves the `flush()` failure behind it.
+Two tests were written first and seen failing with the traceback, one for each command. They start the real program through `sh` with descriptor 1 closed, and check that standard error is empty, the exit code is 0, and the stored tasks are as expected. Two deliberate breaks of the code are each caught: no guard, and a guard that returns 1.
+
+**Bugfix Context:**
+Review comment 2 on PR #26. Root cause: the code assumed `sys.stdout` is always a stream, and Python documents that it can be `None`.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #26 review, second round, step 3
+- Issue: #7 (PR #26, review comment 2)
+
 ## [2026-11-07 11:58] Commit Summary
 
 **Change Type:** Fix

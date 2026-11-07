@@ -336,19 +336,24 @@ _ERRORS_FILE = "errors.txt"
 
 @contextmanager
 def _run_in_a_new_process(
-    folder: Path, argv: list[str], stdout: int
+    folder: Path, argv: list[str], stdout: int, *, close_stdout: bool = False
 ) -> Iterator[subprocess.Popen[str]]:
     """Run `task-tracker` with `argv` in `folder`; wait for it when the block ends.
 
     Its standard error goes to `errors.txt` in `folder`, so a test reads exactly
-    what a terminal would have shown.
+    what a terminal would have shown. With `close_stdout` the shell closes
+    descriptor 1 before it starts the program, as cron and some service managers
+    do, and `stdout` is not used.
     """
     # The console script does the same: it passes the return value to sys.exit.
-    command = "import sys, task_tracker; sys.exit(task_tracker.main(sys.argv[1:]))"
+    code = "import sys, task_tracker; sys.exit(task_tracker.main(sys.argv[1:]))"
+    command = [sys.executable, "-c", code, *argv]
+    if close_stdout:
+        command = ["sh", "-c", 'exec "$@" >&-', "sh", *command]
     with (
         (folder / _ERRORS_FILE).open("w", encoding="utf-8") as error_file,
         subprocess.Popen(
-            [sys.executable, "-c", command, *argv],
+            command,
             cwd=folder,
             stdout=stdout,
             stderr=error_file,
@@ -392,12 +397,16 @@ def test_a_pipe_that_is_already_closed_ends_a_short_list_quietly(tmp_path: Path)
     assert child.returncode == 1
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="needs a read-only descriptor")
-@pytest.mark.parametrize(
+# Each command, and the task names the file holds after it ran: `add` saves.
+_BOTH_COMMANDS = pytest.mark.parametrize(
     ("argv", "stored"),
     [(["list"], ["first"]), (["add", "second"], ["first", "second"])],
     ids=["list", "add"],
 )
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="needs a read-only descriptor")
+@_BOTH_COMMANDS
 def test_a_write_that_fails_ends_with_one_error_line_and_exit_1(
     tmp_path: Path, argv: list[str], stored: list[str]
 ):
@@ -420,6 +429,25 @@ def test_a_write_that_fails_ends_with_one_error_line_and_exit_1(
     assert len(error_lines) == 1
     assert error_lines[0].startswith("task-tracker: error: cannot write the output: ")
     # `add` saves before it prints, and the task stays saved.
+    assert [task.name for task in load(tmp_path / "tasks.json")] == stored
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="needs sh to close descriptor 1")
+@_BOTH_COMMANDS
+def test_a_closed_standard_output_is_not_an_error(
+    tmp_path: Path, argv: list[str], stored: list[str]
+):
+    # With descriptor 1 closed, `sys.stdout` is None. `print` takes that to mean
+    # "nowhere to write", so the command has nothing to complain about.
+    save([Task(1, "first")], tmp_path / "tasks.json")
+
+    with _run_in_a_new_process(
+        tmp_path, argv, subprocess.DEVNULL, close_stdout=True
+    ) as child:
+        child.wait(timeout=30)
+
+    assert (tmp_path / _ERRORS_FILE).read_text(encoding="utf-8") == ""
+    assert child.returncode == 0
     assert [task.name for task in load(tmp_path / "tasks.json")] == stored
 
 

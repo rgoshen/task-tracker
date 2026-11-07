@@ -116,6 +116,11 @@ def _show(lines: list[str], prog: str) -> int:
     `main`, so a failure to write is never reported as a problem with the data,
     and `add` has already saved by the time it can happen.
     """
+    if sys.stdout is None:
+        # Descriptor 1 was closed when the program started (cron and some service
+        # managers do this), so there is no stream. `print` itself treats that as
+        # "nowhere to write"; the command has still done its work.
+        return 0
     try:
         for line in lines:
             print(_printable(line))
