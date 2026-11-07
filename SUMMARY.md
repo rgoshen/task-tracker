@@ -1,5 +1,23 @@
 # Summary
 
+## [2026-11-07 13:21] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`)
+
+**Summary:**
+Removed the sentence "You write the tests and the code" from the objective of the M4 entry in `TODO.md`. The entry now says only that it fixes the order and the traps. No code changes.
+
+**Rationale:**
+The M4 code was written from this entry by delegated agents and then checked by hand, so the sentence was no longer true. The same sentence in the M2 entry is left as it is: it records how that milestone was worked.
+Before this commit the unpushed history was also tidied: the one-word wording fix to the first M4 `SUMMARY.md` entry was folded into the commit it belonged to, so the branch has three code commits as the plan describes. The final tree was identical before and after.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all
+- Issue: #8
+
 ## [2026-11-07 13:03] Commit Summary
 
 **Change Type:** Docs

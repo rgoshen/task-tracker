@@ -260,7 +260,7 @@ Same branch, `feature/add-and-list`. Test-first, one atomic commit per comment, 
 
 **Objective:**
 Make `uv run task-tracker list --all` (short `-a`) show every task: the current ones first in the M3 order, then the completed ones by date completed, oldest first. Covers issue #8 and the M4 section of `docs/implementation-plan.md`. Feature 4 of `README.md`, project-level list only: `--dir` and `--global` arrive in M7.
-You write the tests and the code; this entry fixes the order and the traps.
+This entry fixes the order and the traps.
 
 **Approach:**
 Branch `feature/list-all` (from `develop`, after M3 merged as PR #26). Test-first, one atomic commit per step, each with its own `SUMMARY.md` entry. The change stays in `src/task_tracker/cli.py` and `tests/test_cli.py`. Standard library only, so `uv.lock` does not change. `_current_order` stays as it is, and the M3 tests are its safety net.
