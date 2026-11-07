@@ -220,6 +220,39 @@ Same branch, `feature/add-and-list`. Test-first, one atomic commit per comment, 
 - **Concurrent `add` can lose a task, not only an ID.** The wording is corrected in this plan, `README.md`, and the PR. The lock is deferred to its own issue: `fcntl` is Unix-only and an `O_EXCL` lockfile goes stale after a crash.
 - **#8, the subject of `0e0d554`, is not reworded.** That needs a force-push, which this work never does, and the merge commit keeps the subject in history. The missing `SUMMARY.md` entry is recorded in the `.gitignore` commit.
 
+## [2026-11-07] Fix: PR #26 review, second round
+
+**Objective:**
+Answer nine more inline comments on PR #26, from a second code review, run after the first round was pushed. Each claim was reproduced before it was triaged: the exit code 120, the traceback with a closed standard output, the escape sequence in an error line, the bidirectional controls, and the 16.7 ms against 0.9 ms.
+Eight are fixed and one (#7, `Task.restore` taking a mapping) is answered with a reason.
+
+**Approach:**
+Same branch, `feature/add-and-list`. Test-first, one atomic commit per comment, each with its own `SUMMARY.md` entry.
+
+1. `#9` (test helper): the child-process helper becomes a context manager, which removes the pylint suppression that had no reason. Commit: `test(cli): start child processes through one context manager`.
+2. `#1`: one `_discard_stdout` helper, used by the broken-pipe and the other write-failure branches, so the exit-time flush cannot fail again (exit 120). Commit: `fix(cli): discard standard output after any failed write`.
+3. `#2`: a closed standard output (`sys.stdout is None`) exits 0 without a traceback. Commit: `fix(cli): say nothing when standard output is closed`.
+4. `#3`: the error line goes through the same escaping as the output, in one `_say` used for both streams. Commit: `fix(cli): escape the error line like the output`.
+5. `#5`: one compiled regular expression replaces the per-character category lookup, with the same behavior. Commit: `refactor(cli): escape with one regular expression`.
+6. `#4`: the bidirectional controls are escaped too. Commit: `fix(cli): escape bidirectional controls`.
+7. `#6`: `--due` calls the model's date rule instead of repeating it. Commit: `refactor(cli): read --due with the model's date rule`.
+8. `#8`: an unencodable name is tested through `main`. Commit: `test(cli): pin the unencodable name at the command line`.
+9. Docs: the plan, `README.md`, and this entry record the changes. Commit: `docs(plan): record the second round of PR #26 review changes`.
+
+**Tests:**
+
+- A child whose standard output is a read-only descriptor gets one stderr line and exit 1 from `list` and `add`, and the task stays saved. A child started with descriptor 1 closed exits 0 with an empty stderr.
+- A stored record with a key that holds an escape character and a newline gives a one-line error with no raw escape character.
+- A name with U+202E, U+2066, U+200E, or U+061C prints as escapes, and U+200D and U+3000 still print as text.
+- `main(["add", "bad \udcff"])` exits 1 with `UTF-8` in the one-line error, and writes nothing.
+
+**Risks & Trade-offs:**
+
+- **Coverage of the failure branches is measured in child processes**, so pytest-cov does not count them. The in-process figure for `cli.py` drops; the tests still fail when the branch breaks, which the deliberate breaks show.
+- **`as_naive_datetime` becomes public.** It was private to `task.py`. The gain is that the naive-time rule of D6 lives in one place; the docs that called the repetition a cost are corrected.
+- **U+061C is escaped although the comment did not list it.** It is the third Unicode bidirectional mark, next to U+200E and U+200F, and leaving it would make the rule incoherent. U+200D and U+3000 stay text.
+- **#7 is not changed.** A mapping argument touches 19 test call sites and reverses the keyword-only decision of the first review, for a parameter that does not exist. The comment calls the current fix correct.
+
 [dataclasses]: https://docs.python.org/3/library/dataclasses.html#mutable-default-values
 [pytest exit codes]: https://docs.pytest.org/en/stable/reference/exit-codes.html
 [JSONDecodeError]: https://docs.python.org/3/library/json.html#json.JSONDecodeError

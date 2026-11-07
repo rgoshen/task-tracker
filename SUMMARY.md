@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-07 11:54] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`)
+
+**Summary:**
+Planned the work that answers nine more inline review comments on PR #26: nine steps, each with its commit subject, the tests that pin it, and the risks. Eight comments are fixed and one (#7) is answered with a reason instead of a code change.
+
+**Rationale:**
+The project rule is to plan in `TODO.md` before any code changes. Every claim in the review was reproduced first:
+exit 120 after a failed write, the `AttributeError` with a closed standard output (and the task saved before it), an escape sequence and a second line on standard error from a hostile key, the bidirectional controls passing through, and the 16.7 ms against 0.9 ms for the per-character lookup.
+Two points go beyond what the comments asked for, and both are recorded as risks: U+061C joins the escaped bidirectional controls, and the closed-output fix also covers `flush()`, which would fail on `None` the same way as `.encoding`.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #26 review, second round
+- Issue: #7 (PR #26)
+
 ## [2026-11-01 18:22] Commit Summary
 
 **Change Type:** Fix
