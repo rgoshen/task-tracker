@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 14:44] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `CLAUDE.md`, `docs/implementation-plan.md`, `TODO.md`)
+
+**Summary:**
+Document the `update` command now that it exists. `README.md` gets the `update` example and bullet, exit codes 1 and 2 for the new cases, and a lost-write note that covers `update`. The "stores the task before it prints" bullet now names `update` too. `CLAUDE.md` says features 3 to 6 exist. The six M5 boxes in the plan are ticked, and `TODO.md` records the one edge case found in step 1.
+
+**Rationale:**
+The `README.md` and `CLAUDE.md` text was drafted while the code was written, and held back until the command could be checked against it. Before this commit I ran `update` in a scratch directory and compared each claim:
+the output line, exit 2 for an unknown status, an ID that is not a whole number and `--due` with `--clear-due`, exit 1 with the file untouched for no task, no option and a blank name, and date completed set and cleared on the status change.
+The edge case is a task whose `start` or `stop` is later than the clock: marking it `DONE` is refused. No command can make such a task, so it is recorded as accepted and not handled.
+Issue #9 is not changed here. In M4 the boxes were ticked once CI was green, so that waits for the pull request.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M5 Update, step 4
+- Issue: #9
+
 ## [2026-11-07 14:41] Commit Summary
 
 **Change Type:** Feature

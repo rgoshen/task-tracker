@@ -280,12 +280,12 @@ Branch `feature/list-all`. Covers feature 4.
 
 Branch `feature/update-task`. Covers feature 6.
 
-- [ ] Given task 1 "Buy milk" (`LOW`, created and updated 2026-10-01 09:00), when `update 1 --name "Buy oat milk" --priority HIGH`, then the name and priority change, updated is later than 2026-10-01 09:00, created is unchanged, and the other tasks are untouched.
-- [ ] Given task 1 is `TO_DO`, when `update 1 --status DONE`, then date completed is set to the current time.
-- [ ] Given task 1 is `DONE`, when `update 1 --status TO_DO`, then date completed is `None` (Q4).
-- [ ] Given no task 99, when `update 99 --name x`, then the exit code is 1, stderr names 99, and the file is unchanged.
-- [ ] Given `update 1` with no fields, then the behavior you choose (error or no-op) is pinned.
-- [ ] Given `update 1 -n "Buy oat milk" -p HIGH`, then the result equals `update 1 --name "Buy oat milk" --priority HIGH`.
+- [x] Given task 1 "Buy milk" (`LOW`, created and updated 2026-10-01 09:00), when `update 1 --name "Buy oat milk" --priority HIGH`, then the name and priority change, updated is later than 2026-10-01 09:00, created is unchanged, and the other tasks are untouched.
+- [x] Given task 1 is `TO_DO`, when `update 1 --status DONE`, then date completed is set to the current time.
+- [x] Given task 1 is `DONE`, when `update 1 --status TO_DO`, then date completed is `None` (Q4).
+- [x] Given no task 99, when `update 99 --name x`, then the exit code is 1, stderr names 99, and the file is unchanged.
+- [x] Given `update 1` with no fields, then the behavior you choose (error or no-op) is pinned.
+- [x] Given `update 1 -n "Buy oat milk" -p HIGH`, then the result equals `update 1 --name "Buy oat milk" --priority HIGH`.
 
 **Think about:** who sets updated, the command or the task? What stops `update` from changing the ID or the created date? `due` is nullable (Q2): how does a user clear a due date? Can `update` set `start` and `stop` (Q3)? Pin whichever you choose.
 

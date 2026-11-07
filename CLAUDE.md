@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project state
 
 `task-tracker` is a Python 3.14 CLI for task management, grown in vertical slices, one milestone at a time.
-`README.md` is the product spec (task fields, status/priority enums, the seven features); the code implements the task model, storage, and the first slice of commands so far (M1 to M4).
-Of the seven features, 3 (`list`, the current tasks), 4 (`list --all`, short `-a`) and 5 (`add`) exist, for the project list in `./tasks.json` only. The other four (install, the `--dir` and `--global` flags, `update`, `delete`) are not built.
-What exists: `main()` and the `add` and `list` commands (with `list --all`) in `src/task_tracker/cli.py` (`__init__.py` reexports `main`), the `Status` / `Priority` `StrEnum`s, the `Task` dataclass in `src/task_tracker/task.py` (with `Task.restore` for rebuilding a stored task), and `load` / `save` in `src/task_tracker/storage.py`.
+`README.md` is the product spec (task fields, status/priority enums, the seven features); the code implements the task model, storage, and the first slice of commands so far (M1 to M5).
+Of the seven features, 3 (`list`, the current tasks), 4 (`list --all`, short `-a`), 5 (`add`) and 6 (`update`) exist, for the project list in `./tasks.json` only. The other three (install, the `--dir` and `--global` flags, `delete`) are not built.
+What exists: `main()` and the `add`, `list` (with `list --all`) and `update` commands in `src/task_tracker/cli.py` (`__init__.py` reexports `main`), the `Status` / `Priority` `StrEnum`s, the `Task` dataclass in `src/task_tracker/task.py` (with `Task.restore` for rebuilding a stored task and `Task.update` for changing one), and `load` / `save` in `src/task_tracker/storage.py`.
 `main` returns the exit code and the console script passes it to `sys.exit`: 0 on success, 2 for a bad option value (argparse), 1 for anything else that goes wrong, with one `task-tracker: error:` line and no traceback.
 
 Labels are reconciled (Q1): users type and see the enum names (`TO_DO`, `IN_PROGRESS`, `DONE`; `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`), and `Priority.MED` was renamed `MEDIUM` to match `README.md` (M1).

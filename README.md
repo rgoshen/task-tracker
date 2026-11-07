@@ -81,12 +81,13 @@ Every option has a long and a short form.
 
 ## Commands
 
-### Adding and listing tasks
+### Adding, listing and updating tasks
 
 ```bash
 uv run task-tracker add "Pay rent" --priority HIGH --due 2026-11-02
 uv run task-tracker list
 uv run task-tracker list --all
+uv run task-tracker update 1 --status DONE
 ```
 
 - `add NAME` stores a task in `tasks.json` in the current directory and prints its ID. `--priority` (`-p`) takes `CRITICAL`, `HIGH`, `MEDIUM`, or `LOW` and defaults to `LOW`. `--due` (`-D`) takes `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SS`, in local time: a value with a UTC offset is refused.
@@ -94,9 +95,16 @@ uv run task-tracker list --all
   A name is shown with control characters and text-direction controls as escapes (`\n`, `\x1b`, `\u202e`), so one task is always one line and a shared file cannot change how a line is drawn.
 - `list --all` (`-a`) shows every task: the current tasks first, in the order above, then the done tasks by date completed, the earliest first, then the lowest ID. The lines are the same, so the date completed is not shown; it only sets the order.
   When the file holds no tasks it prints `No tasks in <path>`. Plain `list` still prints `No current tasks in <path>` when nothing is current, including when every task is done.
-- Exit codes: 0 on success, 2 for a bad option value (an unknown priority, or a `--due` that is not a local date or date and time), 1 for anything else that goes wrong (a blank name or one UTF-8 cannot hold, a corrupt or unreadable task file, an output that cannot be written). An error prints one line on standard error and never a traceback.
-- `add` stores the task before it prints, so an error about the output means the task is stored. A reader that closes the pipe early (`task-tracker list | head -1`) ends the output quietly, with exit code 1. With standard output closed (`task-tracker list >&-`) there is nowhere to print, and the commands finish with exit code 0.
-- Two `add` commands running at the same moment can lose a task: there is no lock yet ([#27](https://github.com/rgoshen/task-tracker/issues/27)).
+- `update ID` changes one stored task in `tasks.json` in the current directory and prints one line, `Updated task ID: NAME`, where `NAME` is the name after the change.
+  `--name` (`-n`), `--priority` (`-p`), `--status` (`-s`), and `--due` (`-D`) change those fields, and `--clear-due` (`-C`) removes the due date. `--due` and `--clear-due` cannot be given together. `ID` must be a whole number.
+  Giving a task the values it already has changes nothing, and `updated` moves only when something changes. Moving a task to `DONE` sets its date completed to now.
+  Moving a `DONE` task to `TO_DO` or `IN_PROGRESS` clears it, and `DONE` to `DONE` keeps the original. `created`, the ID, `description`, `start`, and `stop` cannot be changed by `update`.
+  A change the task rules refuse, or an `update` with no option to change, is refused and the file is left unchanged.
+- Exit codes: 0 on success, 2 for a bad option value (an unknown priority or status, a `--due` that is not a local date or date and time, an ID that is not a whole number, or `--due` given with `--clear-due`).
+  1 for anything else that goes wrong (a blank name or one UTF-8 cannot hold, a change the task rules refuse, no task with the given ID, an `update` with no option to change, a corrupt or unreadable task file, an output that cannot be written).
+  An error prints one line on standard error and never a traceback.
+- `add` and `update` store the task before they print, so an error about the output means the change is stored. A reader that closes the pipe early (`task-tracker list | head -1`) ends the output quietly, with exit code 1. With standard output closed (`task-tracker list >&-`) there is nowhere to print, and the commands finish with exit code 0.
+- Two `add` or `update` commands running at the same moment can lose a change: each reads and rewrites the whole list, and there is no lock yet ([#27](https://github.com/rgoshen/task-tracker/issues/27)).
 
 ### Running GitHub Actions locally
 
