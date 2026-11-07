@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 15:12] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** cli (`src/task_tracker/cli.py`)
+
+**Summary:**
+`add` and `update` now share one list of priority choices (`_PRIORITIES`) and one `--due` definition (`_DUE_OPTION`: the converter, the metavar, and the help text). No behavior change.
+
+**Rationale:**
+Review comment 7 on PR #29, the part that is agreed. `update` copied `--priority` and `--due` from `add` word for word, so a change to the accepted format needed two edits. The help output of both commands is the same before and after, and the 329 tests pass unchanged. Two deliberate breaks (the converter dropped from the shared `--due`, `LOW` dropped from the shared choices) each fail tests.
+Not done, with the reasons in the reply on the thread: the text of the 'nothing to update' message is not built from the parser, the test keeps its own copy of it, and `_settle_date_completed` is not merged with `_fill_in_defaults`, because after the comment 1 fix they apply different rules.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 6|Issue: #9 (PR #29, review comment 7)
+
+**References:**
+
+- A refactor with the tests as the safety net, so no new test was written first. The shared pieces are a list and a mapping, not a helper function, because a function that takes a parser or a mutually exclusive group would need argparse's private group type in its signature.
+
 ## [2026-11-07 15:11] Commit Summary
 
 **Change Type:** Fix

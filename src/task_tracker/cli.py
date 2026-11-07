@@ -258,6 +258,16 @@ def _task_id(text: str) -> int:
     )
 
 
+# Shared by `add` and `update`, so a change to what they accept is made once. The
+# choices are plain strings, not `Priority` members: see the note in `_build_parser`.
+_PRIORITIES = [priority.value for priority in Priority]
+_DUE_OPTION: dict[str, Any] = {
+    "type": _due,
+    "metavar": "DATETIME",
+    "help": "YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, local time",
+}
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="task-tracker")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -267,19 +277,8 @@ def _build_parser() -> argparse.ArgumentParser:
     # would fail first with a message that lists nothing. The choices are plain
     # strings because argparse prints each one with `repr`, and `Task` turns the
     # checked string into a `Priority`.
-    add.add_argument(
-        "--priority",
-        "-p",
-        choices=[priority.value for priority in Priority],
-        default=Priority.LOW,
-    )
-    add.add_argument(
-        "--due",
-        "-D",
-        type=_due,
-        metavar="DATETIME",
-        help="YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, local time",
-    )
+    add.add_argument("--priority", "-p", choices=_PRIORITIES, default=Priority.LOW)
+    add.add_argument("--due", "-D", **_DUE_OPTION)
     add.set_defaults(run=_add)
     listing = commands.add_parser(
         "list", help="list the current tasks (all tasks with --all)"
@@ -301,7 +300,7 @@ def _build_parser() -> argparse.ArgumentParser:
     update.add_argument(
         "--priority",
         "-p",
-        choices=[priority.value for priority in Priority],
+        choices=_PRIORITIES,
         help="new priority",
     )
     update.add_argument(
@@ -312,13 +311,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     # Mutually exclusive: a date and "no date" in one command contradict each other.
     due = update.add_mutually_exclusive_group()
-    due.add_argument(
-        "--due",
-        "-D",
-        type=_due,
-        metavar="DATETIME",
-        help="YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, local time",
-    )
+    due.add_argument("--due", "-D", **_DUE_OPTION)
     due.add_argument(
         "--clear-due",
         "-C",
