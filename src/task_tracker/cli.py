@@ -98,6 +98,14 @@ def _delete(args: argparse.Namespace, path: Path) -> list[str]:
     answer = _ask(f"Delete task {task.id}: {task.name}? [y/N] ", task.id)
     if answer.strip().lower() not in _YES_ANSWERS:
         return [f"Kept task {task.id}: {task.name}"]
+    # The prompt waits on a person, so the list read above may be stale. Read it
+    # again, and delete only the task that was shown; the rest is saved as read now.
+    tasks = load(path)
+    if task not in tasks:
+        raise ValueError(
+            f"task {task.id} changed or was removed while the prompt was open: "
+            "nothing was deleted"
+        )
     save([other for other in tasks if other.id != task.id], path)
     return [f"Deleted task {task.id}: {task.name}"]
 

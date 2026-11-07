@@ -1363,6 +1363,62 @@ def test_delete_with_standard_input_at_its_end_gives_one_error_line(tmp_path: Pa
     assert (tmp_path / "tasks.json").read_bytes() == before
 
 
+def test_a_task_added_while_the_prompt_is_open_survives_the_delete(
+    project: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    # Given another writer that adds task 4 while the prompt waits for a person
+    _save_three(project)
+
+    def another_writer_adds_task_4(prompt: str = "") -> str:
+        save([*load(project), _stored(4, "Read book")], project)
+        return "y"
+
+    monkeypatch.setattr("builtins.input", another_writer_adds_task_4)
+
+    # When task 2 is deleted after the yes
+    exit_code = main(["delete", "2"])
+
+    # Then task 4 is kept and only task 2 is gone
+    assert exit_code == 0
+    assert capsys.readouterr().out == "Deleted task 2: Walk dog\n"
+    assert [task.id for task in load(project)] == [1, 3, 4]
+
+
+@pytest.mark.parametrize(
+    "others_tasks",
+    [
+        [(1, "Buy milk"), (2, "Walk cat"), (3, "Pay rent")],
+        [(1, "Buy milk"), (3, "Pay rent")],
+    ],
+    ids=["renamed", "removed"],
+)
+def test_a_task_changed_while_the_prompt_is_open_is_not_deleted(
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    others_tasks: list[tuple[int, str]],
+):
+    # Given another writer that renames or removes task 2 while the prompt is open
+    _save_three(project)
+    written: list[bytes] = []
+
+    def another_writer_changes_task_2(prompt: str = "") -> str:
+        save([_stored(number, name) for number, name in others_tasks], project)
+        written.append(project.read_bytes())
+        return "y"
+
+    monkeypatch.setattr("builtins.input", another_writer_changes_task_2)
+
+    exit_code = main(["delete", "2"])
+
+    # Then the delete refuses, says so in one line, and leaves that writer's file
+    assert exit_code == 1
+    _assert_one_line_error(
+        capsys, "task 2 changed or was removed while the prompt was open"
+    )
+    assert project.read_bytes() == written[0]
+
+
 def test_delete_with_standard_output_closed_gives_one_error_line(tmp_path: Path):
     # With descriptor 1 closed, `sys.stdout` is None and `input` cannot prompt.
     save([Task(1, "Buy milk")], tmp_path / "tasks.json")

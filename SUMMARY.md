@@ -1,5 +1,32 @@
 # Summary
 
+## [2026-11-07 15:54] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** CLI (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+After a yes, `delete` reads the task list again and deletes task `ID` only if it still equals the task that was shown.
+A task another writer added while the prompt was open is kept.
+If the task was renamed, changed, or removed meanwhile, `delete` prints one error line, exits 1, and deletes nothing.
+
+**Rationale:**
+Step 3 of M6 (`TODO.md`: 2026-11-07 Feature: M6 Delete).
+The prompt waits on a person, so the list read before it can be minutes old, and saving it would drop a task added from another terminal.
+`Task` is a dataclass, so `==` compares every field.
+The rest of the file is saved as it was read after the answer.
+The remaining window between that read and the save is the same as for every other command (#27).
+
+**Bugfix Context (if applicable):**
+The first version of `delete` saved the list read before the prompt.
+Any task another process added while the prompt was open was lost on a yes.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 3
+- Issue: #10
+
 ## [2026-11-07 15:53] Commit Summary
 
 **Change Type:** Feature
