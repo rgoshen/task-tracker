@@ -293,20 +293,22 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     listing.set_defaults(run=_list)
     update = commands.add_parser("update", help="change a stored task")
-    update.add_argument("id", type=_task_id)
+    update.add_argument("id", type=_task_id, help="ID of the task to change")
     # Defaults are `None` so that a missing option is told apart from one given
     # with the default value. As in `add`, no `type=`: argparse would convert before
     # it checks `choices`.
-    update.add_argument("--name", "-n")
+    update.add_argument("--name", "-n", help="new name")
     update.add_argument(
         "--priority",
         "-p",
         choices=[priority.value for priority in Priority],
+        help="new priority",
     )
     update.add_argument(
         "--status",
         "-s",
         choices=[status.value for status in Status],
+        help="new status (DONE sets the date completed, leaving DONE clears it)",
     )
     # Mutually exclusive: a date and "no date" in one command contradict each other.
     due = update.add_mutually_exclusive_group()
@@ -317,7 +319,12 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="DATETIME",
         help="YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, local time",
     )
-    due.add_argument("--clear-due", "-C", action="store_true")
+    due.add_argument(
+        "--clear-due",
+        "-C",
+        action="store_true",
+        help="remove the due date (cannot be used with --due)",
+    )
     update.set_defaults(run=_update)
     return parser
 

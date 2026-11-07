@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 15:11] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+Every argument of `update` now has help text: the `ID`, `--name`, `--priority`, `--status`, and `--clear-due` (`--due` already had it). A test reads the `update --help` output for each argument.
+
+**Rationale:**
+Review comment 6 on PR #29. `task-tracker update -h` listed `--clear-due, -C` with no description, so the one option whose meaning is not obvious was explained only in `README.md`. The omission looked accidental, since `--due` had help text.
+Five of the six cases failed first, and all pass now. Two deliberate breaks (the `--clear-due` text removed, the text of `--status` given to `--priority`) each fail a test. The test reads an argument's row with the lines indented under it, because argparse moves the text of a long option such as `--priority {CRITICAL,...}` to the next line.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 5|Issue: #9 (PR #29, review comment 6)
+
+**References:**
+
+- The help for `--priority` and `--name` is short on purpose (`new priority`, `new name`): the choices are already printed in the usage line. `add` has the same gap for its own options and is not changed here, because the comment is about `update`.
+
 ## [2026-11-07 15:09] Commit Summary
 
 **Change Type:** Fix

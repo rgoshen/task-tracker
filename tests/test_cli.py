@@ -14,6 +14,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import datetime, timedelta
+from itertools import takewhile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -1086,3 +1087,38 @@ def test_update_with_no_option_exits_1_naming_the_options_and_leaves_the_file_al
     assert exit_code == 1
     _assert_one_line_error(capsys, NOTHING_TO_UPDATE)
     assert project.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    ("argument", "explanation"),
+    [
+        ("id", "ID of the task to change"),
+        ("--name", "new name"),
+        ("--priority", "new priority"),
+        ("--status", "new status"),
+        ("--due", "YYYY-MM-DD"),
+        ("--clear-due", "remove the due date"),
+    ],
+)
+def test_update_help_explains_each_argument(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    argument: str,
+    explanation: str,
+):
+    # A wide terminal keeps the explanations on one line. argparse still moves the
+    # text of a long option such as `--priority {CRITICAL,...}` to the next line, so
+    # the row is read together with the lines indented under it.
+    monkeypatch.setenv("COLUMNS", "200")
+
+    with pytest.raises(SystemExit) as exit_info:
+        main(["update", "--help"])
+
+    lines = capsys.readouterr().out.splitlines()
+    start = next(
+        n for n, line in enumerate(lines) if line.lstrip().startswith(argument)
+    )
+    row = [lines[start]]
+    row += list(takewhile(lambda line: line.startswith(" " * 10), lines[start + 1 :]))
+    assert exit_info.value.code == 0
+    assert explanation in " ".join(" ".join(row).split())
