@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 15:13] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** tests (`tests/test_task.py`)
+
+**Summary:**
+The comment in the test that gives `Task.update` a date as text now says what the test pins. It used to say the model parses text 'as the CLI passes it'.
+
+**Rationale:**
+Review comment 5 on PR #29, the part that is agreed. The command line passes the `datetime` that `_due` has already parsed, so the old comment was wrong, and the test with its `type: ignore` looked like it covered a path no caller uses. What it does cover is that `update` applies the constructor's date rule, so text works as it does for `Task(...)`. The test stays and only the comment changes.
+Not done, with the reasons in the reply on the thread: the strings from argparse are not converted to `Priority` and `Status` in `_changes`, and its result is not a `TypedDict`. `add` passes the checked strings the same way, `Task` owns the conversion and a test pins it, and `args` attributes are `Any`, so the `TypedDict` would check the keys and little else.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 7|Issue: #9 (PR #29, review comment 5)
+
+**References:**
+
+- A comment change, so no test was written first.
+
 ## [2026-11-07 15:12] Commit Summary
 
 **Change Type:** Refactor

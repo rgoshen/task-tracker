@@ -673,7 +673,9 @@ def test_update_says_whether_it_changed_anything(given: dict[str, Any], expected
 def test_a_date_given_as_text_becomes_midnight_of_that_day():
     task = original_task()
 
-    # The annotation says datetime, but the model parses ISO text as the CLI passes it.
+    # Not a path the command line takes: it passes the `datetime` that `_due` has
+    # already parsed. This pins that `update` applies the constructor's date rule,
+    # so ISO text works here as it does for `Task(...)`, whatever the annotation says.
     task.update(due="2026-12-01")  # type: ignore[arg-type]
 
     assert task.due == DUE_DAY
