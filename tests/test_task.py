@@ -702,17 +702,40 @@ def test_a_blank_name_is_rejected_and_leaves_every_field_unchanged():
     assert asdict(task) == before
 
 
+# A time zone change or a daylight saving fall-back can leave the clock behind
+# the stamps a task already holds (D6: naive local time). `update` must still work.
+
+
 @pytest.mark.usefixtures("readings")
-def test_a_failed_rule_rolls_back_every_field_including_updated():
-    # restore accepts a stop later than the clock, so the task is valid as stored.
-    # Only the date completed the clock gives breaks the timeline.
+def test_updated_is_kept_when_the_clock_is_behind_every_stored_stamp():
+    task = original_task(
+        created=LATER_THAN_CLOCK,
+        updated=LATER_THAN_CLOCK,
+        start=LATER_THAN_CLOCK,
+        stop=LATER_THAN_CLOCK,
+    )
+
+    task.update(name="Landed")
+
+    assert (task.name, task.updated) == ("Landed", LATER_THAN_CLOCK)
+
+
+@pytest.mark.usefixtures("readings")
+def test_updated_never_moves_back_when_the_clock_is_between_created_and_it():
+    task = original_task(updated=LATER_THAN_CLOCK)
+
+    task.update(priority=Priority.HIGH)
+
+    assert task.updated == LATER_THAN_CLOCK
+
+
+@pytest.mark.usefixtures("readings")
+def test_a_task_marked_done_while_the_clock_is_behind_its_stop_completes_at_the_stop():
     task = original_task(stop=LATER_THAN_CLOCK)
-    before = asdict(task)
 
-    with pytest.raises(ValueError, match="stop must not be after the date completed"):
-        task.update(status=Status.DONE, priority=Priority.HIGH)
+    task.update(status=Status.DONE)
 
-    assert asdict(task) == before
+    assert (task.status, task.date_completed) == (Status.DONE, LATER_THAN_CLOCK)
 
 
 @pytest.mark.parametrize(

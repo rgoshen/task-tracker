@@ -158,9 +158,11 @@ class Task:  # pylint: disable=too-many-instance-attributes
             self._normalize()
             self._settle_date_completed(before["status"], now)
             # Compared with the snapshot, so a value given equal to the current one
-            # leaves `updated` alone.
+            # leaves `updated` alone. Never earlier than the stored value: naive local
+            # time (D6) can move back between two commands, and `updated` must stay
+            # on or after `created`.
             if self._snapshot() != before:
-                self.updated = now
+                self.updated = max(now, before["updated"])
             self._validate()
         except Exception:
             # The snapshot is taken first, so a rejected update can be undone field by
@@ -174,11 +176,14 @@ class Task:  # pylint: disable=too-many-instance-attributes
 
     def _settle_date_completed(self, was: Status, now: datetime) -> None:
         # Q4: a task holds a date completed only while it is DONE. Reaching DONE
-        # stamps it now; DONE to DONE keeps the date it already has.
+        # stamps it now; DONE to DONE keeps the date it already has. Never before
+        # `stop`, so the timeline holds when the clock is behind it (a time zone
+        # change). Unlike a new task, which is held to the clock, a stored `stop`
+        # may be later than it.
         if self.status is not Status.DONE:
             self.date_completed = None
         elif was is not Status.DONE:
-            self.date_completed = now
+            self.date_completed = max(now, self.stop)
 
     def _normalize(self) -> None:
         # ValueError, not TypeError: the loader catches one type for any bad field.

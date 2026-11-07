@@ -97,7 +97,7 @@ uv run task-tracker update 1 --status DONE
   When the file holds no tasks it prints `No tasks in <path>`. Plain `list` still prints `No current tasks in <path>` when nothing is current, including when every task is done.
 - `update ID` changes one stored task in `tasks.json` in the current directory and prints one line, `Updated task ID: NAME`, where `NAME` is the name after the change.
   `--name` (`-n`), `--priority` (`-p`), `--status` (`-s`), and `--due` (`-D`) change those fields, and `--clear-due` (`-C`) removes the due date. `--due` and `--clear-due` cannot be given together. `ID` must be a whole number.
-  Giving a task the values it already has changes nothing, and `updated` moves only when something changes. Moving a task to `DONE` sets its date completed to now.
+  Giving a task the values it already has changes nothing, and `updated` moves only when something changes. Moving a task to `DONE` sets its date completed to now, or to its stop time if the clock is behind it (after a change of time zone, for one). `updated` likewise never moves back.
   Moving a `DONE` task to `TO_DO` or `IN_PROGRESS` clears it, and `DONE` to `DONE` keeps the original. `created`, the ID, `description`, `start`, and `stop` cannot be changed by `update`.
   A change the task rules refuse, or an `update` with no option to change, is refused and the file is left unchanged.
 - Exit codes: 0 on success, 2 for a bad option value (an unknown priority or status, a `--due` that is not a local date or date and time, an ID that is not a whole number, or `--due` given with `--clear-due`).

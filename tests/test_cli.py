@@ -13,7 +13,7 @@ import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -974,6 +974,24 @@ def test_a_bad_option_value_exits_2_naming_it_and_leaves_the_file_unchanged(
     assert exit_info.value.code == 2
     assert mention in capsys.readouterr().err.splitlines()[-1]
     assert project.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "argv", [["--name", "Landed"], ["--status", "DONE"]], ids=["rename", "done"]
+)
+def test_update_works_when_the_clock_is_behind_the_stored_time(
+    project: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str]
+):
+    # A time zone change can put the clock hours behind the task's own stamps.
+    later = CLOCK + timedelta(hours=13)
+    monkeypatch.setattr("task_tracker.task._now", lambda: later)
+    save([Task(1, "Fly home")], project)
+    monkeypatch.setattr("task_tracker.task._now", lambda: CLOCK)
+
+    exit_code = main(["update", "1", *argv])
+
+    assert exit_code == 0
+    assert load(project)[0].updated == later
 
 
 @pytest.mark.usefixtures("fixed_clock")

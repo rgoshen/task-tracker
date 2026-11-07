@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-07 15:06] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`, `tests/test_cli.py`)
+
+**Summary:**
+`Task.update` no longer fails when the clock is behind the task's stored times. `updated` becomes the later of the clock and the stored `updated`, and a date completed set by reaching DONE becomes the later of the clock and `stop`. The model test that expected a refusal is replaced by three that expect the update to work, and one command-level test covers rename and DONE.
+`README.md` and the `TODO.md` risk notes are corrected.
+
+**Rationale:**
+Review comment 1 on PR #29. Naive local time (D6) can move back between two commands, so a task created under one time zone could not be updated under another: every update failed with `updated must not be before created` until the clock caught up. The reviewer's fix is used as it was suggested.
+Five tests failed first with the reviewer's messages and with `updated` moving backwards. Three deliberate breaks (`updated` back to the clock, date completed back to the clock, the floor of `updated` taken from `created`) each fail at least one test.
+Rejected: keeping the strict rule and only naming the cause in the message, because no option can repair the task and the user must wait for the clock.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 2|Issue: #9 (PR #29, review comment 1)
+
+**References:**
+
+- Step 1 stamped `updated` and the new date completed straight from the clock, then checked the timeline. When the clock was behind `created` or `stop`, the check refused the whole update. Taking the later of the two values keeps the timeline true by construction, so the check can no longer fail for this reason.
+
 ## [2026-11-07 15:05] Commit Summary
 
 **Change Type:** Fix
