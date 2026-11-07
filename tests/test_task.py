@@ -640,7 +640,7 @@ def test_giving_the_current_values_changes_nothing_including_updated():
     task = original_task(due=DUE_BEFORE)
     before = asdict(task)
 
-    task.update(
+    changed = task.update(
         name="Buy milk",
         priority=Priority.LOW,
         status=Status.TO_DO,
@@ -648,6 +648,25 @@ def test_giving_the_current_values_changes_nothing_including_updated():
     )
 
     assert asdict(task) == before
+    assert changed is False
+
+
+@pytest.mark.usefixtures("readings")
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        ({"name": "Read book"}, True),
+        ({"status": Status.DONE}, True),
+        ({"due": None}, True),
+        ({"name": "  Buy milk  "}, False),
+        ({}, False),
+    ],
+    ids=["new-name", "new-status", "new-due", "name-before-stripping", "nothing-given"],
+)
+def test_update_says_whether_it_changed_anything(given: dict[str, Any], expected: bool):
+    task = original_task(due=DUE_BEFORE)
+
+    assert task.update(**given) is expected
 
 
 @pytest.mark.usefixtures("readings")

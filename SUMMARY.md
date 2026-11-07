@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-07 15:08] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task, cli (`src/task_tracker/task.py`, `src/task_tracker/cli.py`, `tests/`)
+
+**Summary:**
+`Task.update` now returns whether it changed anything. When it did not, `update` leaves the file alone and prints `No change to task N: NAME` (exit code 0) in place of `Updated task N: NAME`. `README.md` says so.
+
+**Rationale:**
+Review comment 2 on PR #29. `README.md` promised that giving a task the values it already has "changes nothing", but the command saved anyway: a hand-formatted list was rewritten in the standard layout and the line still said `Updated`. A no-change update also opened the lost-write window of #27 for no reason.
+The old test could not see this, because it started from a file `save` had written and a rewrite gives the same bytes. It now starts from a file with a four-space indent. It failed first on the output line, and the model tests on `None` where a bool was expected. Three deliberate breaks (always report a change, always save, save only when nothing changed) each fail tests.
+Rejected: only changing the sentence in `README.md`, which would keep the rewrite and the misleading line.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 3|Issue: #9 (PR #29, review comment 2)
+
+**References:**
+
+- The model already compared a snapshot before and after to decide whether to move `updated`, but kept the answer to itself. Returning it lets the caller skip the write.
+
 ## [2026-11-07 15:06] Commit Summary
 
 **Change Type:** Fix

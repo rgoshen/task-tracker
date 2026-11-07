@@ -1012,13 +1012,17 @@ def test_a_blank_name_exits_1_with_one_error_line_and_leaves_the_file_unchanged(
 def test_values_a_task_already_has_leave_the_file_unchanged(
     project: Path, capsys: pytest.CaptureFixture[str]
 ):
+    # A file `save` wrote would come out the same if it were rewritten, so the test
+    # could not tell. This layout is not the one `save` writes.
     save([_stored(1, "Buy milk")], project)
+    records = json.loads(project.read_text(encoding="utf-8"))
+    project.write_text(json.dumps(records, indent=4), encoding="utf-8")
     before = project.read_bytes()
 
     exit_code = main(["update", "1", "--name", "Buy milk", "--priority", "LOW"])
 
     assert exit_code == 0
-    assert capsys.readouterr().out == "Updated task 1: Buy milk\n"
+    assert capsys.readouterr().out == "No change to task 1: Buy milk\n"
     assert project.read_bytes() == before
 
 

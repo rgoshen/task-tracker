@@ -136,12 +136,12 @@ class Task:  # pylint: disable=too-many-instance-attributes
         priority: Priority | None = None,
         status: Status | None = None,
         due: datetime | None = _UNSET,
-    ) -> None:
-        """Change the given fields of an existing task.
+    ) -> bool:
+        """Change the given fields of an existing task and say whether any changed.
 
         `None` means "not given" for name, priority, and status. For `due`, `None`
         clears the date and leaving it out keeps it. A rule the result breaks leaves
-        the task exactly as it was.
+        the task exactly as it was. A caller that gets `False` has nothing to save.
         """
         # One reading for everything, so `updated` and a new date completed agree.
         now = _now()
@@ -161,7 +161,8 @@ class Task:  # pylint: disable=too-many-instance-attributes
             # leaves `updated` alone. Never earlier than the stored value: naive local
             # time (D6) can move back between two commands, and `updated` must stay
             # on or after `created`.
-            if self._snapshot() != before:
+            changed = self._snapshot() != before
+            if changed:
                 self.updated = max(now, before["updated"])
             self._validate()
         except Exception:
@@ -170,6 +171,7 @@ class Task:  # pylint: disable=too-many-instance-attributes
             for field_name, value in before.items():
                 setattr(self, field_name, value)
             raise
+        return changed
 
     def _snapshot(self) -> dict[str, Any]:
         return {field.name: getattr(self, field.name) for field in fields(self)}

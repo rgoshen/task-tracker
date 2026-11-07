@@ -63,7 +63,10 @@ def _update(args: argparse.Namespace, path: Path) -> list[str]:
         raise ValueError(_NOTHING_TO_UPDATE)
     tasks = load(path)
     task = _find(tasks, args.id)
-    task.update(**changes)
+    if not task.update(**changes):
+        # Nothing to write: the file keeps its layout, and a concurrent command has
+        # no window to lose (#27) for a command that changed nothing.
+        return [f"No change to task {task.id}: {task.name}"]
     # Every other task is written back as it was read.
     save(tasks, path)
     return [f"Updated task {task.id}: {task.name}"]
