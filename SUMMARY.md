@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-07 16:33] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `TODO.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Bring the documents in line with what `delete` does after the review of PR #30. A script can answer the prompt on standard input; `delete` with standard output closed exits 1; the closed-stream and undecodable cases are described as the code handles them; and the ID-reuse step names the gap case. `TODO.md` gets a "Fix: PR #30 review" entry.
+
+**Rationale:**
+Review comments 2, 3 and 11 on PR #30, and the changes in the commits before this one.
+Comment 2: the output-closed sentence in `README.md` said the commands finish with exit code 0, and it now lists `delete` among them. Reproduced: `delete 1 >&-` exits 1, because the prompt needs standard output. The sentence now names the three commands that do exit 0, and `delete`.
+Comment 3: `README.md`, the plan and `TODO.md` said a script cannot delete until `--yes` exists. `echo y | task-tracker delete 1` deleted the task, exit 0, and a test now pins it. The text says what is true: a script with input to read can answer, and `--yes` would save the pipe and add no capability.
+Comment 11: step 4 of the M6 entry described a red test that cannot happen. After `delete 3` two tasks remain, so a count gives 3, the same as highest + 1. The gap case (`delete 2`, then `add` gives 4) is the one that fails against a count, and the plan now says that plan box 3 is met by a case that cannot tell the rules apart.
+The decisions the review left in place (Ctrl-C exit 1, the prompt on standard output) are written down with their cost, and the commit-type question (comment 10) is recorded as declined, with the reason.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #30 review
+- Issue: #10 (PR #30, review comments 2, 3 and 11)
+
 ## [2026-11-07 16:32] Commit Summary
 
 **Change Type:** Fix

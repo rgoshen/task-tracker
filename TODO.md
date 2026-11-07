@@ -441,7 +441,8 @@ Branch `feature/delete-task` (from `develop`, after M5 merged as PR #29). Test-f
    The prompt comes with the command, never after it, so no commit deletes without asking. Red: `delete 2` exits 2 because argparse does not know the command. Covers plan boxes 1 and 4. Commit: `feat(cli): add the delete command`.
 2. The refusals: no task with that ID (the prompt is never shown), and no way to answer (`input` raises). Both reach the existing one-line error and exit 1 in `main`, with the file unchanged. Commit: `feat(cli): refuse a delete that names no task or gets no answer`.
 3. Read the list again after the answer. If the task is gone or has changed since it was shown, delete nothing and say so. Red: a patched `input` that rewrites the file while the prompt is open. Commit: `feat(cli): delete only the task that was confirmed`.
-4. ID reuse (plan box 3). `add` already numbers by highest + 1, so this test passes at once. Show that it can fail: make `add` number by count and watch `delete 3` then `add "New"` go red (the ID would be 2), then restore it. Commit: `test(cli): pin that a deleted highest ID is reused`.
+4. ID reuse (plan box 3). `add` already numbers by highest + 1, so this test passes at once. Show that it can fail with the gap case: make `add` number by count and watch `delete 2` then `add "New"` go red (a count gives 3, which collides with the stored task 3; highest + 1 gives 4), then restore it.
+   `delete 3` then `add "New"` gives 3 under both rules, because two tasks remain and 2 + 1 = 3, so it cannot tell them apart; the test keeps it as plan box 3 and as documentation, and the gap case is the one that pins the rule. Commit: `test(cli): pin that a deleted highest ID is reused`.
 5. Docs: tick the M6 boxes in the plan and issue #10, record the decisions below in both, add the `delete` command and its exit codes to `README.md`, and update the project state in `CLAUDE.md` (features 3 to 7 exist). Commit: `docs(plan): record the M6 decisions`.
 6. Done when the tests pass locally, coverage on changed code is at least 80%, the CI-version linters, the Markdown linters, JSCPD, and codespell are clean locally, and `delete` works in a scratch directory. Pushing the code and opening the PR into `develop` wait for the project owner.
 
@@ -453,8 +454,9 @@ The four Given/When/Then items are in the M6 section of the plan. In addition:
 - A no leaves the file byte-for-byte as it was, proved with a hand-formatted file (`indent=4`) that a rewrite would change. The output is `Kept task 2: Buy milk` and the exit code is 0.
 - `delete 99` never calls `input` (the patched `input` fails the test if it is called), exits 1, names 99 on stderr, and leaves the file unchanged.
 - A bad ID (`0`, `-1`, `+1`, `1.5`, `one`) exits 2, never calls `input`, and leaves the file unchanged. Share the case list with the `update` test; do not paste a second copy (JSCPD, threshold 0).
-- With no way to answer, exit 1, one error line, file unchanged, and no traceback: `input` raising `EOFError`, `RuntimeError`, or `KeyboardInterrupt` (patched, one parametrized test), and one real process with standard input at `/dev/null`.
-  Closed input (`<&-`) and closed output (`>&-`) raise `RuntimeError` (`lost sys.stdin`, `lost sys.stdout`), not `EOFError`. A real process for either must start from the venv's Python, because `uv run` hands the child an empty input (checked 2026-11-07, Python 3.14.7).
+- With no way to answer, exit 1, one error line, file unchanged, and no traceback: `input` raising `EOFError`, `KeyboardInterrupt`, or `UnicodeDecodeError` (patched, one parametrized test), a standard input, output or error that is `None` (descriptor closed at start-up), and one real process with standard input at `/dev/null`.
+  Closed input (`<&-`), output (`>&-`) and error (`2>&-`) make the real `input` raise `RuntimeError` (`lost sys.stdin`, `lost sys.stdout`, `lost sys.stderr`), not `EOFError`; `_ask` checks for them before it calls `input`. A real process for closed input must start from the venv's Python, because `uv run` hands the child an empty input (checked 2026-11-07, Python 3.14.7).
+  A `RuntimeError` from anywhere else is not caught, and a test says so.
 - Deleting the only task leaves a file holding `[]`, and `list` then prints `No current tasks in <path>`.
 - Tasks 1 and 3 are identical before and after `delete 2`, field by field, as for `update`.
 - While the prompt is open another writer adds task 4, and after a yes both survive the delete (task 4 stays, task 2 goes). Another writer that renames task 2, or removes it, makes the delete print an error, exit 1, and leave the other writer's file as it is.
@@ -467,10 +469,47 @@ The four Given/When/Then items are in the M6 section of the plan. In addition:
 - **Where the prompt goes, decided 2026-11-07.** Standard output, through `input(prompt)`, as issue #10 and the plan's test wording assume. Cost: with standard output redirected to a file (`delete 2 > out.txt`), the prompt is not visible and the command looks like it waits for nothing. Accepted as a corner case.
   Rejected: writing the prompt to standard error and calling a bare `input()`, as `rm -i` does. The prompt stays visible, but the tests would read standard error instead of the `input` argument, and it adds a second way to write text next to `_say`.
 - **The default is no, confirmed 2026-11-07.** Enter alone keeps the task, and the capital `N` in `[y/N]` says so. `yes` is accepted next to `y`, in any case. Rejected: a default of yes, where a stray Enter deletes a task, and requiring the whole name typed back, which is heavy for a single-user list.
-- **Declining exits 0, confirmed 2026-11-07.** A user who answers no got what they asked for, and `rm -i` does the same. A script cannot answer at all, and that case exits 1 (next point), so exit 0 never hides a failure. Rejected: exit 1 for a no, which makes a normal answer look like a fault.
-- **No way to answer, decided 2026-11-07.** `input` raises `EOFError` when standard input is empty or at its end (`< /dev/null`, a closed pipe) and `RuntimeError` when descriptor 0 or 1 is closed (`<&-` or `>&-`, as cron can start a command). Ctrl-C raises `KeyboardInterrupt`. `main` catches only `ValueError` and `OSError`, so each of them would print a traceback (Review Focus 4).
-  `delete` turns all three into one error line that says nothing was deleted, exit 1. Ctrl-C does not exit 130 (the usual code for it): one handler and one exit code is easier to state, and nothing has been changed by then. `--yes` stays deferred (Q5).
+- **Declining exits 0, confirmed 2026-11-07.** A user who answers no got what they asked for, and `rm -i` does the same. A script with no input to read cannot answer, and that case exits 1 (next point), so exit 0 never hides a failure. Rejected: exit 1 for a no, which makes a normal answer look like a fault.
+- **No way to answer, decided 2026-11-07.** `input` raises `EOFError` when standard input is empty or at its end (`< /dev/null`, a closed pipe), `KeyboardInterrupt` for Ctrl-C, and `UnicodeDecodeError` (a `ValueError`) for bytes that are not text. It raises `RuntimeError` when descriptor 0, 1 or 2 was closed at start-up (`<&-`, `>&-`, `2>&-`, as cron can start a command).
+  `main` catches only `ValueError` and `OSError`, so the first two would print a traceback and the third a codec message with no word on the task (Review Focus 4).
+  `_ask` returns `None` for all of them and `_delete` words the one error line, which says nothing was deleted, exit 1. The closed streams are checked before `input` is called, and `RuntimeError` is not caught, so a bug inside `input` stays visible (PR #30 review).
+  Ctrl-C does not exit 130 (the usual code for it): one handler and one exit code is easier to state, and nothing has been changed by then. Cost, raised in the review: a shell loop such as `for id in 1 2 3; do task-tracker delete $id; done` is not stopped by Ctrl-C the way a process killed by SIGINT would be.
+  On a terminal, an empty line goes to standard error first, so the error does not run on from the `^C` or `^D` the terminal leaves after the prompt. `main` also flushes standard output on every error return and discards it if that fails, because `input` swallows a failed flush of its prompt and the flush at exit would fail again (exit code 120).
+  A script can answer on standard input (`echo y | task-tracker delete 1`), and a test says so. `--yes` stays deferred (Q5): it would save the pipe, not add a capability.
 - **Reading again after the answer, confirmed 2026-11-07.** The prompt waits for a person, so a list read before it can be minutes old, and the save would put it back: a task added from another terminal in the meantime is lost (#27, with a window as long as the person takes).
   `delete` reads the list again after the answer and deletes only a task equal to the one that was shown. `Task` is a dataclass, so `==` compares every field.
   Cost: one more `load`, and a refusal when the task changed while the prompt was open. Rejected: reading once (the window above), and a lock across the prompt (a lock held while waiting on a person). The remaining window is the same as for every other command, `load` to `save`, and #27 still covers it.
 - **Scope held back.** No `--yes`, no `--force`, and no new option at all. Ctrl-C during other commands keeps Python's default, because only the prompt makes it likely. No change to the layout of `cli.py` (M8).
+
+## [2026-11-07] Fix: PR #30 review
+
+**Objective:**
+Answer the eleven inline comments on PR #30 (M6, `delete`). Each factual claim was reproduced first in a scratch directory, with a pty for the two terminal cases. Eight are fixed and resolved (#1, #2, #3, #4, #6, #8, #9, #11), one is fixed in part (#5), and two are answered with a reason and left open for the reviewer (#7, #10).
+
+**Approach:**
+One test-first commit per comment or group, each with its own `SUMMARY.md` entry, on `feature/delete-task`:
+
+1. #8: `_ask(prompt)` returns `None` for no answer and `_delete` words the error. The exceptions are a module constant, because ruff 0.16 removes the parentheses from `except (A, B, C):` and the mypy and flake8 that CI runs reject the result. Commit type `refactor`.
+2. #5 (two of three points): `UnicodeDecodeError` joins the no-answer cases, and `RuntimeError` is no longer caught: a closed standard input, output or error is checked for before `input` is called.
+3. #6: an empty line on standard error first, when standard input is a terminal.
+4. #1: `main` flushes standard output on an error return and discards it if that fails.
+5. #4 and #3: a real process given `y` on standard input. Commit type `test`.
+6. #9: `delete` in the corrupt-file and directory cases, a list that breaks while the prompt is open, and a failing `save`. Commit type `test`.
+7. #2, #3, #11: `README.md`, the plan, and this file say what the code does. Issue #10 and the PR description get the same corrections.
+
+**Tests:**
+
+- #5: `UnicodeDecodeError` gives `task 2 was not deleted`. Standard input, output and error each set to `None` give exit 1 without calling `input`. A `RuntimeError("something else broke")` from `input` escapes `main`.
+- #6: with a standard input stub whose `isatty` is true, standard error is an empty line and then the one error line, for `EOFError` and `KeyboardInterrupt`.
+- #1: a child whose standard output pipe has no reader exits 1 and prints exactly the one error line (it was 120 with a second `Exception ignored` message).
+- #4: `y` on standard input deletes task 1, prints the prompt and `Deleted task 1: Buy milk`, exit 0.
+- #9: see the `SUMMARY.md` entry for the four deliberate breaks and what each one fails.
+
+**Risks & Trade-offs:**
+
+- **#5, Ctrl-C, not changed.** The review notes that exit 1 does not stop a shell loop the way a process killed by SIGINT would. The project owner chose "one error line, exit 1" on 2026-11-07 over the usual 130. The cost is now written beside the decision, and the thread is left open.
+- **#7, the prompt on standard output, not changed.** With `delete 1 > out.txt` the prompt is invisible while the command waits on the keyboard. The project owner chose standard output; standard error would keep the prompt visible, as `rm -i` does, at the price of tests that read standard error and a second way to write text. The thread is left open.
+- **#10, commit types, not changed.** `195e5e9` and `6cb7eb7` are `fix(test):`, and `scripts/bump-version.sh` lists any `fix(scope):` under Fixed. The PR also holds `feat` commits, so the version bump does not change, but the changelog would gain two lines about test code that never shipped. Renaming them needs a rebase and a force-push of a branch under review.
+  New test-only commits use `test(cli):`.
+- **Weak spot in #9.** The directory case passes with the second read broken, because the failing `save` gives the same one line. Only the corrupt case pins the second read.
+- **Found on the way.** `ruff format` at 0.16 and CI's mypy and flake8 disagree about `except A, B:`. Nothing in the repository uses that form now.
