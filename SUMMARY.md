@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-07 13:42] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`, `SUMMARY.md`)
+
+**Summary:**
+Corrected what the documents said about the done-order `assert` under `python -O`. They said the comparison "fails with a `TypeError`, still loudly". It does only when a broken record is compared with a good one; one such record, or several, sort without an error. The `TODO.md` decision and the earlier `SUMMARY.md` entry now say so. No code changes.
+
+**Rationale:**
+Review comment 2 on PR #28 reported this, and it was reproduced first: under `python -O` one done task without a date completed sorted as `[1]`, two as `[1, 2]`, and only a mix with a good record raised.
+The assert stays. The guarantee is `Task._validate`, which runs on construction and in `restore`, so a broken record cannot reach the sort; the assert only tells the type checker. The decision was made with the wrong sentence among its pros and cons, so the project owner is asked to confirm it.
+The other part of the comment, a typed accessor on `Task`, is not done: there is one reader today, and the reasons are in the `TODO.md` entry for this review.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 5
+- Issue: #8 (PR #28, review comment 2)
+
 ## [2026-11-07 13:41] Commit Summary
 
 **Change Type:** Fix
@@ -222,7 +241,7 @@ The list line stays as M3 made it. `list --all` over an empty file says `No task
 The project owner went through each proposal and chose the recommended option every time.
 The one that got discussion was the order of the done tasks: sorting them by the M3 key (due date, priority, ID) would reuse one key for both halves, but it contradicts `README.md` feature 4 and issue #8.
 Most done tasks also have no due date, so they would fall to priority and ID, which say nothing about finished work.
-The `assert` was chosen over a `datetime.max` stand-in (dead code that would sort a broken record last) and a `ValueError` (an unreachable branch that needs a forged task to cover). `python -O` strips it, and the comparison then fails with a `TypeError`, which is still loud.
+The `assert` was chosen over a `datetime.max` stand-in (dead code that would sort a broken record last) and a `ValueError` (an unreachable branch that needs a forged task to cover). `python -O` strips it, and a broken record would then sort without an error unless it is compared with a good one (corrected in the review of PR #28). It cannot reach the sort, because `Task` checks the date on every load.
 The plan, `README.md`, and issue #8 are not edited here: no decision changed their text, because the spec's order stands. They are updated in step 4 of the entry, with the ticked boxes.
 
 **References:**
