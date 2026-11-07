@@ -1,5 +1,23 @@
 # Summary
 
+## [2026-11-07 15:15] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `TODO.md`)
+
+**Summary:**
+Record the three behavior decisions from the PR #29 review in the plan's M5 section (an update never fails because of the clock, a no-change update writes nothing, the ID is plain digits of 1 or more), and bring the M5 steps in `TODO.md` in line with them.
+
+**Rationale:**
+The plan, `TODO.md`, `README.md`, and the issue are meant to agree, and the first version of the M5 notes said the opposite of the code in two places: `updated` came straight from the clock, and a no-change update still printed `Updated`. The PR description is corrected in the same round.
+The reasons and the rejected alternatives are in the `TODO.md` entry 'Fix: PR #29 review'.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #29 review, step 9
+- Issue: #9 (PR #29)
+
 ## [2026-11-07 15:14] Commit Summary
 
 **Change Type:** Fix

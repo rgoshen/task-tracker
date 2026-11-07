@@ -298,6 +298,12 @@ Branch `feature/update-task`. Covers feature 6.
 - `update` cannot set `start` and `stop` (Q3 is closed).
 - Taken as defaults, not separately confirmed: a value equal to the current one changes nothing, `updated` included; `DONE` to `DONE` keeps the date completed; and `-C` as the short form.
 
+**Amended 2026-11-07 (review of PR #29):**
+
+- The clock never makes an update fail. `updated` is the later of the clock and the stored `updated`, and a date completed given by reaching `DONE` is the later of the clock and `stop`. Naive local time (D6) can move back between two commands, after a time zone change for one, and the first version refused every update on such a task.
+- An update that changes nothing does not write the file. It prints `No change to task N: NAME` and exits 0. Rejected: rewriting the file and printing `Updated`, which made "changes nothing" untrue.
+- The `ID` is ASCII digits and at least 1. Anything else, `0` and `-1` included, is a bad value (exit 2), not a task that cannot be found (exit 1).
+
 ### M6. Delete
 
 Branch `feature/delete-task`. Covers feature 7.
