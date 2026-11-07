@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-07 15:58] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+Rename the unused `prompt` argument of the two `input` replacements that another writer uses to `_prompt`, and say in the comment of the ID-reuse test which case tells "highest + 1" from a count.
+
+**Rationale:**
+The CI linters were run on the four M6 commits before the push. Pylint 4.0.6 reported `unused-argument` (W0613) on both replacements and would have failed the `Lint` job. The leading underscore is the form pylint accepts, and `input` is called with the prompt as its only argument, so the name does not matter to the caller.
+The comment said a count would number both new tasks 3. That is only true for the gap case: after `delete 3` a count and "highest + 1" agree, which is why the gap case is the one that can fail.
+Checked after the change: pylint 10.00, black, isort, flake8, and mypy clean at the CI versions, JSCPD 0 clones, 369 tests pass.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10
+
 ## [2026-11-07 15:56] Commit Summary
 
 **Change Type:** Docs

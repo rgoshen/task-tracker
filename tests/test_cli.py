@@ -1369,7 +1369,7 @@ def test_a_task_added_while_the_prompt_is_open_survives_the_delete(
     # Given another writer that adds task 4 while the prompt waits for a person
     _save_three(project)
 
-    def another_writer_adds_task_4(prompt: str = "") -> str:
+    def another_writer_adds_task_4(_prompt: str = "") -> str:
         save([*load(project), _stored(4, "Read book")], project)
         return "y"
 
@@ -1402,7 +1402,7 @@ def test_a_task_changed_while_the_prompt_is_open_is_not_deleted(
     _save_three(project)
     written: list[bytes] = []
 
-    def another_writer_changes_task_2(prompt: str = "") -> str:
+    def another_writer_changes_task_2(_prompt: str = "") -> str:
         save([_stored(number, name) for number, name in others_tasks], project)
         written.append(project.read_bytes())
         return "y"
@@ -1432,7 +1432,8 @@ def test_add_after_a_delete_numbers_the_new_task_from_the_highest_remaining_id(
     new_id: int,
 ):
     # Deleting the highest ID frees it for reuse; deleting a middle one leaves a gap
-    # that `add` does not fill. A count would number both new tasks 3 (D5).
+    # that `add` does not fill (D5). Only the gap case tells "highest + 1" from a
+    # count: after deleting 2, a count gives 3 and collides with the stored task 3.
     _save_three(project)
     _answer_with(monkeypatch, "y")
     main(["delete", str(deleted)])
