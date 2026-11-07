@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-07 13:44] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`SUMMARY.md`)
+
+**Summary:**
+Corrected two sentences in the 13:03 entry that the review of PR #28 made false. One said `README.md` needed no edit; it now says that was the first judgment and that the Commands section was updated. The other said issue #8 still had its boxes unticked; it now says the issue was edited after that commit. No code changes.
+Issue #8 itself was updated on GitHub: its five extra acceptance items and the three decisions from the plan are now in it, all ticked, so it no longer closes without them.
+
+**Rationale:**
+Review comment 6 on PR #28. The project `CLAUDE.md` says to update the plan, the matching issue, and `README.md` together, and step 4 of the M4 entry promised the issue would carry the extra items and the decisions. Only the two original boxes had been ticked, and the `Closes #8` in the pull request would have closed the issue without the rest.
+The issue text was built from the plan by script, not typed again, so the two cannot differ; a diff of the old and new body showed only the added items, the new section, and one sentence in the footer.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 7
+- Issue: #8 (PR #28, review comment 6)
+
 ## [2026-11-07 13:43] Commit Summary
 
 **Change Type:** Docs
@@ -180,9 +199,9 @@ Closed out M4 in the docs. The M4 section of the plan gains five Given/When/Then
 The project `CLAUDE.md` now says that features 3, 4, and 5 exist and that M1 to M4 are built. One earlier `SUMMARY.md` entry said the options table lives in `TODO.md`; it is in `README.md`, and the entry is corrected.
 
 **Rationale:**
-The project `CLAUDE.md` says to update the plan, the matching issue, and `README.md` together when a milestone changes. `README.md` needs no edit: feature 4 already describes this order, and the options table already lists `--all` and `-a`.
+The project `CLAUDE.md` says to update the plan, the matching issue, and `README.md` together when a milestone changes. `README.md` was first judged to need no edit, because feature 4 and the options table already name the flag. The review of PR #28 showed that the Commands section did need it, and it was added there.
 Each box was ticked only after a passing test covered it. The full suite (262 tests), coverage (97%, with the output-failure branches counted in child processes as before), and the linters CI runs on Python and Markdown were run on this commit's parent, and `list --all` was run by hand in a scratch directory.
-Issue #8 still has its boxes unticked: editing it is a change on GitHub, and it waits for the project owner.
+Issue #8 was edited on GitHub after this commit: its two boxes were ticked, and the review of PR #28 added the five extra items and the three decisions.
 
 **References:**
 
