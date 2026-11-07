@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 12:03] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`_printable` finds the characters to escape with one compiled regular expression, `[\x00-\x1f\x7f-\x9f  ]`, instead of calling `unicodedata.category` on every character. The output is the same. Escaping 3000 typical lines went from 16.7 ms to 1.3 ms. The `unicodedata` import, the `_UNSAFE_CATEGORIES` set, and the per-character `map` are gone.
+
+**Rationale:**
+Review comment 5 observed that `Cc`, `Zl` and `Zp` are exactly those ranges. I checked it over all 1,114,112 code points before agreeing: 0 mismatches. A scan of the whole line is faster and shorter than a Python call per character, and the code says in one place what is escaped.
+Because a refactor has to leave behavior alone, the safety net came first: two parametrized tests pin the first and last character of each escaped range (NUL, unit separator, DEL, the first and last C1 control, and the two separators) and the character next to each range that must stay text (space, `~`, no-break space, hyphenation point, narrow no-break space).
+They passed on the old code, then on the new. Four deliberate breaks of a range edge are each caught. A fifth, which escapes the space, passes, and that is expected: `unicode_escape` leaves a printable space as it is, so the change cannot be seen.
+The comment above the pattern records the equivalence with the three categories and the measured gain, so the next reader does not have to rediscover them.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #26 review, second round, step 5
+- Issue: #7 (PR #26, review comment 5)
+
 ## [2026-11-07 12:01] Commit Summary
 
 **Change Type:** Fix

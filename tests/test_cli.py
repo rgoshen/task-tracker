@@ -17,7 +17,7 @@ from types import SimpleNamespace
 import pytest
 
 from task_tracker import main
-from task_tracker.cli import _discard_stdout
+from task_tracker.cli import _discard_stdout, _printable
 from task_tracker.priority import Priority
 from task_tracker.status import Status
 from task_tracker.storage import load, save
@@ -559,6 +559,26 @@ def test_control_characters_in_a_name_are_shown_as_escapes_on_one_line(
     assert listed.splitlines() == [listed.rstrip("\n")]
     assert listed.endswith(f"  {shown}\n")
     assert "\x1b" not in listed
+
+
+@pytest.mark.parametrize(
+    "char",
+    ["\x00", "\x1f", "\x7f", "\x80", "\x9f", "\u2028", "\u2029"],
+    ids=["nul", "unit-separator", "delete", "first-c1", "last-c1", "line", "paragraph"],
+)
+def test_the_first_and_last_character_of_each_escaped_range_is_escaped(char: str):
+    escape = char.encode("unicode_escape").decode("ascii")
+
+    assert _printable(f"a{char}b", io.StringIO()) == f"a{escape}b"
+
+
+@pytest.mark.parametrize(
+    "char",
+    [" ", "~", "\xa0", "\u2027", "\u202f"],
+    ids=["space", "tilde", "no-break-space", "hyphenation-point", "narrow-no-break"],
+)
+def test_the_character_next_to_an_escaped_range_is_left_alone(char: str):
+    assert _printable(f"a{char}b", io.StringIO()) == f"a{char}b"
 
 
 def test_add_shows_a_name_with_a_line_break_as_an_escape(
