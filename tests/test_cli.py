@@ -1419,6 +1419,32 @@ def test_a_task_changed_while_the_prompt_is_open_is_not_deleted(
     assert project.read_bytes() == written[0]
 
 
+@pytest.mark.parametrize(
+    ("deleted", "expected_ids", "new_id"),
+    [(3, [1, 2, 3], 3), (2, [1, 3, 4], 4)],
+    ids=["highest-reused", "gap-not-reused"],
+)
+def test_add_after_a_delete_numbers_the_new_task_from_the_highest_remaining_id(
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    deleted: int,
+    expected_ids: list[int],
+    new_id: int,
+):
+    # Deleting the highest ID frees it for reuse; deleting a middle one leaves a gap
+    # that `add` does not fill. A count would number both new tasks 3 (D5).
+    _save_three(project)
+    _answer_with(monkeypatch, "y")
+    main(["delete", str(deleted)])
+
+    exit_code = main(["add", "New"])
+
+    stored = load(project)
+    assert exit_code == 0
+    assert [task.id for task in stored] == expected_ids
+    assert (stored[-1].id, stored[-1].name) == (new_id, "New")
+
+
 def test_delete_with_standard_output_closed_gives_one_error_line(tmp_path: Path):
     # With descriptor 1 closed, `sys.stdout` is None and `input` cannot prompt.
     save([Task(1, "Buy milk")], tmp_path / "tasks.json")

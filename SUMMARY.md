@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-07 15:56] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+Pin that `add` after a `delete` numbers the new task from the highest remaining ID (D5).
+Deleting task 3 and adding a task gives ID 3 again.
+Deleting task 2 and adding a task gives ID 4, not 3, so the gap is not reused.
+No source code changed.
+
+**Rationale:**
+Step 4 of M6 (`TODO.md`: 2026-11-07 Feature: M6 Delete).
+The highest-ID case passes with the current code, and so does a count-based rule, so the gap case is the one that tells them apart.
+Numbering by count was tried as a temporary mutant: the gap case failed with a duplicate-ID error, and the existing numbering test failed too. The mutant was then reverted.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 4
+- Issue: #10
+
 ## [2026-11-07 15:54] Commit Summary
 
 **Change Type:** Fix
