@@ -97,6 +97,11 @@ def _ask(prompt: str) -> str | None:
     try:
         return input(_printable(prompt, sys.stdout))
     except _NO_ANSWER:
+        # A terminal echoes `^C` or `^D` after the prompt and leaves the cursor
+        # there, so the error would run on from it. It goes to standard error, where
+        # the error goes, and is skipped when nobody is typing.
+        if sys.stdin.isatty():
+            _say("", sys.stderr)
         return None
 
 

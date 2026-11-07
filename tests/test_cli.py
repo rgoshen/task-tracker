@@ -1356,6 +1356,40 @@ def test_a_prompt_that_gets_no_answer_deletes_nothing_and_says_so_in_one_line(
     assert project.read_bytes() == before
 
 
+class _Terminal(io.StringIO):
+    """Standard input that claims to be a terminal, as it is for a person typing."""
+
+    def isatty(self) -> bool:
+        return True
+
+
+@pytest.mark.parametrize(
+    "error", [EOFError(), KeyboardInterrupt()], ids=["ctrl-d", "ctrl-c"]
+)
+def test_on_a_terminal_the_no_answer_error_starts_on_its_own_line(
+    project: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    error: BaseException,
+):
+    # The terminal echoes `^C` or `^D` after the prompt and leaves the cursor there,
+    # so an error written at once would run on from the prompt (checked in a pty).
+    _save_three(project)
+
+    def no_answer(prompt: str = "") -> str:
+        raise error
+
+    monkeypatch.setattr("builtins.input", no_answer)
+    monkeypatch.setattr(sys, "stdin", _Terminal())
+
+    exit_code = main(["delete", "2"])
+
+    assert exit_code == 1
+    assert capsys.readouterr().err == (
+        "\ntask-tracker: error: no answer to the prompt: task 2 was not deleted\n"
+    )
+
+
 @pytest.mark.parametrize("stream", ["stdin", "stdout", "stderr"])
 def test_a_closed_standard_stream_deletes_nothing_without_asking(
     project: Path,

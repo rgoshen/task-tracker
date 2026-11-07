@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-07 16:29] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+When nobody can answer the prompt and standard input is a terminal, an empty line goes to standard error first, so the error starts on its own line.
+
+**Rationale:**
+Review comment 6 on PR #30. A terminal echoes `^C` or `^D` after the prompt and leaves the cursor there. Reproduced in a pty before the change: Ctrl-D printed `[y/N] ^D`, two backspaces and the error on the same line, and Ctrl-C did the same. The earlier PR text recorded this for Ctrl-D only.
+The newline goes to standard error, where the error goes, and only when `sys.stdin.isatty()`. With a pipe or `/dev/null` nobody is typing, so the error stays the one line the other tests assert.
+Red first: the two terminal tests (a stdin stub whose `isatty` is true, with `input` raising `EOFError` and `KeyboardInterrupt`) failed on the missing leading newline. After the change the same two keys were run through a real pty, with a controlling terminal so that Ctrl-C raises SIGINT: each ends `\r\ntask-tracker: error: ...`, exit 1. 375 tests pass.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10 (PR #30, review comment 6)
+
 ## [2026-11-07 16:28] Commit Summary
 
 **Change Type:** Fix
