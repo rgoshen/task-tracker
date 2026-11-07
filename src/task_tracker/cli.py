@@ -248,6 +248,23 @@ def _discard_stdout() -> None:
         os.close(devnull)
 
 
+def _release_stdout() -> None:
+    """Leave nothing in standard output for the flush at exit to fail on again.
+
+    The commands only build their lines and `_show` prints them, so an error means
+    that no output was meant to be written. The exception is a prompt: `input`
+    swallows a failed flush and leaves its bytes in the buffer, and the flush at
+    exit then fails the same way (exit code 120). Flushing here finds out, and
+    `_discard_stdout` is its answer.
+    """
+    if sys.stdout is None:
+        return
+    try:
+        sys.stdout.flush()
+    except OSError:
+        _discard_stdout()
+
+
 def _show(lines: list[str], prog: str) -> int:
     """Print `lines` and return the exit code.
 
@@ -394,6 +411,7 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, OSError) as error:
         # `Task` and `load` raise ValueError for a blank name or a corrupt file
         # (M2 made it the one type); OSError is a file that cannot be read or written.
+        _release_stdout()
         _say(f"{parser.prog}: error: {error}", sys.stderr)
         return 1
     return _show(lines, parser.prog)

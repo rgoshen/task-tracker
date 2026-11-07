@@ -616,6 +616,27 @@ def test_a_pipe_that_is_already_closed_ends_a_short_list_quietly(tmp_path: Path)
     assert child.returncode == 1
 
 
+def test_an_error_after_a_prompt_nobody_could_read_still_exits_1_without_a_second_error(
+    tmp_path: Path,
+):
+    # `input` writes the prompt to a pipe whose reader has gone, swallows the flush
+    # error, and leaves the bytes in the buffer. When the command then ends with an
+    # error, the flush at exit failed again: "Exception ignored" and exit code 120.
+    save([Task(1, "Buy milk")], tmp_path / "tasks.json")
+    read_end, write_end = os.pipe()
+    os.close(read_end)
+
+    with _run_in_a_new_process(tmp_path, ["delete", "1"], write_end) as child:
+        os.close(write_end)
+        child.wait(timeout=30)
+
+    error = (tmp_path / _ERRORS_FILE).read_text(encoding="utf-8")
+    assert child.returncode == 1
+    assert error == (
+        "task-tracker: error: no answer to the prompt: task 1 was not deleted\n"
+    )
+
+
 # Each command, and the task names the file holds after it ran: `add` saves.
 _BOTH_COMMANDS = pytest.mark.parametrize(
     ("argv", "stored"),

@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-07 16:30] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+When a command ends with an error, `main` now flushes standard output first and, if that fails, points it at devnull. A prompt written to a pipe nobody reads no longer turns the exit code into 120.
+
+**Rationale:**
+Review comment 1 on PR #30. `input` writes the prompt to a pipe whose reader has gone, swallows the flush error, and leaves the bytes in the buffer. `main` then printed the error and returned 1, and the flush at interpreter exit failed again: `Exception ignored while flushing sys.stdout` and exit code 120. Reproduced before the change with a child whose stdout reader was already closed.
+This is the case `_discard_stdout` documents, but it was only used on the success path in `_show`. The fix is in the error path of `main`, and not in `_ask`, because the prompt is also in the buffer when the second `load`, the "changed while the prompt was open" check, or `save` raise after it. A flush that works costs nothing, and a command only builds its lines, so no output is lost.
+Red first: `assert 120 == 1` in a real child process. Removing the call makes that one test fail again, and nothing else. 376 tests pass.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 6
+- Issue: #10 (PR #30, review comment 1)
+
 ## [2026-11-07 16:29] Commit Summary
 
 **Change Type:** Fix
