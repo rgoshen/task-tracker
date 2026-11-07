@@ -77,9 +77,8 @@ def _list(args: argparse.Namespace, path: Path) -> list[str]:
         shown += sorted(done, key=_done_order)
     if not shown:
         # Under `--all` the done tasks count too, so "current" would mislead.
-        if args.include_done:
-            return [f"No tasks in {path}"]
-        return [f"No current tasks in {path}"]
+        scope = "tasks" if args.include_done else "current tasks"
+        return [f"No {scope} in {path}"]
     return [_describe(task) for task in shown]
 
 

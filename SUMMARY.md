@@ -1,5 +1,22 @@
 # Summary
 
+## [2026-11-07 13:39] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** cli (`src/task_tracker/cli.py`)
+
+**Summary:**
+`_list` builds the empty-list message once, from a word that is `tasks` under `--all` and `current tasks` otherwise. Before, it tested the flag a second time and returned from two near-identical branches. The text printed is the same in every case.
+
+**Rationale:**
+Review comment 3 on PR #28. One `if` fewer, and the wording choice now sits next to the comment that explains it. No test was added because no behavior changed: the five tests that pin the two messages are the safety net, and swapping the two words makes all five fail.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 2
+- Issue: #8 (PR #28, review comment 3)
+
 ## [2026-11-07 13:38] Commit Summary
 
 **Change Type:** Fix
