@@ -29,6 +29,9 @@ NOV_1 = datetime(2026, 11, 1)  # noqa: DTZ001
 NOV_2 = datetime(2026, 11, 2)  # noqa: DTZ001
 NOV_3 = datetime(2026, 11, 3)  # noqa: DTZ001
 NOV_2_TIMED = datetime(2026, 11, 2, 10, 30, 45)  # noqa: DTZ001
+OCT_1 = datetime(2026, 10, 1)  # noqa: DTZ001
+OCT_5 = datetime(2026, 10, 5)  # noqa: DTZ001
+OCT_10 = datetime(2026, 10, 10)  # noqa: DTZ001
 
 
 @pytest.fixture(name="project")
@@ -147,19 +150,94 @@ def _listed_names(capsys: pytest.CaptureFixture[str]) -> list[str]:
     return [line.split()[-1] for line in capsys.readouterr().out.splitlines()]
 
 
-def test_list_shows_current_tasks_by_due_date_then_priority(
-    project: Path, capsys: pytest.CaptureFixture[str]
-):
+def _done(
+    task_id: int, name: str, completed: datetime, due: datetime | None = None
+) -> Task:
+    """A DONE task completed on `completed`. Only `restore` can build a past one."""
+    # Every stamp is on or before the date completed, as `restore` requires.
+    return Task.restore(
+        {
+            "id": task_id,
+            "name": name,
+            "description": "",
+            "created": OCT_1,
+            "updated": completed,
+            "due": due,
+            "date_completed": completed,
+            "status": Status.DONE,
+            "priority": Priority.LOW,
+            "start": OCT_1,
+            "stop": OCT_1,
+        }
+    )
+
+
+MAIN_CASE_ORDER = ["C", "B", "A", "E", "F", "D"]
+
+
+def _save_main_case(path: Path) -> None:
     save(
         [
             Task(1, "A", due=NOV_2, priority=Priority.LOW),
             Task(2, "B", due=NOV_1, priority=Priority.LOW),
             Task(3, "C", due=NOV_1, priority=Priority.CRITICAL),
-            Task(4, "D", status=Status.DONE),
+            _done(4, "D", OCT_10),
             Task(5, "E", due=NOV_3, status=Status.IN_PROGRESS),
+            _done(6, "F", OCT_5),
         ],
-        project,
+        path,
     )
+
+
+def test_list_all_shows_current_tasks_then_done_ones_by_date_completed(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    _save_main_case(project)
+
+    exit_code = main(["list", "--all"])
+
+    assert exit_code == 0
+    assert _listed_names(capsys) == MAIN_CASE_ORDER
+
+
+def test_list_all_orders_done_tasks_with_one_date_completed_by_id(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    # Stored higher ID first, so the file order would give the other answer.
+    save([_done(2, "second", OCT_5), _done(1, "first", OCT_5)], project)
+
+    main(["list", "--all"])
+
+    assert _listed_names(capsys) == ["first", "second"]
+
+
+def test_list_all_puts_done_task_due_first_after_every_current_task(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    save([_done(1, "done", OCT_5, due=OCT_1), Task(2, "open", due=NOV_1)], project)
+
+    main(["list", "--all"])
+
+    assert _listed_names(capsys) == ["open", "done"]
+
+
+def test_list_all_lists_only_done_tasks_while_plain_list_says_none_current(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    save([_done(1, "old", OCT_5)], project)
+
+    main(["list"])
+    plain = capsys.readouterr().out
+    main(["list", "--all"])
+
+    assert f"No current tasks in {project}" in plain
+    assert _listed_names(capsys) == ["old"]
+
+
+def test_list_shows_current_tasks_by_due_date_then_priority(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    _save_main_case(project)
 
     exit_code = main(["list"])
 

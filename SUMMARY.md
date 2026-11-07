@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 12:57] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+Added `list --all`, whose flag is stored as `include_done`. It lists the current tasks in the M3 order, then the done tasks by date completed, then ID. Plain `list` is unchanged.
+The existing plain-list ordering test now builds its file with the same shared helper as the new tests, which keeps the copypaste check (threshold 0) at zero clones.
+
+**Rationale:**
+The done half sorts by `(date_completed, id)`, not by the M3 key, as `TODO.md` decides. Most done tasks have no due date, and the ID settles ties the same way it does in M3.
+The `assert` tells pyright that a DONE task has a date completed. It adds no branch to cover.
+The done tests build their tasks with `Task.restore`, because the constructor cannot store a past completion date.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all
+- Issue: #8
+
 ## [2026-11-07 12:52] Commit Summary
 
 **Change Type:** Docs

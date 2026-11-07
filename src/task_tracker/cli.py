@@ -60,12 +60,24 @@ def _describe(task: Task) -> str:
     )
 
 
-def _list(_args: argparse.Namespace, path: Path) -> list[str]:
-    """Return the lines to show: the current tasks, or that there are none."""
-    current = [task for task in load(path) if task.status is not Status.DONE]
-    if not current:
+def _done_order(task: Task) -> tuple[datetime, int]:
+    """Sort key for the done tasks: date completed, then ID (M4)."""
+    # A DONE task always has a date completed; the assert tells pyright so.
+    assert task.date_completed is not None
+    return (task.date_completed, task.id)
+
+
+def _list(args: argparse.Namespace, path: Path) -> list[str]:
+    """Return the lines to show: the current tasks, then the done ones with `--all`."""
+    tasks = load(path)
+    current = [task for task in tasks if task.status is not Status.DONE]
+    shown = sorted(current, key=_current_order)
+    if args.include_done:
+        done = [task for task in tasks if task.status is Status.DONE]
+        shown += sorted(done, key=_done_order)
+    if not shown:
         return [f"No current tasks in {path}"]
-    return [_describe(task) for task in sorted(current, key=_current_order)]
+    return [_describe(task) for task in shown]
 
 
 # What is escaped, because it moves the cursor, sends commands to the terminal,
@@ -205,7 +217,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, local time",
     )
     add.set_defaults(run=_add)
-    commands.add_parser("list", help="list the current tasks").set_defaults(run=_list)
+    listing = commands.add_parser("list", help="list the current tasks")
+    listing.add_argument(
+        "--all",
+        action="store_true",
+        dest="include_done",
+        help="also list the done tasks, after the current ones",
+    )
+    listing.set_defaults(run=_list)
     return parser
 
 
