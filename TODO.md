@@ -427,3 +427,47 @@ One test-first commit per comment on `feature/update-task`, each with its own `S
 - **#7, partly declined, decided 2026-11-07.** The test keeps its own copy of the "nothing to update" text on purpose: a test that imports the constant it checks cannot fail when the message is wrong. The message is not built from the parser, which would take more code than the five names it replaces.
   After #1, `_settle_date_completed` (clamps to `stop`) and `_fill_in_defaults` (a new task is held to the clock) no longer apply one rule, so they are not merged.
 - **Scope held back.** No `--description`, `--start`, or `--stop`, and no change to the layout of `cli.py` (M8).
+
+## [2026-11-07] Feature: M6 Delete
+
+**Objective:**
+Make `uv run task-tracker delete ID` remove a stored task, after a prompt that shows the task's ID and name. Covers issue #10 and the M6 section of `docs/implementation-plan.md`. Feature 7 of `README.md`, project-level list only: `--dir` and `--global` arrive in M7.
+This entry records the answers to the "Think about" paragraph (what the prompt prints, what a script gets), so the code steps have nothing left to decide.
+
+**Approach:**
+Branch `feature/delete-task` (from `develop`, after M5 merged as PR #29). Test-first, one atomic commit per step, each with its own `SUMMARY.md` entry. Standard library only, so `uv.lock` does not change. No change to `Task` or `storage.py`: a delete is "load, drop one, save".
+
+1. The command, with its prompt: `delete ID`, where `ID` uses the `_task_id` converter from M5. Load the list, find the task with `_find`, ask `Delete task 2: Buy milk? [y/N]` through `input`, drop the task on a yes, save, print `Deleted task 2: Buy milk`. On a no, print `Kept task 2: Buy milk` and do not write the file.
+   The prompt comes with the command, never after it, so no commit deletes without asking. Red: `delete 2` exits 2 because argparse does not know the command. Covers plan boxes 1 and 4. Commit: `feat(cli): add the delete command`.
+2. The refusals: no task with that ID (the prompt is never shown), and no way to answer (`input` raises). Both reach the existing one-line error and exit 1 in `main`, with the file unchanged. Commit: `feat(cli): refuse a delete that names no task or gets no answer`.
+3. Read the list again after the answer. If the task is gone or has changed since it was shown, delete nothing and say so. Red: a patched `input` that rewrites the file while the prompt is open. Commit: `feat(cli): delete only the task that was confirmed`.
+4. ID reuse (plan box 3). `add` already numbers by highest + 1, so this test passes at once. Show that it can fail: make `add` number by count and watch `delete 3` then `add "New"` go red (the ID would be 2), then restore it. Commit: `test(cli): pin that a deleted highest ID is reused`.
+5. Docs: tick the M6 boxes in the plan and issue #10, record the decisions below in both, add the `delete` command and its exit codes to `README.md`, and update the project state in `CLAUDE.md` (features 3 to 7 exist). Commit: `docs(plan): record the M6 decisions`.
+6. Done when the tests pass locally, coverage on changed code is at least 80%, the CI-version linters, the Markdown linters, JSCPD, and codespell are clean locally, and `delete` works in a scratch directory. Pushing the code and opening the PR into `develop` wait for the project owner.
+
+**Tests:**
+The four Given/When/Then items are in the M6 section of the plan. In addition:
+
+- The prompt passed to `input` holds the ID and the name. A name with a control character shows it as an escape, on one line, as in `list`.
+- `y`, `Y`, `yes`, and `YES` (also with spaces around the answer) delete. `n`, `no`, the empty answer, `maybe`, and `yy` keep the task. One parametrized test, not two lists.
+- A no leaves the file byte-for-byte as it was, proved with a hand-formatted file (`indent=4`) that a rewrite would change. The output is `Kept task 2: Buy milk` and the exit code is 0.
+- `delete 99` never calls `input` (the patched `input` fails the test if it is called), exits 1, names 99 on stderr, and leaves the file unchanged.
+- A bad ID (`0`, `-1`, `+1`, `1.5`, `one`) exits 2, never calls `input`, and leaves the file unchanged. Share the case list with the `update` test; do not paste a second copy (JSCPD, threshold 0).
+- With no way to answer, exit 1, one error line, file unchanged, and no traceback: `input` raising `EOFError` (patched), and one real process with standard input at `/dev/null`. Closed input (`<&-`) raises `RuntimeError`, not `EOFError`, and needs a real process started from the venv's Python, because `uv run` hands the child an empty input (checked 2026-11-07, Python 3.14.7).
+- Deleting the only task leaves a file holding `[]`, and `list` then prints `No current tasks in <path>`.
+- Tasks 1 and 3 are identical before and after `delete 2`, field by field, as for `update`.
+- While the prompt is open another writer adds task 4, and after a yes both survive the delete (task 4 stays, task 2 goes). Another writer that renames task 2, or removes it, makes the delete print an error, exit 1, and leave the other writer's file as it is.
+- The success line is printed after the save, through `_show`, as for `update`, so a failed write of the output still means the task is gone.
+
+**Risks & Trade-offs:**
+
+- **What the prompt prints, decided 2026-11-07.** The ID and the name: `Delete task 2: Buy milk? [y/N]`, then a space. The prompt exists to catch a reused ID (D5), and only the name tells the user that ID 3 is no longer the task they meant. The name is printed through `_printable`, because a name can come from a shared file.
+  Cost: `input` writes the prompt to standard output itself, so the escaping is applied to the text before it is passed in.
+- **The default is no, decided 2026-11-07, not separately confirmed.** Enter alone keeps the task, and the capital `N` in `[y/N]` says so. `yes` is accepted next to `y`, in any case. Rejected: a default of yes, where a stray Enter deletes a task, and requiring the whole name typed back, which is heavy for a single-user list.
+- **Declining exits 0, taken as a default.** A user who answers no got what they asked for, and `rm -i` does the same. A script cannot answer at all, and that case exits 1 (next point), so exit 0 never hides a failure. Rejected: exit 1 for a no, which makes a normal answer look like a fault.
+- **No way to answer, decided 2026-11-07.** `input` raises `EOFError` when standard input is empty or at its end (`< /dev/null`, a closed pipe) and `RuntimeError` when descriptor 0 is closed (`<&-`, as cron can start a command). `main` catches only `ValueError` and `OSError`, so either one would print a traceback (Review Focus 4).
+  `delete` turns both into one error line that says nothing was deleted, exit 1. `--yes` stays deferred (Q5).
+- **Reading again after the answer, decided 2026-11-07, not separately confirmed.** The prompt waits for a person, so a list read before it can be minutes old, and the save would put it back: a task added from another terminal in the meantime is lost (#27, with a window as long as the person takes).
+  `delete` reads the list again after the answer and deletes only a task equal to the one that was shown. `Task` is a dataclass, so `==` compares every field.
+  Cost: one more `load`, and a refusal when the task changed while the prompt was open. Rejected: reading once (the window above), and a lock across the prompt (a lock held while waiting on a person). The remaining window is the same as for every other command, `load` to `save`, and #27 still covers it.
+- **Scope held back.** No `--yes`, no `--force`, and no new option at all. Ctrl-C at the prompt is not handled: it ends the program with Python's default, as it does for every command today (`main` does not catch `KeyboardInterrupt`). A closed standard output while prompting is not handled either. No change to the layout of `cli.py` (M8).

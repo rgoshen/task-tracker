@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-07 15:40] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Plan M6, the `delete` command. `TODO.md` gets the M6 entry with its steps, tests, and trade-offs. The plan's M6 section gets a "Decided (2026-11-07)" block that answers its "Think about" paragraph: what the prompt prints, what a script gets, and what happens when nothing can answer.
+
+**Rationale:**
+The prompt exists to catch a reused ID (D5), so it prints the ID and the name, escaped like every other name. The decisions that go beyond the four plan boxes are the ones a review would otherwise find later:
+
+- `input` raises `EOFError` or `RuntimeError` when there is no terminal, and `main` catches neither, so a script would get a traceback. Both become one error line with exit 1. Checked with Python 3.14.7.
+- A prompt waits on a person, so a list read before it can be stale when the save comes. The list is read again after the answer, and only a task equal to the one shown is deleted. Rejected: one read (a concurrent `add` would be lost for as long as the person takes) and a lock held across the prompt.
+- Four points are taken as defaults and marked as such in both files: the default answer is no, `yes` is accepted, declining exits 0, and the second read.
+
+Ctrl-C at the prompt and a closed standard output while prompting are named as not handled. Issue #10 is not changed in this commit. Its text is copied from the plan, so it needs the same "Decided" block once the project owner agrees.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete
+- Issue: #10
+
 ## [2026-11-07 15:15] Commit Summary
 
 **Change Type:** Docs
