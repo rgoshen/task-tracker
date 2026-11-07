@@ -1,7 +1,9 @@
-"""Tests for the command line: `add` and `list`."""
+"""Tests for the command line: `add`, `list`, and `update`."""
 
 # Test names state the intent, so per-test docstrings would only repeat them.
 # pylint: disable=missing-function-docstring
+# The command tests share fixtures and helpers, so they stay in this one module.
+# pylint: disable=too-many-lines
 
 import io
 import json
@@ -11,7 +13,8 @@ import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timedelta
+from itertools import takewhile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -35,6 +38,8 @@ OCT_5 = datetime(2026, 10, 5)  # noqa: DTZ001
 OCT_5_MORNING = datetime(2026, 10, 5, 9, 0)  # noqa: DTZ001
 OCT_5_EVENING = datetime(2026, 10, 5, 17, 0)  # noqa: DTZ001
 OCT_10 = datetime(2026, 10, 10)  # noqa: DTZ001
+OCT_1_NINE = datetime(2026, 10, 1, 9, 0)  # noqa: DTZ001
+DEC_1 = datetime(2026, 12, 1)  # noqa: DTZ001
 
 
 @pytest.fixture(name="project")
@@ -169,22 +174,35 @@ def _listed_names(capsys: pytest.CaptureFixture[str]) -> list[str]:
     return [line.split()[-1] for line in capsys.readouterr().out.splitlines()]
 
 
+def _stored(
+    task_id: int,
+    name: str,
+    *,
+    priority: Priority = Priority.LOW,
+    due: datetime | None = None,
+    date_completed: datetime | None = None,
+) -> Task:
+    """A task stored on 2026-10-01 at 09:00, DONE when it has a date completed."""
+    # The field list comes from the dataclass, so a new field needs no change here.
+    # Every stamp is on or before the date completed, as `restore` requires.
+    record = asdict(Task(task_id, name)) | {
+        "created": OCT_1_NINE,
+        "updated": OCT_1_NINE,
+        "start": OCT_1_NINE,
+        "stop": OCT_1_NINE,
+        "priority": priority,
+        "status": Status.TO_DO if date_completed is None else Status.DONE,
+        "due": due,
+        "date_completed": date_completed,
+    }
+    return Task.restore(record)
+
+
 def _done(
     task_id: int, name: str, completed: datetime, due: datetime | None = None
 ) -> Task:
     """A DONE task completed on `completed`. Only `restore` can build a past one."""
-    # The field list comes from the dataclass, so a new field needs no change here.
-    # Every stamp is on or before the date completed, as `restore` requires.
-    record = asdict(Task(task_id, name)) | {
-        "created": OCT_1,
-        "updated": completed,
-        "start": OCT_1,
-        "stop": OCT_1,
-        "due": due,
-        "status": Status.DONE,
-        "date_completed": completed,
-    }
-    return Task.restore(record)
+    return _stored(task_id, name, due=due, date_completed=completed)
 
 
 MAIN_CASE_ORDER = ["C", "B", "A", "E", "F", "D"]
@@ -434,7 +452,11 @@ def _assert_one_line_error(capsys: pytest.CaptureFixture[str], mention: str) -> 
     return captured.err
 
 
-@pytest.mark.parametrize("argv", [["list"], ["list", "--all"], ["add", "Buy milk"]])
+@pytest.mark.parametrize(
+    "argv",
+    [["list"], ["list", "--all"], ["add", "Buy milk"], ["update", "1", "--name", "x"]],
+    ids=["list", "list-all", "add", "update"],
+)
 @pytest.mark.parametrize(
     "text",
     ["not json", '[{"cls": 1}]', "[" * 200_000],
@@ -502,12 +524,17 @@ def test_add_with_a_name_that_cannot_be_kept_gives_a_one_line_error_and_writes_n
     assert not project.exists()
 
 
+@pytest.mark.parametrize(
+    "argv",
+    [["list"], ["update", "1", "--name", "x"]],
+    ids=["list", "update"],
+)
 def test_a_directory_where_the_list_should_be_gives_a_one_line_error(
-    project: Path, capsys: pytest.CaptureFixture[str]
+    project: Path, capsys: pytest.CaptureFixture[str], argv: list[str]
 ):
     project.mkdir()
 
-    exit_code = main(["list"])
+    exit_code = main(argv)
 
     assert exit_code == 1
     _assert_one_line_error(capsys, "tasks.json")
@@ -828,3 +855,279 @@ def test_text_that_standard_output_cannot_encode_is_shown_as_escapes(
     stdout.flush()
     assert exit_code == 0
     assert buffer.getvalue().endswith(b"  Zo\\xeb \\u2615\n")
+
+
+# --- M5: update ---
+
+
+@pytest.mark.usefixtures("fixed_clock")
+def test_update_changes_the_name_and_priority_of_the_given_task_only(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    save(
+        [_stored(1, "Buy milk"), _stored(2, "Walk dog", priority=Priority.HIGH)],
+        project,
+    )
+    other_before = load(project)[1]
+
+    exit_code = main(["update", "1", "--name", "Buy oat milk", "--priority", "HIGH"])
+
+    changed, other = load(project)
+    assert exit_code == 0
+    assert capsys.readouterr().out == "Updated task 1: Buy oat milk\n"
+    assert (changed.name, changed.priority) == ("Buy oat milk", Priority.HIGH)
+    assert (changed.created, changed.updated) == (OCT_1_NINE, CLOCK)
+    assert other == other_before
+
+
+@pytest.mark.usefixtures("fixed_clock")
+def test_update_to_done_sets_date_completed_to_the_clock(project: Path):
+    save([_stored(1, "Buy milk")], project)
+
+    main(["update", "1", "--status", "DONE"])
+
+    stored = load(project)[0]
+    assert (stored.status, stored.date_completed) == (Status.DONE, CLOCK)
+
+
+@pytest.mark.usefixtures("fixed_clock")
+@pytest.mark.parametrize("status", ["TO_DO", "IN_PROGRESS"])
+def test_update_away_from_done_clears_date_completed(project: Path, status: str):
+    save([_done(1, "Buy milk", OCT_5)], project)
+
+    exit_code = main(["update", "1", "--status", status])
+
+    stored = load(project)[0]
+    assert exit_code == 0
+    assert (stored.status, stored.date_completed) == (Status(status), None)
+    assert stored.updated == CLOCK
+
+
+@pytest.mark.usefixtures("fixed_clock")
+@pytest.mark.parametrize(
+    ("long_form", "short_form"),
+    [
+        (["--name", "Buy oat milk"], ["-n", "Buy oat milk"]),
+        (["--priority", "HIGH"], ["-p", "HIGH"]),
+        (["--status", "IN_PROGRESS"], ["-s", "IN_PROGRESS"]),
+        (["--due", "2026-12-01"], ["-D", "2026-12-01"]),
+        (["--clear-due"], ["-C"]),
+    ],
+    ids=["name", "priority", "status", "due", "clear-due"],
+)
+def test_each_short_option_leaves_the_same_file_as_its_long_form(
+    project: Path, long_form: list[str], short_form: list[str]
+):
+    seed = [_stored(1, "Buy milk", due=NOV_1)]
+    save(seed, project)
+    seeded = project.read_bytes()
+
+    main(["update", "1", *long_form])
+    from_long = project.read_bytes()
+    save(seed, project)
+    main(["update", "1", *short_form])
+
+    assert from_long != seeded  # else two runs that did nothing would match
+    assert project.read_bytes() == from_long
+
+
+@pytest.mark.usefixtures("fixed_clock")
+@pytest.mark.parametrize(
+    ("argv", "due"),
+    [(["--due", "2026-12-01"], DEC_1), (["--clear-due"], None)],
+    ids=["sets-midnight", "clears"],
+)
+def test_due_sets_the_given_date_at_midnight_or_clears_it(
+    project: Path, argv: list[str], due: datetime | None
+):
+    save([_stored(1, "Buy milk", due=NOV_1)], project)
+
+    main(["update", "1", *argv])
+
+    assert load(project)[0].due == due
+
+
+def test_due_and_clear_due_together_exit_2_and_leave_the_file_unchanged(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    save([_stored(1, "Buy milk", due=NOV_1)], project)
+    before = project.read_bytes()
+
+    with pytest.raises(SystemExit) as exit_info:
+        main(["update", "1", "--due", "2026-12-01", "--clear-due"])
+
+    assert exit_info.value.code == 2
+    assert "not allowed with" in capsys.readouterr().err
+    assert project.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    ("argv", "mention"),
+    [
+        (["1", "--status", "DOING"], "--status"),
+        (["1", "--priority", "URGENT"], "--priority"),
+        (["1", "--due", "tomorrow"], "--due"),
+        (["one", "--name", "x"], "whole number"),
+        (["1.5", "--name", "x"], "whole number"),
+        (["+1", "--name", "x"], "whole number"),
+        (["0_1", "--name", "x"], "whole number"),
+        ([" 1 ", "--name", "x"], "whole number"),
+        (["\u0661", "--name", "x"], "whole number"),
+        (["-1", "--name", "x"], "whole number"),
+        (["0", "--name", "x"], "whole number"),
+    ],
+    ids=[
+        "unknown-status",
+        "unknown-priority",
+        "due-not-a-date",
+        "id-word",
+        "id-part",
+        "id-plus-sign",
+        "id-underscore",
+        "id-spaces",
+        "id-arabic-indic-digit",
+        "id-negative",
+        "id-zero",
+    ],
+)
+def test_a_bad_option_value_exits_2_naming_it_and_leaves_the_file_unchanged(
+    project: Path, capsys: pytest.CaptureFixture[str], argv: list[str], mention: str
+):
+    save([_stored(1, "Buy milk")], project)
+    before = project.read_bytes()
+
+    with pytest.raises(SystemExit) as exit_info:
+        main(["update", *argv])
+
+    assert exit_info.value.code == 2
+    assert mention in capsys.readouterr().err.splitlines()[-1]
+    assert project.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "argv", [["--name", "Landed"], ["--status", "DONE"]], ids=["rename", "done"]
+)
+def test_update_works_when_the_clock_is_behind_the_stored_time(
+    project: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str]
+):
+    # A time zone change can put the clock hours behind the task's own stamps.
+    later = CLOCK + timedelta(hours=13)
+    monkeypatch.setattr("task_tracker.task._now", lambda: later)
+    save([Task(1, "Fly home")], project)
+    monkeypatch.setattr("task_tracker.task._now", lambda: CLOCK)
+
+    exit_code = main(["update", "1", *argv])
+
+    assert exit_code == 0
+    assert load(project)[0].updated == later
+
+
+@pytest.mark.usefixtures("fixed_clock")
+def test_a_blank_name_exits_1_with_one_error_line_and_leaves_the_file_unchanged(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    save([_stored(1, "Buy milk")], project)
+    before = project.read_bytes()
+
+    exit_code = main(["update", "1", "--name", "   "])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "name must not be blank")
+    assert project.read_bytes() == before
+
+
+@pytest.mark.usefixtures("fixed_clock")
+def test_values_a_task_already_has_leave_the_file_unchanged(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    # A file `save` wrote would come out the same if it were rewritten, so the test
+    # could not tell. This layout is not the one `save` writes.
+    save([_stored(1, "Buy milk")], project)
+    records = json.loads(project.read_text(encoding="utf-8"))
+    project.write_text(json.dumps(records, indent=4), encoding="utf-8")
+    before = project.read_bytes()
+
+    exit_code = main(["update", "1", "--name", "Buy milk", "--priority", "LOW"])
+
+    assert exit_code == 0
+    assert capsys.readouterr().out == "No change to task 1: Buy milk\n"
+    assert project.read_bytes() == before
+
+
+NOTHING_TO_UPDATE = (
+    "nothing to update: give at least one of --name, --priority, --status, --due, "
+    "--clear-due"
+)
+
+
+def test_update_of_a_missing_id_exits_1_naming_it_and_leaves_the_file_unchanged(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    save([_stored(1, "Buy milk")], project)
+    before = project.read_bytes()
+
+    exit_code = main(["update", "99", "--name", "x"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "no task with ID 99")
+    assert project.read_bytes() == before
+
+
+def test_update_with_no_tasks_file_exits_1_and_creates_no_file(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    exit_code = main(["update", "1", "--name", "x"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "no task with ID 1")
+    assert not project.exists()
+
+
+@pytest.mark.parametrize("id_text", ["1", "99"])
+def test_update_with_no_option_exits_1_naming_the_options_and_leaves_the_file_alone(
+    project: Path, capsys: pytest.CaptureFixture[str], id_text: str
+):
+    # The option check comes first, so an ID that does not exist is not reported.
+    save([_stored(1, "Buy milk")], project)
+    before = project.read_bytes()
+
+    exit_code = main(["update", id_text])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, NOTHING_TO_UPDATE)
+    assert project.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    ("argument", "explanation"),
+    [
+        ("id", "ID of the task to change"),
+        ("--name", "new name"),
+        ("--priority", "new priority"),
+        ("--status", "new status"),
+        ("--due", "YYYY-MM-DD"),
+        ("--clear-due", "remove the due date"),
+    ],
+)
+def test_update_help_explains_each_argument(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    argument: str,
+    explanation: str,
+):
+    # A wide terminal keeps the explanations on one line. argparse still moves the
+    # text of a long option such as `--priority {CRITICAL,...}` to the next line, so
+    # the row is read together with the lines indented under it.
+    monkeypatch.setenv("COLUMNS", "200")
+
+    with pytest.raises(SystemExit) as exit_info:
+        main(["update", "--help"])
+
+    lines = capsys.readouterr().out.splitlines()
+    start = next(
+        n for n, line in enumerate(lines) if line.lstrip().startswith(argument)
+    )
+    row = [lines[start]]
+    row += list(takewhile(lambda line: line.startswith(" " * 10), lines[start + 1 :]))
+    assert exit_info.value.code == 0
+    assert explanation in " ".join(" ".join(row).split())

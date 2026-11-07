@@ -129,6 +129,64 @@ class Task:  # pylint: disable=too-many-instance-attributes
         task._validate()  # pylint: disable=protected-access
         return task
 
+    def update(
+        self,
+        *,
+        name: str | None = None,
+        priority: Priority | None = None,
+        status: Status | None = None,
+        due: datetime | None = _UNSET,
+    ) -> bool:
+        """Change the given fields of an existing task and say whether any changed.
+
+        `None` means "not given" for name, priority, and status. For `due`, `None`
+        clears the date and leaving it out keeps it. A rule the result breaks leaves
+        the task exactly as it was. A caller that gets `False` has nothing to save.
+        """
+        # One reading for everything, so `updated` and a new date completed agree.
+        now = _now()
+        before = self._snapshot()
+        try:
+            if name is not None:
+                self.name = name
+            if priority is not None:
+                self.priority = priority
+            if status is not None:
+                self.status = status
+            if due is not _UNSET:
+                self.due = due
+            self._normalize()
+            self._settle_date_completed(before["status"], now)
+            # Compared with the snapshot, so a value given equal to the current one
+            # leaves `updated` alone. Never earlier than the stored value: naive local
+            # time (D6) can move back between two commands, and `updated` must stay
+            # on or after `created`.
+            changed = self._snapshot() != before
+            if changed:
+                self.updated = max(now, before["updated"])
+            self._validate()
+        except Exception:
+            # The snapshot is taken first, so a rejected update can be undone field by
+            # field, `updated` included.
+            for field_name, value in before.items():
+                setattr(self, field_name, value)
+            raise
+        return changed
+
+    def _snapshot(self) -> dict[str, Any]:
+        return {field.name: getattr(self, field.name) for field in fields(self)}
+
+    def _settle_date_completed(self, was: Status, now: datetime) -> None:
+        # Q4: a task holds a date completed only while it is DONE. Reaching DONE
+        # stamps it now; DONE to DONE keeps the date it already has. Never before
+        # `stop`, so the timeline holds when the clock is behind it (a time zone
+        # change). Unlike a new task, which is held to the clock, a stored `stop`
+        # may be later than it.
+        if self.status is not Status.DONE:
+            self.date_completed = None
+        elif was is not Status.DONE:
+            self.date_completed = max(now, self.stop)
+
     def _normalize(self) -> None:
         # ValueError, not TypeError: the loader catches one type for any bad field.
         # bool is an int in Python, and JSON `true` must not pass for an ID.

@@ -81,7 +81,7 @@ Whole seconds because `created` carries microseconds while a typed date does not
 
 - Q1. **Decided:** users type and see the enum names (`TO_DO`, `IN_PROGRESS`, `DONE`; `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`). `Priority.MED` is renamed `MEDIUM` so the word matches `README.md`. Do it before any task file exists: the stored value is the enum value.
 - Q2. **Decided:** `due` is optional and defaults to `None`. Tasks without a due date sort after tasks with one, then by priority. (Defaulting to now made every new task overdue and ranked undated tasks ahead of future deadlines.)
-- Q3. **Decided:** `start` and `stop` are plain datetime fields that default to the current time, with no tracking logic. Decided in M3 (2026-11-01): `add` does not set them and `list` does not show them. Still open for M5: can `update` set them?
+- Q3. **Decided:** `start` and `stop` are plain datetime fields that default to the current time, with no tracking logic. Decided in M3 (2026-11-01): `add` does not set them and `list` does not show them. Decided in M5 (2026-11-07): `update` does not set them either.
 - Q4. **Decided:** yes. Moving a task out of `DONE` sets date completed to `None`, so `status != DONE` always means date completed is `None`. **Amended 2026-10-31 (project owner):** the converse holds too. A `DONE` task always has a date completed, defaulting to the moment it was marked done, and a date passed in cannot be in the future.
 - Q5. **Decided:** yes. `delete` shows the task's name and asks before deleting (see D5). A `--yes` flag for scripts is deferred.
 - Q6. **Decided:** a date and time. `due`, `created`, `updated`, and `date completed` are all datetimes; a bare date such as `2026-11-02` parses to midnight.
@@ -280,14 +280,29 @@ Branch `feature/list-all`. Covers feature 4.
 
 Branch `feature/update-task`. Covers feature 6.
 
-- [ ] Given task 1 "Buy milk" (`LOW`, created and updated 2026-10-01 09:00), when `update 1 --name "Buy oat milk" --priority HIGH`, then the name and priority change, updated is later than 2026-10-01 09:00, created is unchanged, and the other tasks are untouched.
-- [ ] Given task 1 is `TO_DO`, when `update 1 --status DONE`, then date completed is set to the current time.
-- [ ] Given task 1 is `DONE`, when `update 1 --status TO_DO`, then date completed is `None` (Q4).
-- [ ] Given no task 99, when `update 99 --name x`, then the exit code is 1, stderr names 99, and the file is unchanged.
-- [ ] Given `update 1` with no fields, then the behavior you choose (error or no-op) is pinned.
-- [ ] Given `update 1 -n "Buy oat milk" -p HIGH`, then the result equals `update 1 --name "Buy oat milk" --priority HIGH`.
+- [x] Given task 1 "Buy milk" (`LOW`, created and updated 2026-10-01 09:00), when `update 1 --name "Buy oat milk" --priority HIGH`, then the name and priority change, updated is later than 2026-10-01 09:00, created is unchanged, and the other tasks are untouched.
+- [x] Given task 1 is `TO_DO`, when `update 1 --status DONE`, then date completed is set to the current time.
+- [x] Given task 1 is `DONE`, when `update 1 --status TO_DO`, then date completed is `None` (Q4).
+- [x] Given no task 99, when `update 99 --name x`, then the exit code is 1, stderr names 99, and the file is unchanged.
+- [x] Given `update 1` with no fields, then the behavior you choose (error or no-op) is pinned.
+- [x] Given `update 1 -n "Buy oat milk" -p HIGH`, then the result equals `update 1 --name "Buy oat milk" --priority HIGH`.
 
 **Think about:** who sets updated, the command or the task? What stops `update` from changing the ID or the created date? `due` is nullable (Q2): how does a user clear a due date? Can `update` set `start` and `stop` (Q3)? Pin whichever you choose.
+
+**Decided (2026-11-07):**
+
+- The task sets `updated`, in a `Task.update(...)` method that also sets or clears date completed (Q4) and runs the same checks as the constructor. The command only parses options and saves. Rejected: the command assigning fields itself, which would need the model's clock and checks or a copy of them.
+- `Task.update` has no parameter for `id`, `created`, `updated`, `description`, `start`, or `stop`, so a caller cannot change them. `update` has no option for them either.
+- `--clear-due` (`-C`) sets `due` to `None`, and argparse refuses it together with `--due`. Rejected: `--due none`, a reserved word that the date reader would have to special-case.
+- `update 1` with no option is an error that names the options: exit 1, file unchanged. Rejected: a silent no-op, which hides a typo that drops every flag.
+- `update` cannot set `start` and `stop` (Q3 is closed).
+- Taken as defaults, not separately confirmed: a value equal to the current one changes nothing, `updated` included; `DONE` to `DONE` keeps the date completed; and `-C` as the short form.
+
+**Amended 2026-11-07 (review of PR #29):**
+
+- The clock never makes an update fail. `updated` is the later of the clock and the stored `updated`, and a date completed given by reaching `DONE` is the later of the clock and `stop`. Naive local time (D6) can move back between two commands, after a time zone change for one, and the first version refused every update on such a task.
+- An update that changes nothing does not write the file. It prints `No change to task N: NAME` and exits 0. Rejected: rewriting the file and printing `Updated`, which made "changes nothing" untrue.
+- The `ID` is ASCII digits and at least 1. Anything else, `0` and `-1` included, is a bad value (exit 2), not a task that cannot be found (exit 1).
 
 ### M6. Delete
 

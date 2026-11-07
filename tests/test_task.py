@@ -5,6 +5,7 @@
 
 import time
 from collections.abc import Iterator
+from dataclasses import asdict
 from datetime import UTC, date, datetime, timedelta
 from itertools import count
 from typing import Any
@@ -560,3 +561,219 @@ def test_an_id_below_one_is_rejected(bad_id: int):
 def test_restore_rejects_an_id_below_one(bad_id: int):
     with pytest.raises(ValueError, match="id must be 1 or more"):
         Task.restore(stored(id=bad_id))
+
+
+# --- Task.update: changing a stored task (M5) ---
+
+ORIGINAL = datetime(2026, 10, 1, 9, 0, 0)  # noqa: DTZ001
+DONE_ON = datetime(2026, 10, 15, 17, 30, 0)  # noqa: DTZ001
+DUE_BEFORE = datetime(2026, 11, 30, 0, 0, 0)  # noqa: DTZ001
+DUE_DAY = datetime(2026, 12, 1, 0, 0, 0)  # noqa: DTZ001
+LATER_THAN_CLOCK = FIRST_READING + timedelta(hours=1)
+DONE_FIELDS = {"status": Status.DONE, "date_completed": DONE_ON, "stop": DONE_ON}
+
+
+def original_task(**overrides: Any) -> Task:
+    """Task 1 as stored on 2026-10-01 at 09:00, with the given fields changed.
+
+    Built with restore, not the constructor, because the constructor stamps
+    `created` with the clock.
+    """
+    return Task.restore(
+        stored(created=ORIGINAL, updated=ORIGINAL, start=ORIGINAL, stop=ORIGINAL)
+        | overrides
+    )
+
+
+def done_original_task() -> Task:
+    """A stored DONE task whose timeline holds: created <= start <= stop <= done."""
+    return original_task(**DONE_FIELDS)
+
+
+@pytest.mark.usefixtures("readings")
+def test_update_changes_the_given_fields_and_stamps_updated_only():
+    task = original_task()
+    before = asdict(task)
+
+    task.update(name="Read book", priority=Priority.HIGH)
+
+    assert asdict(task) == before | {
+        "name": "Read book",
+        "priority": Priority.HIGH,
+        "updated": FIRST_READING,
+    }
+
+
+@pytest.mark.usefixtures("readings")
+@pytest.mark.parametrize("status", [Status.TO_DO, Status.IN_PROGRESS])
+def test_marking_a_task_done_sets_date_completed_to_the_clock_reading(status: Status):
+    task = original_task(status=status)
+
+    task.update(status=Status.DONE)
+
+    assert task.date_completed == FIRST_READING
+
+
+@pytest.mark.usefixtures("readings")
+@pytest.mark.parametrize("status", [Status.TO_DO, Status.IN_PROGRESS])
+def test_reopening_a_done_task_clears_date_completed(status: Status):
+    task = done_original_task()
+
+    task.update(status=status)
+
+    assert task.status is status
+    assert task.date_completed is None
+
+
+@pytest.mark.usefixtures("readings")
+def test_done_to_done_keeps_the_original_date_completed_and_updated():
+    task = done_original_task()
+    before = asdict(task)
+
+    task.update(status=Status.DONE)
+
+    assert asdict(task) == before
+
+
+@pytest.mark.usefixtures("readings")
+def test_giving_the_current_values_changes_nothing_including_updated():
+    task = original_task(due=DUE_BEFORE)
+    before = asdict(task)
+
+    changed = task.update(
+        name="Buy milk",
+        priority=Priority.LOW,
+        status=Status.TO_DO,
+        due=DUE_BEFORE,
+    )
+
+    assert asdict(task) == before
+    assert changed is False
+
+
+@pytest.mark.usefixtures("readings")
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        ({"name": "Read book"}, True),
+        ({"status": Status.DONE}, True),
+        ({"due": None}, True),
+        ({"name": "  Buy milk  "}, False),
+        ({}, False),
+    ],
+    ids=["new-name", "new-status", "new-due", "name-before-stripping", "nothing-given"],
+)
+def test_update_says_whether_it_changed_anything(given: dict[str, Any], expected: bool):
+    task = original_task(due=DUE_BEFORE)
+
+    assert task.update(**given) is expected
+
+
+@pytest.mark.usefixtures("readings")
+def test_a_date_given_as_text_becomes_midnight_of_that_day():
+    task = original_task()
+
+    # Not a path the command line takes: it passes the `datetime` that `_due` has
+    # already parsed. This pins that `update` applies the constructor's date rule,
+    # so ISO text works here as it does for `Task(...)`, whatever the annotation says.
+    task.update(due="2026-12-01")  # type: ignore[arg-type]
+
+    assert task.due == DUE_DAY
+
+
+@pytest.mark.usefixtures("readings")
+def test_due_none_clears_the_due_date():
+    task = original_task(due=DUE_BEFORE)
+
+    task.update(due=None)
+
+    assert task.due is None
+
+
+@pytest.mark.usefixtures("readings")
+def test_a_due_date_not_given_keeps_the_current_one():
+    task = original_task(due=DUE_BEFORE)
+
+    task.update(name="Read book")
+
+    assert task.due == DUE_BEFORE
+
+
+@pytest.mark.usefixtures("readings")
+def test_updated_and_date_completed_share_one_clock_reading(
+    readings: Iterator[datetime],
+):
+    task = original_task(status=Status.TO_DO)
+
+    task.update(status=Status.DONE)
+
+    assert task.updated == task.date_completed == FIRST_READING
+    # The next reading is still unused, so update took exactly one.
+    assert next(readings) == FIRST_READING + timedelta(seconds=1)
+
+
+@pytest.mark.usefixtures("readings")
+def test_a_blank_name_is_rejected_and_leaves_every_field_unchanged():
+    task = original_task()
+    before = asdict(task)
+
+    with pytest.raises(ValueError, match="name must not be blank"):
+        task.update(name="   ", priority=Priority.HIGH)
+
+    assert asdict(task) == before
+
+
+# A time zone change or a daylight saving fall-back can leave the clock behind
+# the stamps a task already holds (D6: naive local time). `update` must still work.
+
+
+@pytest.mark.usefixtures("readings")
+def test_updated_is_kept_when_the_clock_is_behind_every_stored_stamp():
+    task = original_task(
+        created=LATER_THAN_CLOCK,
+        updated=LATER_THAN_CLOCK,
+        start=LATER_THAN_CLOCK,
+        stop=LATER_THAN_CLOCK,
+    )
+
+    task.update(name="Landed")
+
+    assert (task.name, task.updated) == ("Landed", LATER_THAN_CLOCK)
+
+
+@pytest.mark.usefixtures("readings")
+def test_updated_never_moves_back_when_the_clock_is_between_created_and_it():
+    task = original_task(updated=LATER_THAN_CLOCK)
+
+    task.update(priority=Priority.HIGH)
+
+    assert task.updated == LATER_THAN_CLOCK
+
+
+@pytest.mark.usefixtures("readings")
+def test_a_task_marked_done_while_the_clock_is_behind_its_stop_completes_at_the_stop():
+    task = original_task(stop=LATER_THAN_CLOCK)
+
+    task.update(status=Status.DONE)
+
+    assert (task.status, task.date_completed) == (Status.DONE, LATER_THAN_CLOCK)
+
+
+@pytest.mark.parametrize(
+    "field_name", ["id", "created", "updated", "description", "start", "stop"]
+)
+def test_update_has_no_parameter_for_a_field_the_model_owns(field_name: str):
+    # The model stamps or keeps these, so a caller cannot change them through update.
+    task = original_task()
+
+    with pytest.raises(TypeError, match=f"'{field_name}'"):
+        task.update(**{field_name: NAIVE_DAY})  # type: ignore[arg-type]
+
+
+@pytest.mark.usefixtures("readings")
+def test_the_name_is_stored_without_surrounding_whitespace():
+    task = original_task()
+
+    task.update(name="  Read book  ")
+
+    assert task.name == "Read book"

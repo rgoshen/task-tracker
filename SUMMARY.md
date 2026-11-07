@@ -1,5 +1,306 @@
 # Summary
 
+## [2026-11-07 15:15] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `TODO.md`)
+
+**Summary:**
+Record the three behavior decisions from the PR #29 review in the plan's M5 section (an update never fails because of the clock, a no-change update writes nothing, the ID is plain digits of 1 or more), and bring the M5 steps in `TODO.md` in line with them.
+
+**Rationale:**
+The plan, `TODO.md`, `README.md`, and the issue are meant to agree, and the first version of the M5 notes said the opposite of the code in two places: `updated` came straight from the clock, and a no-change update still printed `Updated`. The PR description is corrected in the same round.
+The reasons and the rejected alternatives are in the `TODO.md` entry 'Fix: PR #29 review'.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #29 review, step 9
+- Issue: #9 (PR #29)
+
+## [2026-11-07 15:14] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+`update` joins the cases that check a corrupt list file (three kinds of bad content) and a directory in place of the list: exit code 1, one error line that names `tasks.json`, and the path left as it was.
+
+**Rationale:**
+Review comment 8 on PR #29. `README.md` lists a corrupt or unreadable task file under exit code 1 for `update`, and nothing pinned it for `update` through `main`.
+The code already behaved this way, so these tests passed at once, and the check that they bite is a pair of deliberate breaks: `update` treating a corrupt file as an empty list fails three of them, and treating an unreadable file as an empty list fails the directory case.
+The other half of the comment, the timeline refusal through `main`, is moot after the fix for comment 1: `update` can no longer produce a timeline error, so there is nothing to pin. The blank name and the rest of the model's refusals keep their tests.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 8|Issue: #9 (PR #29, review comment 8)
+
+**References:**
+
+- Tests added after the behavior, because the behavior was already there and untested. A test that cannot fail proves nothing, so each was shown to fail against a version of `update` that ignores the error.
+
+## [2026-11-07 15:13] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** tests (`tests/test_task.py`)
+
+**Summary:**
+The comment in the test that gives `Task.update` a date as text now says what the test pins. It used to say the model parses text 'as the CLI passes it'.
+
+**Rationale:**
+Review comment 5 on PR #29, the part that is agreed. The command line passes the `datetime` that `_due` has already parsed, so the old comment was wrong, and the test with its `type: ignore` looked like it covered a path no caller uses. What it does cover is that `update` applies the constructor's date rule, so text works as it does for `Task(...)`. The test stays and only the comment changes.
+Not done, with the reasons in the reply on the thread: the strings from argparse are not converted to `Priority` and `Status` in `_changes`, and its result is not a `TypedDict`. `add` passes the checked strings the same way, `Task` owns the conversion and a test pins it, and `args` attributes are `Any`, so the `TypedDict` would check the keys and little else.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 7|Issue: #9 (PR #29, review comment 5)
+
+**References:**
+
+- A comment change, so no test was written first.
+
+## [2026-11-07 15:12] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** cli (`src/task_tracker/cli.py`)
+
+**Summary:**
+`add` and `update` now share one list of priority choices (`_PRIORITIES`) and one `--due` definition (`_DUE_OPTION`: the converter, the metavar, and the help text). No behavior change.
+
+**Rationale:**
+Review comment 7 on PR #29, the part that is agreed. `update` copied `--priority` and `--due` from `add` word for word, so a change to the accepted format needed two edits. The help output of both commands is the same before and after, and the 329 tests pass unchanged. Two deliberate breaks (the converter dropped from the shared `--due`, `LOW` dropped from the shared choices) each fail tests.
+Not done, with the reasons in the reply on the thread: the text of the 'nothing to update' message is not built from the parser, the test keeps its own copy of it, and `_settle_date_completed` is not merged with `_fill_in_defaults`, because after the comment 1 fix they apply different rules.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 6|Issue: #9 (PR #29, review comment 7)
+
+**References:**
+
+- A refactor with the tests as the safety net, so no new test was written first. The shared pieces are a list and a mapping, not a helper function, because a function that takes a parser or a mutually exclusive group would need argparse's private group type in its signature.
+
+## [2026-11-07 15:11] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+Every argument of `update` now has help text: the `ID`, `--name`, `--priority`, `--status`, and `--clear-due` (`--due` already had it). A test reads the `update --help` output for each argument.
+
+**Rationale:**
+Review comment 6 on PR #29. `task-tracker update -h` listed `--clear-due, -C` with no description, so the one option whose meaning is not obvious was explained only in `README.md`. The omission looked accidental, since `--due` had help text.
+Five of the six cases failed first, and all pass now. Two deliberate breaks (the `--clear-due` text removed, the text of `--status` given to `--priority`) each fail a test. The test reads an argument's row with the lines indented under it, because argparse moves the text of a long option such as `--priority {CRITICAL,...}` to the next line.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 5|Issue: #9 (PR #29, review comment 6)
+
+**References:**
+
+- The help for `--priority` and `--name` is short on purpose (`new priority`, `new name`): the choices are already printed in the usage line. `add` has the same gap for its own options and is not changed here, because the comment is about `update`.
+
+## [2026-11-07 15:09] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`, `README.md`)
+
+**Summary:**
+The `ID` of `update` is read by a new `_task_id` converter: ASCII digits and 1 or more. `+1`, `0_1`, an ID with spaces around it, non-ASCII digits, `0`, and `-1` now exit 2 with `expected a whole number of 1 or more`, and the tests cover each.
+
+**Rationale:**
+Review comment 3 on PR #29. `type=int` accepted forms that `README.md` does not call whole numbers (`+1`, `0_1`, a padded ID, the Arabic-Indic digit one), so `update 0_1 -n x` changed task 1. `0` and `-1` reached the lookup and exited 1, although an ID below 1 can never exist (`Task` refuses it) and is a bad value like `1.5`.
+The reviewer's suggestion is used: a small `type=` function that raises `ArgumentTypeError`, the same pattern as `_due`, so the rule has one home. `delete` in M6 can reuse it.
+Six new cases failed first because the command accepted them, and the two old cases failed on the changed message. Three deliberate breaks (back to `int`, no ASCII check, no lower bound) each fail a test.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 4|Issue: #9 (PR #29, review comment 3)
+
+**References:**
+
+- The ASCII check is what rejects `0_1`, a padded ID, a sign, and non-ASCII digits (`isdecimal` alone accepts the last). The lower bound is what rejects `0`. `-1` fails `isdecimal` on its own.
+
+## [2026-11-07 15:08] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task, cli (`src/task_tracker/task.py`, `src/task_tracker/cli.py`, `tests/`)
+
+**Summary:**
+`Task.update` now returns whether it changed anything. When it did not, `update` leaves the file alone and prints `No change to task N: NAME` (exit code 0) in place of `Updated task N: NAME`. `README.md` says so.
+
+**Rationale:**
+Review comment 2 on PR #29. `README.md` promised that giving a task the values it already has "changes nothing", but the command saved anyway: a hand-formatted list was rewritten in the standard layout and the line still said `Updated`. A no-change update also opened the lost-write window of #27 for no reason.
+The old test could not see this, because it started from a file `save` had written and a rewrite gives the same bytes. It now starts from a file with a four-space indent. It failed first on the output line, and the model tests on `None` where a bool was expected. Three deliberate breaks (always report a change, always save, save only when nothing changed) each fail tests.
+Rejected: only changing the sentence in `README.md`, which would keep the rewrite and the misleading line.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 3|Issue: #9 (PR #29, review comment 2)
+
+**References:**
+
+- The model already compared a snapshot before and after to decide whether to move `updated`, but kept the answer to itself. Returning it lets the caller skip the write.
+
+## [2026-11-07 15:06] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`, `tests/test_cli.py`)
+
+**Summary:**
+`Task.update` no longer fails when the clock is behind the task's stored times. `updated` becomes the later of the clock and the stored `updated`, and a date completed set by reaching DONE becomes the later of the clock and `stop`. The model test that expected a refusal is replaced by three that expect the update to work, and one command-level test covers rename and DONE.
+`README.md` and the `TODO.md` risk notes are corrected.
+
+**Rationale:**
+Review comment 1 on PR #29. Naive local time (D6) can move back between two commands, so a task created under one time zone could not be updated under another: every update failed with `updated must not be before created` until the clock caught up. The reviewer's fix is used as it was suggested.
+Five tests failed first with the reviewer's messages and with `updated` moving backwards. Three deliberate breaks (`updated` back to the clock, date completed back to the clock, the floor of `updated` taken from `created`) each fail at least one test.
+Rejected: keeping the strict rule and only naming the cause in the message, because no option can repair the task and the user must wait for the clock.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 2|Issue: #9 (PR #29, review comment 1)
+
+**References:**
+
+- Step 1 stamped `updated` and the new date completed straight from the clock, then checked the timeline. When the clock was behind `created` or `stop`, the check refused the whole update. Taking the later of the two values keeps the timeline true by construction, so the check can no longer fail for this reason.
+
+## [2026-11-07 15:05] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+The test that moves a DONE task back to TO_DO or IN_PROGRESS now runs with the fixed clock and checks that `updated` is the clock reading.
+
+**Rationale:**
+Review comment 4 on PR #29: the test read the real clock through `Task.update`, so it passed only because the wall clock is later than the stored dates, and it did not check `updated` at all. Every other state-changing `update` test already uses `fixed_clock`.
+It failed first on the new assertion, with the real time where the fixed clock reading should be, and passes with the fixture.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 1|Issue: #9 (PR #29, review comment 4)
+
+**References:**
+
+- Without the fixture the test depended on the date it was run, which the project's rule for deterministic tests forbids. It never failed, which is why it went unnoticed.
+
+## [2026-11-07 15:04] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`)
+
+**Summary:**
+Plan the review fixes for PR #29 (M5, `update`): a new `TODO.md` entry, "Fix: PR #29 review", with the order of the commits, the tests, and the trade-offs. No code changes.
+
+**Rationale:**
+The eight inline comments were each checked before any change: six were reproduced with the command in a scratch directory (a time zone change that blocks every update, a no-op update that rewrites the file, an ID such as `0_1` that is accepted) and two were confirmed from the source and the tests.
+Six are to be fixed. Two are fixed in part and answered with a reason, so their threads stay open for the reviewer.
+The plan also corrects a claim from step 1, that no command can make a task with a future `created`, `start`, or `stop`: `add` followed by a time zone change does.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #29 review
+- Issue: #9 (PR #29, review comments 1 to 8)
+
+## [2026-11-07 14:44] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `CLAUDE.md`, `docs/implementation-plan.md`, `TODO.md`)
+
+**Summary:**
+Document the `update` command now that it exists. `README.md` gets the `update` example and bullet, exit codes 1 and 2 for the new cases, and a lost-write note that covers `update`. The "stores the task before it prints" bullet now names `update` too. `CLAUDE.md` says features 3 to 6 exist. The six M5 boxes in the plan are ticked, and `TODO.md` records the one edge case found in step 1.
+
+**Rationale:**
+The `README.md` and `CLAUDE.md` text was drafted while the code was written, and held back until the command could be checked against it. Before this commit I ran `update` in a scratch directory and compared each claim:
+the output line, exit 2 for an unknown status, an ID that is not a whole number and `--due` with `--clear-due`, exit 1 with the file untouched for no task, no option and a blank name, and date completed set and cleared on the status change.
+The edge case is a task whose `start` or `stop` is later than the clock: marking it `DONE` is refused. No command can make such a task, so it is recorded as accepted and not handled.
+Issue #9 is not changed here. In M4 the boxes were ticked once CI was green, so that waits for the pull request.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M5 Update, step 4
+- Issue: #9
+
+## [2026-11-07 14:41] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`update` now refuses two commands with a one-line error and exit code 1: one that names no option, and one whose ID matches no task. Both are checked before the file is written, and in the no-option case before it is read. The file is left byte for byte unchanged, and a missing file is not created.
+The module-level pylint suppression for `too-many-lines` is now needed, with the reason beside it.
+
+**Rationale:**
+A command that gives no change would otherwise exit 0 and print a success line, which hides a forgotten or mistyped flag, as decided for M5. An unknown ID is refused rather than skipped, so the user sees that nothing changed.
+The checks use `ValueError`, which `main` already turns into one error line and exit code 1, so the error path is not duplicated.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M5 Update, step 3
+- Issue: #9
+
+## [2026-11-07 14:39] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`update ID` changes a stored task's name, priority, status, or due date. It passes only the options that were given to `Task.update`, and `--due` and `--clear-due` are mutually exclusive. Every other task is saved unchanged.
+The test helper `_done` now builds on a new `_stored` helper, so the record is written in one place.
+Refusing an update with no change and refusing an unknown ID come in the next step.
+
+**Rationale:**
+The command only parses options and saves, and the rule stays in `Task.update`, as decided for M5. Options default to `None`, so a missing option is told apart from one given with its default value. `due` is left out of the keyword arguments unless a flag is given, because `None` means "clear the date" to `Task.update`.
+The short forms are checked against the long forms byte for byte, so a mistake in a short form cannot pass unnoticed.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M5 Update, step 2
+- Issue: #9
+
+## [2026-11-07 14:33] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** task (`src/task_tracker/task.py`, `tests/test_task.py`)
+
+**Summary:**
+`Task.update` changes an existing task's name, priority, status, and due date. Its arguments are keyword-only. `None` means "not given" for name, priority, and status, while `due` uses the existing `_UNSET` marker so that `None` can clear the date.
+The method reads the clock once, moves `updated` only when a field changes, and sets or clears date completed with the status (Q4). When the result breaks a rule, every field is restored from a snapshot before the error is raised.
+Passing `id`, `created`, `updated`, `description`, `start`, or `stop` raises `TypeError`, because the method has no such parameter.
+
+**Rationale:**
+The update rule sits beside `_now` and `_validate`, so the command added in a later step stays thin and the model can be tested without argparse. The rejected alternative, the command assigning fields itself, would need the clock and the validation copied or moved out of the model. `TODO.md` records it.
+A snapshot with restore is used instead of checking the change first, because the timeline rules already check a whole task. Running them on the changed task and undoing on failure reuses every rule without a second copy.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M5 Update, step 1
+- Issue: #9
+
+## [2026-11-07 14:26] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`, `docs/implementation-plan.md`, `README.md`)
+
+**Summary:**
+Plan M5, the `update` command. `TODO.md` gets the M5 entry with its steps, tests, and trade-offs. The plan's M5 section gets a "Decided (2026-11-07)" block, and Q3 is closed: `update` does not set `start` and `stop`. The `README.md` options table gets `--clear-due` (`-C`), and its columns are re-aligned for the wider cell.
+
+**Rationale:**
+The M5 "Think about" paragraph asked four questions, and the project owner answered each in turn: the task owns the update rule (`Task.update`), a due date is cleared with `--clear-due`, `update` with no option is an error, and `start` and `stop` stay out of reach. Recording them before any code means the red tests have nothing left to decide.
+Four smaller points were taken as defaults and are marked as such in both files: the `-C` short form, no change to `updated` when a value is the same, `DONE` to `DONE` keeping its date completed, and `description` not being settable.
+Rejected alternatives are written next to each decision in `TODO.md` and the plan.
+Issue #9 is not changed in this commit. Its text is copied from the plan, so it needs the same "Decided" block and is the next step once the project owner agrees.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M5 Update
+- Issue: #9
+
 ## [2026-11-07 13:53] Commit Summary
 
 **Change Type:** Fix

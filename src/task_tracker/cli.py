@@ -6,7 +6,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import TextIO
+from typing import Any, TextIO
 
 from task_tracker.priority import Priority
 from task_tracker.status import Status
@@ -25,6 +25,51 @@ def _add(args: argparse.Namespace, path: Path) -> list[str]:
     task = Task(next_id, args.name, priority=args.priority, due=args.due)
     save([*tasks, task], path)
     return [f"Added task {task.id}: {task.name}"]
+
+
+def _changes(args: argparse.Namespace) -> dict[str, Any]:
+    """The keyword arguments for `Task.update`: only the options that were given."""
+    given = {"name": args.name, "priority": args.priority, "status": args.status}
+    changes = {name: value for name, value in given.items() if value is not None}
+    # `due` is left out entirely when neither flag is given: in `Task.update` that
+    # means "keep it", while `due=None` means "clear it".
+    if args.due is not None:
+        changes["due"] = args.due
+    elif args.clear_due:
+        changes["due"] = None
+    return changes
+
+
+_NOTHING_TO_UPDATE = (
+    "nothing to update: give at least one of --name, --priority, --status, --due, "
+    "--clear-due"
+)
+
+
+def _find(tasks: list[Task], task_id: int) -> Task:
+    """Return the task with `task_id`, or refuse the command if there is none."""
+    for task in tasks:
+        if task.id == task_id:
+            return task
+    raise ValueError(f"no task with ID {task_id}")
+
+
+def _update(args: argparse.Namespace, path: Path) -> list[str]:
+    """Change task `args.id` and return the line to show."""
+    changes = _changes(args)
+    # Refused before the file is read, so a command that changes nothing (a
+    # forgotten or mistyped flag) cannot rewrite the file.
+    if not changes:
+        raise ValueError(_NOTHING_TO_UPDATE)
+    tasks = load(path)
+    task = _find(tasks, args.id)
+    if not task.update(**changes):
+        # Nothing to write: the file keeps its layout, and a concurrent command has
+        # no window to lose (#27) for a command that changed nothing.
+        return [f"No change to task {task.id}: {task.name}"]
+    # Every other task is written back as it was read.
+    save(tasks, path)
+    return [f"Updated task {task.id}: {task.name}"]
 
 
 # Highest priority first. The rank is the enum's definition order, because the
@@ -198,6 +243,31 @@ def _due(text: str) -> datetime:
     return due
 
 
+def _task_id(text: str) -> int:
+    """Read a task ID: ASCII digits, 1 or more, the form the task file holds.
+
+    `int` alone also takes `+1`, `0_1`, a padded " 1 " and non-ASCII digits, and it
+    lets `0` and `-1` through to a "no task" error, although a task never has an ID
+    below 1 (`Task` refuses it). Every one of them is a bad value, as `1.5` is, so
+    argparse names the argument and exits with 2.
+    """
+    if text.isascii() and text.isdecimal() and int(text) >= 1:
+        return int(text)
+    raise argparse.ArgumentTypeError(
+        f"expected a whole number of 1 or more, not {text!r}"
+    )
+
+
+# Shared by `add` and `update`, so a change to what they accept is made once. The
+# choices are plain strings, not `Priority` members: see the note in `_build_parser`.
+_PRIORITIES = [priority.value for priority in Priority]
+_DUE_OPTION: dict[str, Any] = {
+    "type": _due,
+    "metavar": "DATETIME",
+    "help": "YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, local time",
+}
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="task-tracker")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -207,19 +277,8 @@ def _build_parser() -> argparse.ArgumentParser:
     # would fail first with a message that lists nothing. The choices are plain
     # strings because argparse prints each one with `repr`, and `Task` turns the
     # checked string into a `Priority`.
-    add.add_argument(
-        "--priority",
-        "-p",
-        choices=[priority.value for priority in Priority],
-        default=Priority.LOW,
-    )
-    add.add_argument(
-        "--due",
-        "-D",
-        type=_due,
-        metavar="DATETIME",
-        help="YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, local time",
-    )
+    add.add_argument("--priority", "-p", choices=_PRIORITIES, default=Priority.LOW)
+    add.add_argument("--due", "-D", **_DUE_OPTION)
     add.set_defaults(run=_add)
     listing = commands.add_parser(
         "list", help="list the current tasks (all tasks with --all)"
@@ -232,6 +291,34 @@ def _build_parser() -> argparse.ArgumentParser:
         help="also list the done tasks, after the current ones",
     )
     listing.set_defaults(run=_list)
+    update = commands.add_parser("update", help="change a stored task")
+    update.add_argument("id", type=_task_id, help="ID of the task to change")
+    # Defaults are `None` so that a missing option is told apart from one given
+    # with the default value. As in `add`, no `type=`: argparse would convert before
+    # it checks `choices`.
+    update.add_argument("--name", "-n", help="new name")
+    update.add_argument(
+        "--priority",
+        "-p",
+        choices=_PRIORITIES,
+        help="new priority",
+    )
+    update.add_argument(
+        "--status",
+        "-s",
+        choices=[status.value for status in Status],
+        help="new status (DONE sets the date completed, leaving DONE clears it)",
+    )
+    # Mutually exclusive: a date and "no date" in one command contradict each other.
+    due = update.add_mutually_exclusive_group()
+    due.add_argument("--due", "-D", **_DUE_OPTION)
+    due.add_argument(
+        "--clear-due",
+        "-C",
+        action="store_true",
+        help="remove the due date (cannot be used with --due)",
+    )
+    update.set_defaults(run=_update)
     return parser
 
 
