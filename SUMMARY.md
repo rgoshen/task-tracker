@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-07 13:41] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+Added a test that the done tasks of `list --all` sort on the full date completed, not on the day. Two tasks are completed on 2026-10-05, the lower ID at 17:00 and the higher at 09:00, and the 09:00 one must come first.
+
+**Rationale:**
+Review comment 5 on PR #28. Every done task in the earlier tests was completed at midnight, so a key cut to the day passed the whole suite, and the ID tie-break hid the difference. The new case gives the two keys different answers.
+The test passes against the current code, so it was checked with a deliberate break instead of a red run: with the key cut to the day, this test fails and the other 263 still pass, which confirms the gap the comment described.
+
+**Bugfix Context:**
+Not a bug in the code: the key was already the full timestamp. The gap was in the tests, which could not tell the two apart.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 4
+- Issue: #8 (PR #28, review comment 5)
+
 ## [2026-11-07 13:40] Commit Summary
 
 **Change Type:** Refactor

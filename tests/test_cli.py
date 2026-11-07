@@ -32,6 +32,8 @@ NOV_3 = datetime(2026, 11, 3)  # noqa: DTZ001
 NOV_2_TIMED = datetime(2026, 11, 2, 10, 30, 45)  # noqa: DTZ001
 OCT_1 = datetime(2026, 10, 1)  # noqa: DTZ001
 OCT_5 = datetime(2026, 10, 5)  # noqa: DTZ001
+OCT_5_MORNING = datetime(2026, 10, 5, 9, 0)  # noqa: DTZ001
+OCT_5_EVENING = datetime(2026, 10, 5, 17, 0)  # noqa: DTZ001
 OCT_10 = datetime(2026, 10, 10)  # noqa: DTZ001
 
 
@@ -222,6 +224,17 @@ def test_list_all_orders_done_tasks_with_one_date_completed_by_id(
     main(["list", "--all"])
 
     assert _listed_names(capsys) == ["first", "second"]
+
+
+def test_list_all_orders_done_tasks_completed_on_one_day_by_the_time(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    # The lower ID finished later, so the ID tie-break would give the other answer.
+    save([_done(1, "late", OCT_5_EVENING), _done(2, "early", OCT_5_MORNING)], project)
+
+    main(["list", "--all"])
+
+    assert _listed_names(capsys) == ["early", "late"]
 
 
 def test_list_all_puts_done_task_due_first_after_every_current_task(
