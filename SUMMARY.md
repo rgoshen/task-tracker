@@ -1,5 +1,339 @@
 # Summary
 
+## [2026-11-07 13:53] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+The sort key for the done tasks now raises a `ValueError` for a DONE task without a date completed, where it used an `assert`. `main` turns that into the usual one-line error on standard error and exit code 1. Before, the same task gave a traceback, and under `python -O` it sorted without any error.
+
+**Rationale:**
+Review comment 2 on PR #28 showed that the assert is removed by `python -O`, and that the comparison then fails only when a broken record is mixed with a good one. The project owner chose the exception over the assert, because it is the same in every mode and reuses the error path `main` already has.
+The new test hands the command a DONE task with no date completed, which `load` refuses to build, so the task is passed in directly. It failed first with a bare `AssertionError` from `main`, and a version of the branch that returns instead of raising fails it. I also ran the command under `python -O` with the asserts confirmed stripped: one error line and exit code 1.
+The cost is a branch that real data cannot reach, which the new test covers.
+
+**Bugfix Context:**
+Not reachable with stored data today, because `Task` and `load` refuse such a record. The change makes the sort say so by itself in every mode, if that rule is ever broken.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 8
+- Issue: #8 (PR #28, review comment 2)
+
+## [2026-11-07 13:44] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`SUMMARY.md`)
+
+**Summary:**
+Corrected two sentences in the 13:03 entry that the review of PR #28 made false. One said `README.md` needed no edit; it now says that was the first judgment and that the Commands section was updated. The other said issue #8 still had its boxes unticked; it now says the issue was edited after that commit. No code changes.
+Issue #8 itself was updated on GitHub: its five extra acceptance items and the three decisions from the plan are now in it, all ticked, so it no longer closes without them.
+
+**Rationale:**
+Review comment 6 on PR #28. The project `CLAUDE.md` says to update the plan, the matching issue, and `README.md` together, and step 4 of the M4 entry promised the issue would carry the extra items and the decisions. Only the two original boxes had been ticked, and the `Closes #8` in the pull request would have closed the issue without the rest.
+The issue text was built from the plan by script, not typed again, so the two cannot differ; a diff of the old and new body showed only the added items, the new section, and one sentence in the footer.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 7
+- Issue: #8 (PR #28, review comment 6)
+
+## [2026-11-07 13:43] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`)
+
+**Summary:**
+The Commands section of `README.md` now documents `list --all`. The example block gains `uv run task-tracker list --all`.
+A new bullet says what the flag shows (every task, the current ones first in the usual order, then the done ones by date completed and ID), that the lines are unchanged so the date completed is not shown, and the `No tasks in <path>` message.
+It also says that plain `list` keeps its own message, including when every task is done.
+
+**Rationale:**
+The review of PR #28 pointed out that this section is where a user learns the commands, and it never mentioned the flag. The feature list and the options table already named `--all`, which is why the PR description said no change was needed; that was wrong, because they are a spec and a table, not usage. The description is corrected too.
+The earlier `SUMMARY.md` entry for the plan and `CLAUDE.md` has the same wrong sentence; it is corrected in the commit for the review comment about issue #8.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 6
+- Issue: #8 (PR #28, PR-level comment)
+
+## [2026-11-07 13:42] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`, `SUMMARY.md`)
+
+**Summary:**
+Corrected what the documents said about the done-order `assert` under `python -O`. They said the comparison "fails with a `TypeError`, still loudly". It does only when a broken record is compared with a good one; one such record, or several, sort without an error. The `TODO.md` decision and the earlier `SUMMARY.md` entry now say so. No code changes.
+
+**Rationale:**
+Review comment 2 on PR #28 reported this, and it was reproduced first: under `python -O` one done task without a date completed sorted as `[1]`, two as `[1, 2]`, and only a mix with a good record raised.
+The assert stays. The guarantee is `Task._validate`, which runs on construction and in `restore`, so a broken record cannot reach the sort; the assert only tells the type checker. The decision was made with the wrong sentence among its pros and cons, so the project owner is asked to confirm it.
+Superseded: the review of PR #28 replaced the `assert` with a `ValueError` (see the 13:53 entry).
+The other part of the comment, a typed accessor on `Task`, is not done: there is one reader today, and the reasons are in the `TODO.md` entry for this review.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 5
+- Issue: #8 (PR #28, review comment 2)
+
+## [2026-11-07 13:41] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+Added a test that the done tasks of `list --all` sort on the full date completed, not on the day. Two tasks are completed on 2026-10-05, the lower ID at 17:00 and the higher at 09:00, and the 09:00 one must come first.
+
+**Rationale:**
+Review comment 5 on PR #28. Every done task in the earlier tests was completed at midnight, so a key cut to the day passed the whole suite, and the ID tie-break hid the difference. The new case gives the two keys different answers.
+The test passes against the current code, so it was checked with a deliberate break instead of a red run: with the key cut to the day, this test fails and the other 263 still pass, which confirms the gap the comment described.
+
+**Bugfix Context:**
+Not a bug in the code: the key was already the full timestamp. The gap was in the tests, which could not tell the two apart.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 4
+- Issue: #8 (PR #28, review comment 5)
+
+## [2026-11-07 13:40] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+The `_done` test helper no longer spells out the eleven stored fields. It starts from `asdict(Task(task_id, name))` and overrides the seven values a done task changes (the four stamps, `due`, `status`, and `date_completed`).
+
+**Rationale:**
+Review comment 4 on PR #28 said `_done` was a third copy of the stored record, so a new `Task` field would need a change in three test modules. This removes the copy from the new code: the field list now comes from the dataclass. As a check, a throwaway field added to `Task` leaves the eight list tests passing.
+The comment suggested moving `stored()` from `test_task.py` into a shared module. Not done: that call cannot build these records, because `stored()` has `created` on 2026-10-10 at 09:00, after the dates completed here, and `restore` refuses an earlier date completed. Making it work overrides nine of eleven fields, and moving it edits M1 tests outside this diff.
+The copies in `test_task.py` and `test_storage.py` remain.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 3
+- Issue: #8 (PR #28, review comment 4)
+
+## [2026-11-07 13:39] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** cli (`src/task_tracker/cli.py`)
+
+**Summary:**
+`_list` builds the empty-list message once, from a word that is `tasks` under `--all` and `current tasks` otherwise. Before, it tested the flag a second time and returned from two near-identical branches. The text printed is the same in every case.
+
+**Rationale:**
+Review comment 3 on PR #28. One `if` fewer, and the wording choice now sits next to the comment that explains it. No test was added because no behavior changed: the five tests that pin the two messages are the safety net, and swapping the two words makes all five fail.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 2
+- Issue: #8 (PR #28, review comment 3)
+
+## [2026-11-07 13:38] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+The help for `list` in `task-tracker --help` now reads `list the current tasks (all tasks with --all)`. It used to say only `list the current tasks`, which told a reader the command could never show finished work.
+
+**Rationale:**
+Review comment 1 on PR #28. The new test reads the top-level help and checks that the `list` line names `--all`; it failed on the old text before the change. It sets a wide terminal, so argparse does not wrap the line being checked.
+
+**Bugfix Context:**
+The M4 change added the flag and its own help but left the one-line description that the top-level help prints. That line is the first thing a user reads, so it was out of date as soon as the flag existed.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 1
+- Issue: #8 (PR #28, review comment 1)
+
+## [2026-11-07 13:37] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`)
+
+**Summary:**
+Added the plan for answering the review of PR #28 to `TODO.md`: seven steps, one per comment, the tests each needs, and what is declined and why. No code changes.
+
+**Rationale:**
+The project rules ask for the plan before any fix. Each claim in the review was checked first, and one of them showed that a sentence I wrote earlier was wrong: under `python -O` the done-order assert does not always fail loudly. The plan records that, keeps the assert, and asks the project owner to confirm the choice with the corrected facts.
+Superseded: the review of PR #28 replaced the `assert` with a `ValueError` (see the 13:53 entry).
+Two comments are answered in part with a reason (an accessor on `Task`, and a shared module for the stored record), so their threads stay open for the reviewer.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review
+- Issue: #8 (PR #28)
+
+## [2026-11-07 13:22] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`SUMMARY.md`)
+
+**Summary:**
+Reworded one sentence in the rationale of the previous `SUMMARY.md` entry. It said who wrote the M4 code; it now says only that the sentence removed from `TODO.md` named who would write the code, which is not how M4 was worked. No code changes.
+
+**Rationale:**
+The project rules ask for no statements about how the code was generated in the documentation. The previous entry was already pushed, so the wording is corrected in a new commit instead of rewriting history.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all
+- Issue: #8
+
+## [2026-11-07 13:21] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`)
+
+**Summary:**
+Removed the sentence "You write the tests and the code" from the objective of the M4 entry in `TODO.md`. The entry now says only that it fixes the order and the traps. No code changes.
+
+**Rationale:**
+The sentence named who would write the code, which is not how M4 was worked, so it was no longer true. The same sentence in the M2 entry is left as it is: it records how that milestone was worked.
+Before this commit the unpushed history was also tidied: the one-word wording fix to the first M4 `SUMMARY.md` entry was folded into the commit it belonged to, so the branch has three code commits as the plan describes. The final tree was identical before and after.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all
+- Issue: #8
+
+## [2026-11-07 13:03] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`docs/implementation-plan.md`, `CLAUDE.md`, `SUMMARY.md`)
+
+**Summary:**
+Closed out M4 in the docs. The M4 section of the plan gains five Given/When/Then items (done tasks with one date completed, a done task due first, only done tasks, the empty-list wording, a corrupt file), a record of the three decisions, and all seven boxes ticked.
+The project `CLAUDE.md` now says that features 3, 4, and 5 exist and that M1 to M4 are built. One earlier `SUMMARY.md` entry said the options table lives in `TODO.md`; it is in `README.md`, and the entry is corrected.
+
+**Rationale:**
+The project `CLAUDE.md` says to update the plan, the matching issue, and `README.md` together when a milestone changes. `README.md` was first judged to need no edit, because feature 4 and the options table already name the flag. The review of PR #28 showed that the Commands section did need it, and it was added there.
+Each box was ticked only after a passing test covered it. The full suite (262 tests), coverage (97%, with the output-failure branches counted in child processes as before), and the linters CI runs on Python and Markdown were run on this commit's parent, and `list --all` was run by hand in a scratch directory.
+Issue #8 was edited on GitHub after this commit: its two boxes were ticked, and the review of PR #28 added the five extra items and the three decisions.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all, step 4
+- Issue: #8
+
+## [2026-11-07 12:59] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`list --all` over a missing or empty file now says `No tasks in <path>`, and exits 0. Plain `list` still says `No current tasks in <path>`, including when the file holds only done tasks.
+The corrupt-file test also runs `list --all`, and it already passed, because the load error comes before any wording is chosen.
+
+**Rationale:**
+`No current tasks` is wrong under `--all`, where done tasks count too. A hint at `--all` in the plain message was rejected, because the spec never asked for it.
+The wording is chosen after the lines are built, so the message check stays in one place.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all
+- Issue: #8
+
+## [2026-11-07 12:58] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+Added `-a` as the short form of `list --all`. The parametrized test runs both forms and checks that each gives the same order.
+
+**Rationale:**
+The short form follows the options table in `README.md` and shares the `dest` of the long form, so the two cannot drift apart.
+The test is parametrized on the flag rather than repeated, so a new alias needs one entry in the list.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all
+- Issue: #8
+
+## [2026-11-07 12:57] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+Added `list --all`, whose flag is stored as `include_done`. It lists the current tasks in the M3 order, then the done tasks by date completed, then ID. Plain `list` is unchanged.
+The existing plain-list ordering test now builds its file with the same shared helper as the new tests, which keeps the copypaste check (threshold 0) at zero clones.
+
+**Rationale:**
+The done half sorts by `(date_completed, id)`, not by the M3 key, as `TODO.md` decides. Most done tasks have no due date, and the ID settles ties the same way it does in M3.
+The `assert` tells pyright that a DONE task has a date completed. It adds no branch to cover.
+Superseded: the review of PR #28 replaced the `assert` with a `ValueError` (see the 13:53 entry).
+The done tests build their tasks with `Task.restore`, because the constructor cannot store a past completion date.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all
+- Issue: #8
+
+## [2026-11-07 12:52] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`)
+
+**Summary:**
+Recorded the four M4 decisions in the `TODO.md` entry, changing "proposed" to "decided" and adding what was rejected.
+The done tasks sort by date completed, then ID. The sort key states the "a done task has a date completed" invariant with an `assert` for the type checker.
+Superseded: the review of PR #28 replaced the `assert` with a `ValueError` (see the 13:53 entry).
+The list line stays as M3 made it. `list --all` over an empty file says `No tasks in <path>`. The flag's value is named `include_done`. No code changes.
+
+**Rationale:**
+The project owner went through each proposal and chose the recommended option every time.
+The one that got discussion was the order of the done tasks: sorting them by the M3 key (due date, priority, ID) would reuse one key for both halves, but it contradicts `README.md` feature 4 and issue #8.
+Most done tasks also have no due date, so they would fall to priority and ID, which say nothing about finished work.
+The `assert` was chosen over a `datetime.max` stand-in (dead code that would sort a broken record last) and a `ValueError` (an unreachable branch that needs a forged task to cover). `python -O` strips it, and a broken record would then sort without an error unless it is compared with a good one (corrected in the review of PR #28). It cannot reach the sort, because `Task` checks the date on every load.
+Superseded: the review of PR #28 replaced the `assert` with a `ValueError` (see the 13:53 entry).
+The plan, `README.md`, and issue #8 are not edited here: no decision changed their text, because the spec's order stands. They are updated in step 4 of the entry, with the ticked boxes.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all
+- Issue: #8
+
+## [2026-11-07 12:36] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`)
+
+**Summary:**
+Added the plan for M4, `list --all`, to `TODO.md`: five steps (the `--all` flag, the `-a` short flag, the empty-list wording, the docs, the local checks), the tests to write, and the risks. No code changes.
+
+**Rationale:**
+The project rules ask for the plan before any code, on a branch cut from `develop`. M3 merged as PR #26, so the branch starts from a `develop` that has `add` and `list`.
+The entry fixes the traps before the tests are written. The done tasks must be built with `Task.restore`, because the constructor rejects a date completed before `created`. The done half must sort by date completed, then ID, and a test with the later ID completed first would fail an ID order.
+The sort key, the list line, the empty-list wording, and the name of the flag's destination are proposed with reasons and left open for the project owner to veto, as in the M2 and M3 entries.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all
+- Issue: #8
+
 ## [2026-11-07 12:11] Commit Summary
 
 **Change Type:** Refactor

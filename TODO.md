@@ -256,6 +256,82 @@ Same branch, `feature/add-and-list`. Test-first, one atomic commit per comment, 
   the commit that made `restore` take `**record` (`db9f244`, from the review of PR #25) did it so that the dataclass is the one list of fields, and a mapping keeps that exactly. What remains against the change is churn, 20 call sites in the tests, which is mechanical and checked by the type checker;
   for it, the whole class of key-against-parameter collisions goes away and so does the `/` special case.
 
+## [2026-11-07] Feature: M4 List all
+
+**Objective:**
+Make `uv run task-tracker list --all` (short `-a`) show every task: the current ones first in the M3 order, then the completed ones by date completed, oldest first. Covers issue #8 and the M4 section of `docs/implementation-plan.md`. Feature 4 of `README.md`, project-level list only: `--dir` and `--global` arrive in M7.
+This entry fixes the order and the traps.
+
+**Approach:**
+Branch `feature/list-all` (from `develop`, after M3 merged as PR #26). Test-first, one atomic commit per step, each with its own `SUMMARY.md` entry. The change stays in `src/task_tracker/cli.py` and `tests/test_cli.py`. Standard library only, so `uv.lock` does not change. `_current_order` stays as it is, and the M3 tests are its safety net.
+
+1. `--all` on the `list` subparser (`action="store_true"`, `dest="include_done"`). Red: `list --all` exits 2 because argparse does not know the flag. Green: the current tasks in `_current_order`, then the done tasks by date completed, then ID. Commit: `feat(cli): add list --all`.
+2. `-a`, the short form from the options table. Red: `list -a` exits 2. Commit: `feat(cli): add the -a short flag for list --all`.
+3. The empty case: `list --all` over a missing or empty file says `No tasks in <path>`, and plain `list` keeps `No current tasks in <path>`. Commit: `feat(cli): say no tasks when list --all finds none`.
+4. Docs: tick the M4 boxes in the plan and issue #8, record the decisions below in both, and update the project state in `CLAUDE.md` (features 3, 4, and 5 exist). Commit: `docs(plan): record the M4 decisions`.
+5. Done when the tests pass locally, coverage on changed code is at least 80%, the CI-version linters and the Markdown linters are clean locally, and `list --all` works in a scratch directory. Pushing and opening the PR into `develop` wait for the project owner.
+
+**Tests:**
+The two Given/When/Then items are in the M4 section of the plan. In addition:
+
+- Build the done tasks with `Task.restore` and a full record, not the constructor. The constructor stamps `created` with the clock and rejects a date completed before it, so a task completed on 2026-10-10 cannot be built that way (the same trap as M2 step 3). The record must also keep `created <= start <= stop <= date_completed`, so all four sit before 2026-10-05.
+- The done half orders by date completed, not by ID. With A to E at IDs 1 to 5 and F at ID 6, F (completed first) must come before D (ID 4); an ID order would give D, F and fail.
+- Two done tasks with the same date completed list the lower ID first, even when the file holds them the other way round (the M3 tie rule).
+- A done task with the earliest due date still comes after every current task.
+- `list -a` and `list --all` print the same output, and both equal the expected order.
+- Plain `list` still leaves the done tasks out. A file with only done tasks lists them under `--all`, and plain `list` still says `No current tasks in <path>`.
+- A corrupt list file gives the same one-line error and exit 1 under `--all`; add `["list", "--all"]` to the existing parametrized case.
+
+**Risks & Trade-offs:**
+
+- **Sort key of the done half, decided 2026-11-07.** `(date_completed, id)`: the same "ID settles ties" rule as M3, so the order never depends on how the file was written. The half is only the `DONE` tasks, so none of them lacks a date completed.
+  Rejected: sorting the done half by the M3 key (due date, priority, ID). It would give one key for both halves, but it contradicts `README.md` feature 4 and issue #8, most done tasks have no due date and would fall to priority (meaningless for finished work) and ID (creation order), and nothing would read `date_completed`.
+- **Typing of that key, decided 2026-11-07 and changed the same day in the review of PR #28.** `Task` guarantees that a `DONE` task has a date completed (the constructor fills it in, `restore` and `load` reject a record without one), but the field's type is `datetime | None`, so pyright rejects the bare comparison.
+  The key first used `assert task.date_completed is not None`, which adds no branch. It now raises `ValueError("task <id> is DONE but has no date completed")`, which `main` already turns into one error line and exit 1. The owner chose it after the review showed what the assert does under `python -O` (see the risks of the review entry).
+  Rejected: the `datetime.max` stand-in from `_current_order`, which is dead code here and would quietly sort a broken record last. The exception is the same in every mode; the cost is a branch that real data cannot reach, covered by a test that hands the command a broken task directly because `load` refuses to build one.
+- **The list line stays as M3 made it, decided 2026-11-07.** It shows the due date, not the date completed, so a reader cannot see why F precedes D. Rejected for now: a completed column under `--all` (two line formats depending on a flag) and in every list (it changes a format that tests pin, and plain `list` would carry a column that is always empty). Cheap to add later.
+- **Empty wording, decided 2026-11-07.** `No current tasks in <path>` is wrong under `--all`, where done tasks count, so `--all` says `No tasks in <path>` and plain `list` keeps its message. Rejected: one message for both, which would mislead under `--all`, and a hint at `--all` in plain `list`, which is behavior the spec never asked for.
+- **No header or divider between the halves** (M3: no header, one line per task). The status column tells them apart. A divider would break "one line per task" for anyone who parses the output.
+- **Flag name in the code, decided 2026-11-07.** argparse derives `dest` from the first long option string ([argparse dest]), so `--all` would become `args.all`. The flag gets `dest="include_done"`, which says what it does where `_list` branches on it and does not read like the built-in `all()`. The cost is one keyword argument, and a name that differs from the flag text.
+- **Clock changes.** Date completed is naive local time (D6), so a clock set back could reorder tasks completed in the repeated hour. Accepted, as in M2.
+- **Scope held back.** No filtering beyond `--all`, no `--dir` or `--global` (M7), and no change to the layout of `cli.py` (M8).
+
+## [2026-11-07] Fix: PR #28 review
+
+**Objective:**
+Answer the six inline comments and the one PR-level comment on PR #28 (M4, `list --all`). Each claim was checked first: the stale top-level help, the behavior of the assert under `python -O`, the `stored()` call that would build a done record, and the gap in the done-order tests.
+Five are fixed (#1, #3, #5, #6, and the PR-level `README.md` comment). Two are fixed in part and answered with a reason for the rest (#2 and #4), so those two threads stay open for the reviewer.
+
+**Approach:**
+Same branch, `feature/list-all`. Test-first where behavior changes, one atomic commit per comment, each with its own `SUMMARY.md` entry. Pushing waits until the last commit; fixed threads are resolved after the push.
+
+1. #1, the top-level help: red test that `task-tracker --help` names `--all`; green: the help text for `list`. Commit: `fix(cli): name --all in the help for list`.
+2. #3, one message built once: a `scope` word picks `tasks` or `current tasks`. The output is the same, so the existing empty-list tests are the safety net, and a swapped wording must fail them. Commit: `refactor(cli): build the empty-list message once`.
+3. #4, the third copy of the record: `_done` takes its fields from `asdict(Task(...))` and overrides only what a done task changes. Commit: `test(cli): take the done record's fields from Task`.
+4. #5, the full timestamp: two done tasks completed on one day, the lower ID later in the day. Passing at once, so it is mutation-checked: cutting the key to the day must fail it. Commit: `test(cli): pin that the done half sorts on the full timestamp`.
+5. #2, the claim about `python -O`, corrected in this file, in `SUMMARY.md`, and in the PR description. Commit: `docs(plan): correct what python -O does to the done-order assert`.
+6. PR-level comment, `README.md`: the Commands section documents `list --all`, `-a`, the empty message, and the done half's order. Commit: `docs(readme): document list --all`.
+7. #6, issue #8 and stale statements: issue #8 gains the five extra items and the three decisions (a change on GitHub), and the two statements in the 13:03 `SUMMARY.md` entry that the review made false are corrected. Commit: `docs(summary): correct two statements the review made stale`.
+8. #2, the assert, decided by the owner after the review: a `ValueError` replaces it, so a DONE task without a date completed gives the one-line error and exit 1 in every mode. Red first: the command is handed such a task and fails with a bare `AssertionError`. Commit: `fix(cli): fail loudly on a done task without a date completed`.
+
+**Tests:**
+
+- Top-level `--help` names `--all` next to `list`.
+- Two done tasks completed on the same day, the lower ID at 17:00 and the higher at 09:00, list the 09:00 one first. A mutant that cuts the key to `.date()` fails it.
+- The empty-list wording for `list` and `list --all` is covered by the existing tests; a mutant that swaps the two words fails them.
+- A DONE task with no date completed, handed to `list --all` directly because `load` refuses it, gives one error line naming the task and exit 1. A version of the branch that returns instead of raising fails it.
+
+**Risks & Trade-offs:**
+
+- **The `python -O` claim was wrong, found 2026-11-07.** I wrote that without the assert the comparison "fails with a `TypeError`, still loudly". Run under `python -O`, one DONE task with no date completed sorts without error, two sort by ID, and only a mix with a good one raises.
+  The decision to use the assert was made with that sentence among its pros and cons, so the owner was asked again with the corrected facts and chose the `ValueError` (step 8). Run under `python -O` with the asserts confirmed stripped, a broken task now gives the one-line error and exit 1.
+  The guarantee is still `Task._validate`, which runs on construction and in `restore`, so on every `load`; a broken record cannot reach `_done_order` today. The `ValueError` says so by itself in every mode if that rule is ever broken.
+- **No accessor or narrower type on `Task` for `date_completed`, declined in part of #2.** There is one consumer. `update` writes the field and `delete` does not read it. A typed accessor changes the M1 model for one caller and is decided against on 2026-11-07; M8 revisits the layout. Rejected for now, not forever: a second reader of the field is the point to reopen it.
+- **`stored()` is not moved into a shared module, declined in part of #4.** The call the comment suggests cannot build these records: `stored()` has `created` on 2026-10-10 at 09:00, after the dates completed here, and `restore` refuses a date completed before `created`. Making it work overrides nine of eleven fields. Moving it also edits the M1 tests, outside this diff.
+  What is fixed is the new code's copy: `_done` takes the field list from the dataclass. The older copies in `test_task.py` and `test_storage.py` remain.
+- **Scope held back.** No change to `Task`, no change to the older tests, no new `tests/` helper module.
+
+[argparse dest]: https://docs.python.org/3/library/argparse.html#dest
 [dataclasses]: https://docs.python.org/3/library/dataclasses.html#mutable-default-values
 [pytest exit codes]: https://docs.pytest.org/en/stable/reference/exit-codes.html
 [JSONDecodeError]: https://docs.python.org/3/library/json.html#json.JSONDecodeError

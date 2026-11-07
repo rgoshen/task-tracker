@@ -60,12 +60,28 @@ def _describe(task: Task) -> str:
     )
 
 
-def _list(_args: argparse.Namespace, path: Path) -> list[str]:
-    """Return the lines to show: the current tasks, or that there are none."""
-    current = [task for task in load(path) if task.status is not Status.DONE]
-    if not current:
-        return [f"No current tasks in {path}"]
-    return [_describe(task) for task in sorted(current, key=_current_order)]
+def _done_order(task: Task) -> tuple[datetime, int]:
+    """Sort key for the done tasks: date completed, then ID (M4)."""
+    # `Task` and `load` already refuse a DONE task without a date completed. This
+    # says so again in every mode (`python -O` removes an assert), and tells pyright.
+    if task.date_completed is None:
+        raise ValueError(f"task {task.id} is DONE but has no date completed")
+    return (task.date_completed, task.id)
+
+
+def _list(args: argparse.Namespace, path: Path) -> list[str]:
+    """Return the lines to show: the current tasks, then the done ones with `--all`."""
+    tasks = load(path)
+    current = [task for task in tasks if task.status is not Status.DONE]
+    shown = sorted(current, key=_current_order)
+    if args.include_done:
+        done = [task for task in tasks if task.status is Status.DONE]
+        shown += sorted(done, key=_done_order)
+    if not shown:
+        # Under `--all` the done tasks count too, so "current" would mislead.
+        scope = "tasks" if args.include_done else "current tasks"
+        return [f"No {scope} in {path}"]
+    return [_describe(task) for task in shown]
 
 
 # What is escaped, because it moves the cursor, sends commands to the terminal,
@@ -205,7 +221,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, local time",
     )
     add.set_defaults(run=_add)
-    commands.add_parser("list", help="list the current tasks").set_defaults(run=_list)
+    listing = commands.add_parser(
+        "list", help="list the current tasks (all tasks with --all)"
+    )
+    listing.add_argument(
+        "--all",
+        "-a",
+        action="store_true",
+        dest="include_done",
+        help="also list the done tasks, after the current ones",
+    )
+    listing.set_defaults(run=_list)
     return parser
 
 

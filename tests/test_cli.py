@@ -10,6 +10,7 @@ import subprocess
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -29,6 +30,11 @@ NOV_1 = datetime(2026, 11, 1)  # noqa: DTZ001
 NOV_2 = datetime(2026, 11, 2)  # noqa: DTZ001
 NOV_3 = datetime(2026, 11, 3)  # noqa: DTZ001
 NOV_2_TIMED = datetime(2026, 11, 2, 10, 30, 45)  # noqa: DTZ001
+OCT_1 = datetime(2026, 10, 1)  # noqa: DTZ001
+OCT_5 = datetime(2026, 10, 5)  # noqa: DTZ001
+OCT_5_MORNING = datetime(2026, 10, 5, 9, 0)  # noqa: DTZ001
+OCT_5_EVENING = datetime(2026, 10, 5, 17, 0)  # noqa: DTZ001
+OCT_10 = datetime(2026, 10, 10)  # noqa: DTZ001
 
 
 @pytest.fixture(name="project")
@@ -126,6 +132,22 @@ def test_a_bare_command_exits_2_and_asks_for_a_command(
     assert "command" in capsys.readouterr().err.splitlines()[-1]
 
 
+def test_the_top_level_help_says_list_can_show_every_task(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+):
+    # A wide terminal, so argparse does not wrap the line being checked.
+    monkeypatch.setenv("COLUMNS", "200")
+
+    with pytest.raises(SystemExit) as exit_info:
+        main(["--help"])
+
+    list_line = next(
+        line for line in capsys.readouterr().out.splitlines() if " list " in line
+    )
+    assert exit_info.value.code == 0
+    assert "--all" in list_line
+
+
 @pytest.mark.usefixtures("fixed_clock")
 def test_short_flags_store_the_same_task_as_the_long_flags(project: Path):
     main(["add", "Pay rent", "--priority", "HIGH", "--due", "2026-11-02"])
@@ -147,19 +169,140 @@ def _listed_names(capsys: pytest.CaptureFixture[str]) -> list[str]:
     return [line.split()[-1] for line in capsys.readouterr().out.splitlines()]
 
 
-def test_list_shows_current_tasks_by_due_date_then_priority(
-    project: Path, capsys: pytest.CaptureFixture[str]
-):
+def _done(
+    task_id: int, name: str, completed: datetime, due: datetime | None = None
+) -> Task:
+    """A DONE task completed on `completed`. Only `restore` can build a past one."""
+    # The field list comes from the dataclass, so a new field needs no change here.
+    # Every stamp is on or before the date completed, as `restore` requires.
+    record = asdict(Task(task_id, name)) | {
+        "created": OCT_1,
+        "updated": completed,
+        "start": OCT_1,
+        "stop": OCT_1,
+        "due": due,
+        "status": Status.DONE,
+        "date_completed": completed,
+    }
+    return Task.restore(record)
+
+
+MAIN_CASE_ORDER = ["C", "B", "A", "E", "F", "D"]
+
+
+def _save_main_case(path: Path) -> None:
     save(
         [
             Task(1, "A", due=NOV_2, priority=Priority.LOW),
             Task(2, "B", due=NOV_1, priority=Priority.LOW),
             Task(3, "C", due=NOV_1, priority=Priority.CRITICAL),
-            Task(4, "D", status=Status.DONE),
+            _done(4, "D", OCT_10),
             Task(5, "E", due=NOV_3, status=Status.IN_PROGRESS),
+            _done(6, "F", OCT_5),
         ],
-        project,
+        path,
     )
+
+
+def test_list_all_shows_current_tasks_then_done_ones_by_date_completed(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    _save_main_case(project)
+
+    exit_code = main(["list", "--all"])
+
+    assert exit_code == 0
+    assert _listed_names(capsys) == MAIN_CASE_ORDER
+
+
+def test_list_all_orders_done_tasks_with_one_date_completed_by_id(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    # Stored higher ID first, so the file order would give the other answer.
+    save([_done(2, "second", OCT_5), _done(1, "first", OCT_5)], project)
+
+    main(["list", "--all"])
+
+    assert _listed_names(capsys) == ["first", "second"]
+
+
+def test_list_all_orders_done_tasks_completed_on_one_day_by_the_time(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    # The lower ID finished later, so the ID tie-break would give the other answer.
+    save([_done(1, "late", OCT_5_EVENING), _done(2, "early", OCT_5_MORNING)], project)
+
+    main(["list", "--all"])
+
+    assert _listed_names(capsys) == ["early", "late"]
+
+
+def test_list_all_reports_a_done_task_without_a_date_completed_as_one_line(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+):
+    # `load` refuses such a record, so the broken task is handed over directly. It
+    # stands for a rule `Task` breaks one day, and the sort must not hide it.
+    broken = Task(7, "broken")
+    broken.status = Status.DONE
+    monkeypatch.setattr("task_tracker.cli.load", lambda _path: [broken])
+
+    exit_code = main(["list", "--all"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "task 7")
+
+
+def test_list_all_puts_done_task_due_first_after_every_current_task(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    save([_done(1, "done", OCT_5, due=OCT_1), Task(2, "open", due=NOV_1)], project)
+
+    main(["list", "--all"])
+
+    assert _listed_names(capsys) == ["open", "done"]
+
+
+def test_list_all_lists_only_done_tasks_while_plain_list_says_none_current(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    save([_done(1, "old", OCT_5)], project)
+
+    main(["list"])
+    plain = capsys.readouterr().out
+    main(["list", "--all"])
+
+    assert f"No current tasks in {project}" in plain
+    assert _listed_names(capsys) == ["old"]
+
+
+@pytest.mark.parametrize("flag", ["-a", "--all"])
+def test_list_short_and_long_all_flags_show_the_same_order(
+    project: Path, capsys: pytest.CaptureFixture[str], flag: str
+):
+    _save_main_case(project)
+
+    main(["list", flag])
+
+    assert _listed_names(capsys) == MAIN_CASE_ORDER
+
+
+@pytest.mark.parametrize("stored", [None, []], ids=["no file", "empty file"])
+def test_list_all_with_no_tasks_says_no_tasks_and_names_the_file(
+    project: Path, capsys: pytest.CaptureFixture[str], stored: list[Task] | None
+):
+    if stored is not None:
+        save(stored, project)
+
+    exit_code = main(["list", "--all"])
+
+    assert exit_code == 0
+    assert capsys.readouterr().out == f"No tasks in {project}\n"
+
+
+def test_list_shows_current_tasks_by_due_date_then_priority(
+    project: Path, capsys: pytest.CaptureFixture[str]
+):
+    _save_main_case(project)
 
     exit_code = main(["list"])
 
@@ -291,7 +434,7 @@ def _assert_one_line_error(capsys: pytest.CaptureFixture[str], mention: str) -> 
     return captured.err
 
 
-@pytest.mark.parametrize("argv", [["list"], ["add", "Buy milk"]])
+@pytest.mark.parametrize("argv", [["list"], ["list", "--all"], ["add", "Buy milk"]])
 @pytest.mark.parametrize(
     "text",
     ["not json", '[{"cls": 1}]', "[" * 200_000],
