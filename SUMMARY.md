@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-07 13:40] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+The `_done` test helper no longer spells out the eleven stored fields. It starts from `asdict(Task(task_id, name))` and overrides the seven values a done task changes (the four stamps, `due`, `status`, and `date_completed`).
+
+**Rationale:**
+Review comment 4 on PR #28 said `_done` was a third copy of the stored record, so a new `Task` field would need a change in three test modules. This removes the copy from the new code: the field list now comes from the dataclass. As a check, a throwaway field added to `Task` leaves the eight list tests passing.
+The comment suggested moving `stored()` from `test_task.py` into a shared module. Not done: that call cannot build these records, because `stored()` has `created` on 2026-10-10 at 09:00, after the dates completed here, and `restore` refuses an earlier date completed. Making it work overrides nine of eleven fields, and moving it edits M1 tests outside this diff.
+The copies in `test_task.py` and `test_storage.py` remain.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 3
+- Issue: #8 (PR #28, review comment 4)
+
 ## [2026-11-07 13:39] Commit Summary
 
 **Change Type:** Refactor

@@ -10,6 +10,7 @@ import subprocess
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -170,22 +171,18 @@ def _done(
     task_id: int, name: str, completed: datetime, due: datetime | None = None
 ) -> Task:
     """A DONE task completed on `completed`. Only `restore` can build a past one."""
+    # The field list comes from the dataclass, so a new field needs no change here.
     # Every stamp is on or before the date completed, as `restore` requires.
-    return Task.restore(
-        {
-            "id": task_id,
-            "name": name,
-            "description": "",
-            "created": OCT_1,
-            "updated": completed,
-            "due": due,
-            "date_completed": completed,
-            "status": Status.DONE,
-            "priority": Priority.LOW,
-            "start": OCT_1,
-            "stop": OCT_1,
-        }
-    )
+    record = asdict(Task(task_id, name)) | {
+        "created": OCT_1,
+        "updated": completed,
+        "start": OCT_1,
+        "stop": OCT_1,
+        "due": due,
+        "status": Status.DONE,
+        "date_completed": completed,
+    }
+    return Task.restore(record)
 
 
 MAIN_CASE_ORDER = ["C", "B", "A", "E", "F", "D"]
