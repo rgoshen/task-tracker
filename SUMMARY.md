@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-07 11:55] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+The helper that runs `task-tracker list` in a child process is now a context manager, `_list_in_a_new_process(folder, stdout)`. It opens the error file, starts the process, yields it, and waits for it when the block ends. This removes the `# pylint: disable=consider-using-with` line, which had no reason beside it. No behavior changes: the same 215 tests pass.
+
+**Rationale:**
+Review comment 9 asked for the reason to be written next to the suppression, because the project `CLAUDE.md` requires one for every pylint suppression and forbids loosening the rules. The reason was that the caller closed the process, which is a promise made across two functions. A context manager makes the promise structural:
+`Popen` is entered with `with`, so the check has nothing to flag and nothing to suppress. A reason comment would have kept the suppression and the need to remember it.
+The caller no longer has to remember `os.close` order and `with child` either; it uses the child inside one block. The refactor was checked against the two pipe tests with deliberate breaks of the code (no `BrokenPipeError` branch, no flush), and both are still caught.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #26 review, second round, step 1
+- Issue: #7 (PR #26, review comment 9)
+
 ## [2026-11-07 11:54] Commit Summary
 
 **Change Type:** Docs
