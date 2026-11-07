@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 13:38] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+The help for `list` in `task-tracker --help` now reads `list the current tasks (all tasks with --all)`. It used to say only `list the current tasks`, which told a reader the command could never show finished work.
+
+**Rationale:**
+Review comment 1 on PR #28. The new test reads the top-level help and checks that the `list` line names `--all`; it failed on the old text before the change. It sets a wide terminal, so argparse does not wrap the line being checked.
+
+**Bugfix Context:**
+The M4 change added the flag and its own help but left the one-line description that the top-level help prints. That line is the first thing a user reads, so it was out of date as soon as the flag existed.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #28 review, step 1
+- Issue: #8 (PR #28, review comment 1)
+
 ## [2026-11-07 13:37] Commit Summary
 
 **Change Type:** Docs

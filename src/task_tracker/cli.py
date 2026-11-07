@@ -220,7 +220,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, local time",
     )
     add.set_defaults(run=_add)
-    listing = commands.add_parser("list", help="list the current tasks")
+    listing = commands.add_parser(
+        "list", help="list the current tasks (all tasks with --all)"
+    )
     listing.add_argument(
         "--all",
         "-a",

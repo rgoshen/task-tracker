@@ -129,6 +129,22 @@ def test_a_bare_command_exits_2_and_asks_for_a_command(
     assert "command" in capsys.readouterr().err.splitlines()[-1]
 
 
+def test_the_top_level_help_says_list_can_show_every_task(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+):
+    # A wide terminal, so argparse does not wrap the line being checked.
+    monkeypatch.setenv("COLUMNS", "200")
+
+    with pytest.raises(SystemExit) as exit_info:
+        main(["--help"])
+
+    list_line = next(
+        line for line in capsys.readouterr().out.splitlines() if " list " in line
+    )
+    assert exit_info.value.code == 0
+    assert "--all" in list_line
+
+
 @pytest.mark.usefixtures("fixed_clock")
 def test_short_flags_store_the_same_task_as_the_long_flags(project: Path):
     main(["add", "Pay rent", "--priority", "HIGH", "--due", "2026-11-02"])
