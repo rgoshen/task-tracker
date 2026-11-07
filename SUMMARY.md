@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-07 12:59] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`list --all` over a missing or empty file now says `No tasks in <path>`, and exits 0. Plain `list` still says `No current tasks in <path>`, including when the file holds only done tasks.
+The corrupt-file test also runs `list --all`, and it already passed, because the load error comes before any wording is chosen.
+
+**Rationale:**
+`No current tasks` is wrong under `--all`, where done tasks count too. A hint at `--all` in the plain message was rejected, because the spec never asked for it.
+The wording is chosen after the lines are built, so the message check stays in one place.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M4 List all
+- Issue: #8
+
 ## [2026-11-07 12:58] Commit Summary
 
 **Change Type:** Feature

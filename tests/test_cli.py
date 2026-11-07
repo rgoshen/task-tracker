@@ -245,6 +245,19 @@ def test_list_short_and_long_all_flags_show_the_same_order(
     assert _listed_names(capsys) == MAIN_CASE_ORDER
 
 
+@pytest.mark.parametrize("stored", [None, []], ids=["no file", "empty file"])
+def test_list_all_with_no_tasks_says_no_tasks_and_names_the_file(
+    project: Path, capsys: pytest.CaptureFixture[str], stored: list[Task] | None
+):
+    if stored is not None:
+        save(stored, project)
+
+    exit_code = main(["list", "--all"])
+
+    assert exit_code == 0
+    assert capsys.readouterr().out == f"No tasks in {project}\n"
+
+
 def test_list_shows_current_tasks_by_due_date_then_priority(
     project: Path, capsys: pytest.CaptureFixture[str]
 ):
@@ -380,7 +393,7 @@ def _assert_one_line_error(capsys: pytest.CaptureFixture[str], mention: str) -> 
     return captured.err
 
 
-@pytest.mark.parametrize("argv", [["list"], ["add", "Buy milk"]])
+@pytest.mark.parametrize("argv", [["list"], ["list", "--all"], ["add", "Buy milk"]])
 @pytest.mark.parametrize(
     "text",
     ["not json", '[{"cls": 1}]', "[" * 200_000],
