@@ -308,10 +308,10 @@ Branch `feature/update-task`. Covers feature 6.
 
 Branch `feature/delete-task`. Covers feature 7.
 
-- [ ] Given tasks 1, 2, 3, when `delete 2`, then tasks 1 and 3 remain with their IDs unchanged.
-- [ ] Given no task 99, when `delete 99`, then the exit code is 1, stderr names 99, and the file is unchanged.
-- [ ] Given tasks 1, 2, 3, when `delete 3` then `add "New"`, then the new task's ID is 3 (D5: highest + 1 reuses the freed ID).
-- [ ] Given `delete 2` and the answer "n" (patch `input` with `monkeypatch`), then nothing is deleted. Given the answer "y", then task 2 is deleted. In both cases the prompt includes task 2's name (Q5).
+- [x] Given tasks 1, 2, 3, when `delete 2`, then tasks 1 and 3 remain with their IDs unchanged.
+- [x] Given no task 99, when `delete 99`, then the exit code is 1, stderr names 99, and the file is unchanged.
+- [x] Given tasks 1, 2, 3, when `delete 3` then `add "New"`, then the new task's ID is 3 (D5: highest + 1 reuses the freed ID).
+- [x] Given `delete 2` and the answer "n" (patch `input` with `monkeypatch`), then nothing is deleted. Given the answer "y", then task 2 is deleted. In both cases the prompt includes task 2's name (Q5).
 
 **Think about:** the prompt exists to catch a reused ID, so what must it print? Scripts cannot answer a prompt; a `--yes` flag is deferred until you need one.
 

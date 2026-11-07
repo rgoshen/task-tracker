@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-07 15:59] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `CLAUDE.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Document the `delete` command. `README.md` gets the usage line, a `delete ID` entry (the prompt, the answers, the two output lines, the exit codes, and the missing-answer and changed-while-prompting errors), and `delete` joins the stored-before-printing and lost-write notes. `CLAUDE.md` now says features 3 to 7 exist and M1 to M6 are built. The four M6 boxes in the plan are ticked.
+
+**Rationale:**
+Each box was ticked against a test that passes: the first and fourth by the yes and no tests, the second by the missing-ID and bad-ID tests, and the third by the ID-reuse test. That test passes under both "highest + 1" and a count for `delete 3`, so the gap case (`delete 2`, then `add` gives 4) is what pins the rule; it was shown to fail against a count.
+The `README.md` text first said that after `delete 3` the next `add` gets ID 3. That holds only when 3 is the highest ID, so it now says that deleting the highest-numbered task frees its ID.
+`delete` saves before `_show` prints, as `add` and `update` do, so it belongs in the note about output errors.
+Two earlier entries had times I guessed instead of reading from the clock (15:40 and 15:55). They now carry the commit times, 15:36 and 15:42.
+Issue #10 is not changed in this commit. It still needs the "Decided" block, which waits for the project owner.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete, step 5
+- Issue: #10
+
 ## [2026-11-07 15:58] Commit Summary
 
 **Change Type:** Fix
@@ -111,7 +132,7 @@ Step 1 of M6 (`TODO.md`: 2026-11-07 Feature: M6 Delete). The prompt comes with t
 - `TODO.md`: 2026-11-07 Feature: M6 Delete, step 1
 - Issue: #10
 
-## [2026-11-07 15:55] Commit Summary
+## [2026-11-07 15:42] Commit Summary
 
 **Change Type:** Docs
 
@@ -132,7 +153,7 @@ The project owner answered three questions on 2026-11-07.
 - `TODO.md`: 2026-11-07 Feature: M6 Delete
 - Issue: #10
 
-## [2026-11-07 15:40] Commit Summary
+## [2026-11-07 15:36] Commit Summary
 
 **Change Type:** Docs
 
