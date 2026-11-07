@@ -1,5 +1,31 @@
 # Summary
 
+## [2026-11-07 11:58] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+A write failure that is not a broken pipe now ends with exit code 1 and exactly one line on standard error. It used to print `cannot write the output: ...`, then `Exception ignored while flushing sys.stdout`, and exit with 120. A full disk, a file-size limit, or an I/O error behaved the same way.
+Both failure branches of `_show` now call one helper, `_discard_stdout`, and the helper closes the extra descriptor it opens, which the first version leaked.
+
+**Rationale:**
+A failed write leaves its bytes in the buffer, and Python flushes stdout once more at exit. Only the broken-pipe branch pointed stdout at devnull, so the other branch let that second flush fail and turn the exit code into 120. This breaks the promise in `README.md` of one error line and a plain exit code 1. The fix is the one the review described:
+a single helper used by both branches, with the descriptor closed after `dup2`.
+The old test for this case replaced `sys.stdout` with a fake object, so there was no buffer for Python to flush again, which is why it never saw the bug.
+The new tests run the real command in a child process with standard output on a read-only descriptor, which fails every write with EBADF, and they check the exit code and the error lines for `list` and for `add` (the task stays saved).
+The leaked descriptor cannot be seen from outside a process that is about to exit, so two small in-process tests pin the helper itself: later writes go to devnull, and no extra descriptor stays open. A deliberate break that removed the `close` first survived, which is why that test exists.
+The fake `sys.stdout` for those tests is installed inside the test body, because pytest's capture puts its own stream back when the body starts; my first version set it in a fixture and redirected the capture file instead.
+
+**Bugfix Context:**
+Review comment 1 on PR #26. Root cause: the cleanup for a failed flush existed in one `except` branch and not in the other.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Fix: PR #26 review, second round, step 2
+- Issue: #7 (PR #26, review comment 1)
+
 ## [2026-11-07 11:55] Commit Summary
 
 **Change Type:** Refactor

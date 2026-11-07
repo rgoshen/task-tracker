@@ -93,6 +93,22 @@ def _printable(line: str) -> str:
     return escaped.encode(encoding, "backslashreplace").decode(encoding)
 
 
+def _discard_stdout() -> None:
+    """Point standard output at devnull, so that nothing is left to flush again.
+
+    A write that failed leaves its bytes in the buffer, and Python flushes stdout
+    once more at exit. That flush fails the same way, prints "Exception ignored",
+    and turns the exit code into 120. The retry succeeds against devnull (the
+    recipe in the `signal` module's SIGPIPE note). The extra descriptor is closed
+    once `dup2` has made its copy.
+    """
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    try:
+        os.dup2(devnull, sys.stdout.fileno())
+    finally:
+        os.close(devnull)
+
+
 def _show(lines: list[str], prog: str) -> int:
     """Print `lines` and return the exit code.
 
@@ -107,13 +123,11 @@ def _show(lines: list[str], prog: str) -> int:
         sys.stdout.flush()
     except BrokenPipeError:
         # The reader stopped early, as `head` does. That is not worth a message.
-        # Python flushes stdout once more at exit and would fail the same way, so
-        # point it at devnull first (the recipe in the `signal` module's SIGPIPE
-        # note, which also exits with 1).
-        devnull = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(devnull, sys.stdout.fileno())
+        # The recipe in the `signal` module's SIGPIPE note also exits with 1.
+        _discard_stdout()
         return 1
     except OSError as error:
+        _discard_stdout()
         print(f"{prog}: error: cannot write the output: {error}", file=sys.stderr)
         return 1
     return 0

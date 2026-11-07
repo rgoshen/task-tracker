@@ -3,7 +3,6 @@
 # Test names state the intent, so per-test docstrings would only repeat them.
 # pylint: disable=missing-function-docstring
 
-import errno
 import io
 import os
 import subprocess
@@ -17,6 +16,7 @@ from types import SimpleNamespace
 import pytest
 
 from task_tracker import main
+from task_tracker.cli import _discard_stdout
 from task_tracker.priority import Priority
 from task_tracker.status import Status
 from task_tracker.storage import load, save
@@ -335,20 +335,20 @@ _ERRORS_FILE = "errors.txt"
 
 
 @contextmanager
-def _list_in_a_new_process(
-    folder: Path, stdout: int
+def _run_in_a_new_process(
+    folder: Path, argv: list[str], stdout: int
 ) -> Iterator[subprocess.Popen[str]]:
-    """Run `task-tracker list` in `folder` and wait for it when the block ends.
+    """Run `task-tracker` with `argv` in `folder`; wait for it when the block ends.
 
     Its standard error goes to `errors.txt` in `folder`, so a test reads exactly
     what a terminal would have shown.
     """
     # The console script does the same: it passes the return value to sys.exit.
-    command = "import sys, task_tracker; sys.exit(task_tracker.main(['list']))"
+    command = "import sys, task_tracker; sys.exit(task_tracker.main(sys.argv[1:]))"
     with (
         (folder / _ERRORS_FILE).open("w", encoding="utf-8") as error_file,
         subprocess.Popen(
-            [sys.executable, "-c", command],
+            [sys.executable, "-c", command, *argv],
             cwd=folder,
             stdout=stdout,
             stderr=error_file,
@@ -366,7 +366,7 @@ def test_a_reader_that_stops_early_ends_the_list_quietly(tmp_path: Path):
         tmp_path / "tasks.json",
     )
 
-    with _list_in_a_new_process(tmp_path, subprocess.PIPE) as child:
+    with _run_in_a_new_process(tmp_path, ["list"], subprocess.PIPE) as child:
         assert child.stdout is not None
         first_line = child.stdout.readline()
         child.stdout.close()
@@ -384,7 +384,7 @@ def test_a_pipe_that_is_already_closed_ends_a_short_list_quietly(tmp_path: Path)
     read_end, write_end = os.pipe()
     os.close(read_end)
 
-    with _list_in_a_new_process(tmp_path, write_end) as child:
+    with _run_in_a_new_process(tmp_path, ["list"], write_end) as child:
         os.close(write_end)
         child.wait(timeout=30)
 
@@ -392,26 +392,80 @@ def test_a_pipe_that_is_already_closed_ends_a_short_list_quietly(tmp_path: Path)
     assert child.returncode == 1
 
 
-def test_a_write_that_fails_after_add_saved_has_its_own_message(
-    project: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+@pytest.mark.skipif(sys.platform == "win32", reason="needs a read-only descriptor")
+@pytest.mark.parametrize(
+    ("argv", "stored"),
+    [(["list"], ["first"]), (["add", "second"], ["first", "second"])],
+    ids=["list", "add"],
+)
+def test_a_write_that_fails_ends_with_one_error_line_and_exit_1(
+    tmp_path: Path, argv: list[str], stored: list[str]
 ):
-    def refuse(_text: str) -> int:
-        raise OSError(errno.ENOSPC, "No space left on device")
+    # Standard output is a descriptor opened for reading only, so every write to it
+    # fails with EBADF: an OSError that is not a broken pipe. A fake `sys.stdout`
+    # would have no buffer for Python to flush again at exit, which is where exit
+    # code 120 and the "Exception ignored" lines came from.
+    save([Task(1, "first")], tmp_path / "tasks.json")
+    sink = tmp_path / "sink.txt"
+    sink.write_text("", encoding="utf-8")
+    read_only = os.open(sink, os.O_RDONLY)
+    try:
+        with _run_in_a_new_process(tmp_path, argv, read_only) as child:
+            child.wait(timeout=30)
+    finally:
+        os.close(read_only)
 
-    monkeypatch.setattr(
-        sys,
-        "stdout",
-        SimpleNamespace(encoding="utf-8", write=refuse, flush=lambda: None),
-    )
+    error_lines = (tmp_path / _ERRORS_FILE).read_text(encoding="utf-8").splitlines()
+    assert child.returncode == 1
+    assert len(error_lines) == 1
+    assert error_lines[0].startswith("task-tracker: error: cannot write the output: ")
+    # `add` saves before it prints, and the task stays saved.
+    assert [task.name for task in load(tmp_path / "tasks.json")] == stored
 
-    exit_code = main(["add", "Buy milk"])
 
-    error = capsys.readouterr().err
-    assert exit_code == 1
-    assert error.startswith("task-tracker: error: cannot write the output: ")
-    assert len(error.splitlines()) == 1
-    # The task was saved before the output was written, and it stays saved.
-    assert [task.name for task in load(project)] == ["Buy milk"]
+@pytest.fixture(name="stdout_file")
+def _stdout_file(tmp_path: Path) -> Iterator[tuple[int, Path]]:
+    """A real descriptor on a file that the test can read."""
+    path = tmp_path / "stdout.txt"
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT)
+    yield descriptor, path
+    os.close(descriptor)
+
+
+def _become_stdout(monkeypatch: pytest.MonkeyPatch, descriptor: int) -> None:
+    # Call this in the test body, not in a fixture: pytest's capture puts its own
+    # stream back into `sys.stdout` when the body starts, which would replace this
+    # one, and the helper would redirect the capture file instead.
+    monkeypatch.setattr(sys, "stdout", SimpleNamespace(fileno=lambda: descriptor))
+
+
+def test_discarding_standard_output_sends_later_writes_to_devnull(
+    stdout_file: tuple[int, Path], monkeypatch: pytest.MonkeyPatch
+):
+    descriptor, path = stdout_file
+    _become_stdout(monkeypatch, descriptor)
+
+    _discard_stdout()
+    os.write(descriptor, b"the flush at exit")
+
+    assert path.read_bytes() == b""
+
+
+def test_discarding_standard_output_leaves_no_descriptor_open(
+    stdout_file: tuple[int, Path], monkeypatch: pytest.MonkeyPatch
+):
+    descriptor, _ = stdout_file
+    _become_stdout(monkeypatch, descriptor)
+    # `dup` returns the lowest free number, which is where `os.open` would put the
+    # helper's own descriptor. If the helper keeps it, the lowest free number moves.
+    lowest_free = os.dup(descriptor)
+    os.close(lowest_free)
+
+    _discard_stdout()
+
+    still_lowest = os.dup(descriptor)
+    os.close(still_lowest)
+    assert still_lowest == lowest_free
 
 
 # --- review of PR #26: what a name can do to the terminal ---
