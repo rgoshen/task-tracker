@@ -243,6 +243,21 @@ def _due(text: str) -> datetime:
     return due
 
 
+def _task_id(text: str) -> int:
+    """Read a task ID: ASCII digits, 1 or more, the form the task file holds.
+
+    `int` alone also takes `+1`, `0_1`, a padded " 1 " and non-ASCII digits, and it
+    lets `0` and `-1` through to a "no task" error, although a task never has an ID
+    below 1 (`Task` refuses it). Every one of them is a bad value, as `1.5` is, so
+    argparse names the argument and exits with 2.
+    """
+    if text.isascii() and text.isdecimal() and int(text) >= 1:
+        return int(text)
+    raise argparse.ArgumentTypeError(
+        f"expected a whole number of 1 or more, not {text!r}"
+    )
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="task-tracker")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -278,7 +293,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     listing.set_defaults(run=_list)
     update = commands.add_parser("update", help="change a stored task")
-    update.add_argument("id", type=int)
+    update.add_argument("id", type=_task_id)
     # Defaults are `None` so that a missing option is told apart from one given
     # with the default value. As in `add`, no `type=`: argparse would convert before
     # it checks `choices`.

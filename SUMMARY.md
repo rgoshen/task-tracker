@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-07 15:09] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`, `README.md`)
+
+**Summary:**
+The `ID` of `update` is read by a new `_task_id` converter: ASCII digits and 1 or more. `+1`, `0_1`, an ID with spaces around it, non-ASCII digits, `0`, and `-1` now exit 2 with `expected a whole number of 1 or more`, and the tests cover each.
+
+**Rationale:**
+Review comment 3 on PR #29. `type=int` accepted forms that `README.md` does not call whole numbers (`+1`, `0_1`, a padded ID, the Arabic-Indic digit one), so `update 0_1 -n x` changed task 1. `0` and `-1` reached the lookup and exited 1, although an ID below 1 can never exist (`Task` refuses it) and is a bad value like `1.5`.
+The reviewer's suggestion is used: a small `type=` function that raises `ArgumentTypeError`, the same pattern as `_due`, so the rule has one home. `delete` in M6 can reuse it.
+Six new cases failed first because the command accepted them, and the two old cases failed on the changed message. Three deliberate breaks (back to `int`, no ASCII check, no lower bound) each fail a test.
+
+**Bugfix Context:**
+`TODO.md`: 2026-11-07 Fix: PR #29 review, step 4|Issue: #9 (PR #29, review comment 3)
+
+**References:**
+
+- The ASCII check is what rejects `0_1`, a padded ID, a sign, and non-ASCII digits (`isdecimal` alone accepts the last). The lower bound is what rejects `0`. `-1` fails `isdecimal` on its own.
+
 ## [2026-11-07 15:08] Commit Summary
 
 **Change Type:** Fix
