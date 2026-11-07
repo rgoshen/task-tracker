@@ -338,3 +338,49 @@ Same branch, `feature/list-all`. Test-first where behavior changes, one atomic c
 [os.replace]: https://docs.python.org/3/library/os.html#os.replace
 [os.fsync]: https://docs.python.org/3/library/os.html#os.fsync
 [tempfile]: https://docs.python.org/3/library/tempfile.html#tempfile.mkstemp
+
+## [2026-11-07] Feature: M5 Update
+
+**Objective:**
+Make `uv run task-tracker update ID [options]` change a stored task: its name, priority, status, and due date. Covers issue #9 and the M5 section of `docs/implementation-plan.md`. Feature 6 of `README.md`, project-level list only: `--dir` and `--global` arrive in M7.
+This entry records the four decisions the "Think about" paragraph asked for, so the code steps have nothing left to decide.
+
+**Approach:**
+Branch `feature/update-task` (from `develop`, after M4 merged as PR #28). Test-first, one atomic commit per step, each with its own `SUMMARY.md` entry. Standard library only, so `uv.lock` does not change.
+
+1. The model rule: `Task.update(...)` in `src/task_tracker/task.py`. It takes keyword-only `name`, `priority`, `status`, and `due`, each defaulting to a not-given marker (the same idea as `_UNSET`), because `due=None` has to mean "clear it".
+   It reads `_now()` once, sets `updated` to that reading only when something changed, sets date completed to it when the status becomes `DONE`, clears date completed when the status leaves `DONE` (Q4), and runs `_normalize` and `_validate` so every rule the constructor has still holds. If a rule fails, the task is left as it was.
+   It has no parameter for `id`, `created`, `updated`, `description`, `start`, or `stop`. Commit: `feat(task): add Task.update`.
+2. The command: `update ID` with `--name`/`-n`, `--priority`/`-p`, `--status`/`-s`, `--due`/`-D`, and `--clear-due`/`-C`. `--due` and `--clear-due` are mutually exclusive in argparse (exit 2). `ID` is an `int` argument. Red: `update 1 --name x` exits 2 because argparse does not know the command.
+   Green: load, find the task, call `Task.update`, save, print `Updated task 1: <name>`. Commit: `feat(cli): add the update command`.
+3. The errors: no task with that ID, and `update 1` with no option, both raise `ValueError` and so reach the existing one-line error and exit 1 in `main`. The file is byte-for-byte unchanged in both. Commit: `feat(cli): refuse an update that names no task or no change`.
+4. Docs: tick the M5 boxes in the plan and issue #9, record the decisions below in both, add the `update` command and the lost-write note to `README.md`, and update the project state in `CLAUDE.md` (features 3 to 6 exist). Commit: `docs(plan): record the M5 decisions`.
+5. Done when the tests pass locally, coverage on changed code is at least 80%, the CI-version linters, the Markdown linters, and codespell are clean locally, and `update` works in a scratch directory. Pushing the code and opening the PR into `develop` wait for the project owner.
+
+**Tests:**
+The six Given/When/Then items are in the M5 section of the plan. In addition:
+
+- Build task 1 with `Task.restore` and a full record (created and updated 2026-10-01 09:00), not the constructor, because the constructor stamps `created` with the clock. A DONE task for the reopen case needs a date completed after its `stop`, so all of `created <= start <= stop <= date_completed` hold.
+- `updated` moves only when something changed. `update 1 --priority LOW` on a `LOW` task leaves `updated` as it was.
+- `--status DONE` on a task that is already `DONE` keeps the original date completed.
+- `--status IN_PROGRESS` on a `DONE` task clears date completed, the same as `TO_DO` (Q4).
+- `--clear-due` sets `due` to `None`; `--due 2026-12-01` sets it to midnight; both together exit 2.
+- A bad option value exits 2 and a rejected change exits 1, each with the file unchanged. A blank `--name` is the model's error, and the file is unchanged.
+- `Task.update` called with `id`, `created`, `start`, `stop`, or `description` raises `TypeError`, so a caller cannot change them. A failed update leaves the task as it was, field by field, including `updated`.
+- `update 1 -n ... -p HIGH` leaves the same file as the long forms.
+- Every record other than task 1 is identical before and after.
+
+**Risks & Trade-offs:**
+
+- **Where the rule lives, decided 2026-11-07.** `Task.update()`. The rule sits beside `_now` and `_validate`, the CLI stays thin, and the model is testable without argparse. Cost: the first method on `Task` that changes a task that already exists, and a not-given marker so that `due=None` can mean "clear".
+  Rejected: the command assigning fields itself. It would need `_now` and `_validate`, or a copy of them, and the status and date completed rule would have to move out of the CLI again in M8.
+- **Clearing `due`, decided 2026-11-07.** `--clear-due` (`-C`), exclusive with `--due`. Explicit, and argparse rejects a contradictory command. Cost: a second flag with a short form and a `README.md` options row.
+  Rejected: `--due none`, a reserved word that `_due` would have to special-case and that makes a bad-date message harder to word.
+- **`update 1` with no option, decided 2026-11-07.** An error naming the options, exit 1, file unchanged. It catches a forgotten or mistyped flag (Review Focus 4). Cost: a script that passes only the fields it has needs its own guard.
+  Rejected: a silent no-op, which would make a typo that drops every flag look like success.
+- **`start` and `stop`, Q3, decided 2026-11-07.** `update` cannot set them. `add` does not, `list` does not show them, and settable timeline fields would pull the four-link ordering rule into the CLI. They stay model-only until a milestone gives them a use.
+- **Defaults taken, 2026-11-07, not separately confirmed.** The short form `-C`. A value equal to the current one changes nothing, `updated` included, because `README.md` says `updated` moves each time the task changes. `DONE` to `DONE` keeps its date completed. `description` is not settable, as in `add`.
+- **Same-second updates.** `updated` has whole seconds, so two updates in one second leave the same value. Accepted, as for `created`.
+- **Clock set back.** `Task.update` stamps `updated` from the clock, and a clock earlier than `created` fails `updated must not be before created`. Accepted: one error line, exit 1, nothing saved.
+- **Lost writes.** `update` reads and rewrites the whole file, so a concurrent `add` or `update` can lose a change, as #27 describes for `add`. No lock, as in M2.
+- **Scope held back.** No `--description`, `--start`, `--stop`, no change to the layout of `cli.py` (M8), and no `--dir` or `--global` (M7).

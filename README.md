@@ -53,15 +53,16 @@
 
 Every option has a long and a short form.
 
-| Long         | Short |
-| ------------ | ----- |
-| `--dir PATH` | `-d`  |
-| `--global`   | `-g`  |
-| `--priority` | `-p`  |
-| `--due`      | `-D`  |
-| `--status`   | `-s`  |
-| `--name`     | `-n`  |
-| `--all`      | `-a`  |
+| Long          | Short |
+| ------------- | ----- |
+| `--dir PATH`  | `-d`  |
+| `--global`    | `-g`  |
+| `--priority`  | `-p`  |
+| `--due`       | `-D`  |
+| `--status`    | `-s`  |
+| `--name`      | `-n`  |
+| `--all`       | `-a`  |
+| `--clear-due` | `-C`  |
 
 ## App requirements
 

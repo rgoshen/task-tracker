@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 14:26] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`, `docs/implementation-plan.md`, `README.md`)
+
+**Summary:**
+Plan M5, the `update` command. `TODO.md` gets the M5 entry with its steps, tests, and trade-offs. The plan's M5 section gets a "Decided (2026-11-07)" block, and Q3 is closed: `update` does not set `start` and `stop`. The `README.md` options table gets `--clear-due` (`-C`), and its columns are re-aligned for the wider cell.
+
+**Rationale:**
+The M5 "Think about" paragraph asked four questions, and the project owner answered each in turn: the task owns the update rule (`Task.update`), a due date is cleared with `--clear-due`, `update` with no option is an error, and `start` and `stop` stay out of reach. Recording them before any code means the red tests have nothing left to decide.
+Four smaller points were taken as defaults and are marked as such in both files: the `-C` short form, no change to `updated` when a value is the same, `DONE` to `DONE` keeping its date completed, and `description` not being settable.
+Rejected alternatives are written next to each decision in `TODO.md` and the plan.
+Issue #9 is not changed in this commit. Its text is copied from the plan, so it needs the same "Decided" block and is the next step once the project owner agrees.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M5 Update
+- Issue: #9
+
 ## [2026-11-07 13:53] Commit Summary
 
 **Change Type:** Fix
