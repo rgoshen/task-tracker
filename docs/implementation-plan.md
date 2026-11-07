@@ -320,10 +320,10 @@ Branch `feature/delete-task`. Covers feature 7.
 - The prompt prints the ID and the name: `Delete task 2: Buy milk? [y/N]`, then a space. The name is the check against a reused ID (D5), and it is escaped like every other printed name.
 - `delete 99` fails before any prompt: exit 1, stderr names 99, the file is unchanged. `ID` follows the same rule as `update` (ASCII digits, at least 1; anything else exits 2).
 - `y` or `yes`, in any case, deletes. Anything else, the empty answer included, keeps the task, and the file is not written. Declining prints `Kept task 2: Buy milk` and exits 0. Success prints `Deleted task 2: Buy milk`.
-- When there is no way to answer (standard input empty, at its end, or closed), the command exits 1 with one error line and deletes nothing. A script has no other way to delete until `--yes` is built, which stays deferred (Q5).
+- When there is no way to answer (standard input empty, at its end, or closed; standard output closed; Ctrl-C), the command exits 1 with one error line and deletes nothing. A script has no other way to delete until `--yes` is built, which stays deferred (Q5).
 - After the answer the list is read again, and the task is deleted only if it still equals the one that was shown. Otherwise nothing is deleted and one error line says why. Rejected: reading once before the prompt, which would lose a task that another command stored while the person was typing (#27).
-- Taken as defaults, not separately confirmed: the default answer is no, `yes` is accepted next to `y`, declining exits 0, and the second read.
-- Not handled: Ctrl-C at the prompt (Python's default, as for every command) and a closed standard output while prompting.
+- The prompt goes to standard output, through `input(prompt)`. With standard output redirected to a file it is not visible, which is accepted. Rejected: standard error, which would move the tests off the `input` argument.
+- Confirmed by the project owner: the default answer is no, `yes` is accepted next to `y`, declining exits 0, and the second read.
 
 ### M7. Global list
 

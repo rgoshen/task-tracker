@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-07 15:55] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Settle the open points left in the M6 plan. The four defaults are confirmed: the default answer is no, `yes` is accepted, declining exits 0, and the list is read again after the answer. Ctrl-C and a closed standard output now join the "no way to answer" case instead of being listed as not handled. The prompt stays on standard output.
+
+**Rationale:**
+The project owner answered three questions on 2026-11-07.
+
+- Ctrl-C raises `KeyboardInterrupt`, which `main` does not catch, so the prompt would end in a traceback. It shares the handler with `EOFError` and `RuntimeError` and exits 1, not the usual 130: nothing has changed by then, and one code is easier to state.
+- A closed standard output (`>&-`) was checked with Python 3.14.7 and raises `RuntimeError: lost sys.stdout`, so the same handler already covers it. The earlier plan called it "not handled" without having checked what it did.
+- The prompt goes to standard output through `input(prompt)`. A redirected output hides it, which is accepted. Rejected: standard error, which moves the tests off the `input` argument and adds a second way to write text next to `_say`.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M6 Delete
+- Issue: #10
+
 ## [2026-11-07 15:40] Commit Summary
 
 **Change Type:** Docs
