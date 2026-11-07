@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-07 14:39] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`update ID` changes a stored task's name, priority, status, or due date. It passes only the options that were given to `Task.update`, and `--due` and `--clear-due` are mutually exclusive. Every other task is saved unchanged.
+The test helper `_done` now builds on a new `_stored` helper, so the record is written in one place.
+Refusing an update with no change and refusing an unknown ID come in the next step.
+
+**Rationale:**
+The command only parses options and saves, and the rule stays in `Task.update`, as decided for M5. Options default to `None`, so a missing option is told apart from one given with its default value. `due` is left out of the keyword arguments unless a flag is given, because `None` means "clear the date" to `Task.update`.
+The short forms are checked against the long forms byte for byte, so a mistake in a short form cannot pass unnoticed.
+
+**References:**
+
+- `TODO.md`: 2026-11-07 Feature: M5 Update, step 2
+- Issue: #9
+
 ## [2026-11-07 14:33] Commit Summary
 
 **Change Type:** Feature

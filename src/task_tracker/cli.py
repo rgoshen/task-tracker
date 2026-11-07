@@ -6,7 +6,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import TextIO
+from typing import Any, TextIO
 
 from task_tracker.priority import Priority
 from task_tracker.status import Status
@@ -25,6 +25,29 @@ def _add(args: argparse.Namespace, path: Path) -> list[str]:
     task = Task(next_id, args.name, priority=args.priority, due=args.due)
     save([*tasks, task], path)
     return [f"Added task {task.id}: {task.name}"]
+
+
+def _changes(args: argparse.Namespace) -> dict[str, Any]:
+    """The keyword arguments for `Task.update`: only the options that were given."""
+    given = {"name": args.name, "priority": args.priority, "status": args.status}
+    changes = {name: value for name, value in given.items() if value is not None}
+    # `due` is left out entirely when neither flag is given: in `Task.update` that
+    # means "keep it", while `due=None` means "clear it".
+    if args.due is not None:
+        changes["due"] = args.due
+    elif args.clear_due:
+        changes["due"] = None
+    return changes
+
+
+def _update(args: argparse.Namespace, path: Path) -> list[str]:
+    """Change task `args.id` and return the line to show."""
+    tasks = load(path)
+    task = next(task for task in tasks if task.id == args.id)
+    task.update(**_changes(args))
+    # Every other task is written back as it was read.
+    save(tasks, path)
+    return [f"Updated task {task.id}: {task.name}"]
 
 
 # Highest priority first. The rank is the enum's definition order, because the
@@ -232,6 +255,33 @@ def _build_parser() -> argparse.ArgumentParser:
         help="also list the done tasks, after the current ones",
     )
     listing.set_defaults(run=_list)
+    update = commands.add_parser("update", help="change a stored task")
+    update.add_argument("id", type=int)
+    # Defaults are `None` so that a missing option is told apart from one given
+    # with the default value. As in `add`, no `type=`: argparse would convert before
+    # it checks `choices`.
+    update.add_argument("--name", "-n")
+    update.add_argument(
+        "--priority",
+        "-p",
+        choices=[priority.value for priority in Priority],
+    )
+    update.add_argument(
+        "--status",
+        "-s",
+        choices=[status.value for status in Status],
+    )
+    # Mutually exclusive: a date and "no date" in one command contradict each other.
+    due = update.add_mutually_exclusive_group()
+    due.add_argument(
+        "--due",
+        "-D",
+        type=_due,
+        metavar="DATETIME",
+        help="YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, local time",
+    )
+    due.add_argument("--clear-due", "-C", action="store_true")
+    update.set_defaults(run=_update)
     return parser
 
 
