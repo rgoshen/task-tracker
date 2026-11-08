@@ -375,15 +375,17 @@ def _build_parser() -> argparse.ArgumentParser:
     # a subcommand also accepted would turn a slip such as `add Milk -d 2026-11-02`
     # (for `-D`) into a directory. Here argparse refuses it. The `dest` is explicit
     # because `--global` would default to `global`, a keyword, and no subparser may
-    # reuse it: parent and subparser would share one attribute.
-    parser.add_argument(
+    # reuse it: parent and subparser would share one attribute. The two options name
+    # a list each, so argparse refuses both together (exit 2).
+    location = parser.add_mutually_exclusive_group()
+    location.add_argument(
         "--global",
         "-g",
         dest="use_global",
         action="store_true",
         help="use the list in ~/.task-tracker, not the one in the current directory",
     )
-    parser.add_argument(
+    location.add_argument(
         "--dir",
         "-d",
         dest="directory",

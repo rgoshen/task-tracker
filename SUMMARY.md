@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-08 16:54] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`--dir` and `--global` share one `add_mutually_exclusive_group()`. Giving both, in either order and in the long or the short spelling, exits 2 with argparse's `not allowed with` message and writes nothing.
+
+**Rationale:**
+Each option names a list, so both together contradict each other. argparse words the error and exits 2, so there is no check of our own to keep in step.
+Red first, three cases: with no group, both options were accepted and `--global` won (`DID NOT RAISE SystemExit`). The tests use `add`, because "nothing written" means nothing for `list`: they check that the cwd holds no project file and no `elsewhere` directory, and that the fake home is empty. They check only `not allowed with`, because the rest of the wording changes with the order. 404 pass now.
+Break: dropping the group is the Red, so it is not run a second time.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 6
+- Issue: #11
+
 ## [2026-11-08 16:53] Commit Summary
 
 **Change Type:** Feature

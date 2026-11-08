@@ -1838,3 +1838,33 @@ def test_an_empty_dir_is_a_bad_option_value(
     assert exit_info.value.code == 2
     assert "--dir" in capsys.readouterr().err
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--dir", "{dir}", "--global"],
+        ["-d", "{dir}", "-g"],
+        ["--global", "--dir", "{dir}"],
+    ],
+    ids=["long", "short", "reversed"],
+)
+def test_dir_together_with_global_is_refused_and_writes_nothing(
+    project: Path,
+    home: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    options: list[str],
+):
+    elsewhere = tmp_path / "elsewhere"
+    argv = [option.replace("{dir}", str(elsewhere)) for option in options]
+
+    with pytest.raises(SystemExit) as exit_info:
+        main([*argv, "add", "Milk"])
+
+    # argparse words the rest of the message differently for each order.
+    assert exit_info.value.code == 2
+    assert "not allowed with" in capsys.readouterr().err
+    # No project file, no `elsewhere` directory, nothing under the fake home.
+    assert list(tmp_path.iterdir()) == []
+    assert list(home.iterdir()) == []
