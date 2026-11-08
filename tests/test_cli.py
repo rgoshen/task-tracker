@@ -1797,3 +1797,16 @@ def test_dir_naming_a_regular_file_gives_one_error_line(
     _assert_one_line_error(capsys, "plain")
     assert plain.read_text(encoding="utf-8") == "not a directory"
     assert not project.exists()
+
+
+def test_dir_expands_a_leading_tilde_to_the_home_directory(
+    project: Path, home: Path, tmp_path: Path
+):
+    # A shell leaves `~` alone in `--dir=~/groceries`, so the program gets the same
+    # text for both spellings and must expand it, or it makes a directory named `~`.
+    exit_code = main(["--dir", "~/groceries", "add", "Milk"])
+
+    assert exit_code == 0
+    assert [task.name for task in load(home / "groceries" / "tasks.json")] == ["Milk"]
+    assert not (tmp_path / "~").exists()
+    assert not project.exists()

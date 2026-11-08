@@ -342,8 +342,12 @@ _DUE_OPTION: dict[str, Any] = {
 
 
 def _directory(text: str) -> Path:
-    """Turn the value of `--dir` into a path."""
-    return Path(text)
+    """Turn the value of `--dir` into a path, with a leading `~` expanded.
+
+    A shell expands `~` in `--dir ~/x` but not in `--dir=~/x`, which would make a
+    directory literally named `~`.
+    """
+    return Path(text).expanduser()
 
 
 def _list_path(args: argparse.Namespace) -> Path:

@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-08 16:51] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`--dir` expands a leading `~`: `_directory` returns `Path(text).expanduser()`.
+
+**Rationale:**
+Zsh and Bash expand `~` in `--dir ~/x` but not in `--dir=~/x` (checked while planning), so the second form would have created a directory literally named `~`, possibly inside a Git repository. The program receives the same text in both forms, so one test covers them.
+Red first: the task went into `<cwd>/~/groceries` and nothing was under the fake home. 399 pass now.
+Break: dropping `expanduser` fails exactly that test, so the break and the Red are the same thing.
+Cost: a real directory whose name starts with `~` must be written `./~name`.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 3
+- Issue: #11
+
 ## [2026-11-08 16:50] Commit Summary
 
 **Change Type:** Feature
