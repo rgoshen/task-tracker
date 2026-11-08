@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-08 16:52] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+A `--dir` value such as `~no-such-user/x` is refused as a bad option value: exit 2, one usage error that names `--dir/-d` and quotes the text.
+
+**Rationale:**
+`expanduser` raises `RuntimeError` when the home directory of a named user cannot be found, and argparse only turns `ArgumentTypeError`, `TypeError` and `ValueError` from a converter into a usage error. Without the conversion the error ended `main` in a traceback (the Red: `RuntimeError: Could not determine home directory`).
+The conversion lives in the converter, not in `_list_path`, so a bad value exits 2 like every other bad option value and the message names the text the user typed instead of blaming the home directory.
+The test needs no patch: the password-file lookup finds no user called `no-such-user-m7`. 400 pass now.
+Break: removing the handler is the Red, so it is not run a second time.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 4
+- Issue: #11
+
 ## [2026-11-08 16:51] Commit Summary
 
 **Change Type:** Feature

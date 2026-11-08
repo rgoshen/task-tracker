@@ -1810,3 +1810,18 @@ def test_dir_expands_a_leading_tilde_to_the_home_directory(
     assert [task.name for task in load(home / "groceries" / "tasks.json")] == ["Milk"]
     assert not (tmp_path / "~").exists()
     assert not project.exists()
+
+
+def test_dir_with_a_tilde_that_cannot_be_expanded_is_a_bad_option_value(
+    project: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    # `~name` for a user who does not exist: `expanduser` raises RuntimeError, which
+    # argparse does not catch, so without a conversion this ends in a traceback.
+    with pytest.raises(SystemExit) as exit_info:
+        main(["--dir", "~no-such-user-m7/x", "list"])
+
+    error = capsys.readouterr().err
+    assert exit_info.value.code == 2
+    assert "--dir" in error
+    assert "~no-such-user-m7/x" in error
+    assert list(tmp_path.iterdir()) == []

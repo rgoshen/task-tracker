@@ -347,7 +347,12 @@ def _directory(text: str) -> Path:
     A shell expands `~` in `--dir ~/x` but not in `--dir=~/x`, which would make a
     directory literally named `~`.
     """
-    return Path(text).expanduser()
+    try:
+        return Path(text).expanduser()
+    except RuntimeError:
+        # `~name` for a user who does not exist. argparse only turns
+        # ArgumentTypeError, TypeError and ValueError into a usage error (exit 2).
+        raise argparse.ArgumentTypeError(f"cannot expand {text!r}") from None
 
 
 def _list_path(args: argparse.Namespace) -> Path:
