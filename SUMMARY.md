@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-08 16:55] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+A location option after the command is refused and creates nothing. Three cases, each exit 2 with `unrecognized arguments`: `add Milk -d 2026-11-02` (the slip for `-D`), `add Milk --global`, and `list --dir elsewhere`. The cwd and the fake home stay empty.
+
+**Rationale:**
+This passes the moment it is written, because the safety is where the options live (the top-level parser), not code of its own. So it is shown to be able to fail. Putting `--dir` on the `add` subparser fails six tests, the slip case among them, and putting it on `list` fails five, the after-command case among them.
+The breaks also failed the tilde and regular-file tests, which is the shared-`dest` hazard the argparse documentation warns about: the subparser's default of `None` overwrites the value the parent parsed, so even a correct `--dir` is lost. 407 pass.
+Commit type `test`: no production code changes, so nothing reaches the changelog.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 7
+- Issue: #11
+
 ## [2026-11-08 16:54] Commit Summary
 
 **Change Type:** Feature

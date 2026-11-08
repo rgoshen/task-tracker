@@ -1868,3 +1868,31 @@ def test_dir_together_with_global_is_refused_and_writes_nothing(
     # No project file, no `elsewhere` directory, nothing under the fake home.
     assert list(tmp_path.iterdir()) == []
     assert list(home.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["add", "Milk", "-d", "2026-11-02"],
+        ["add", "Milk", "--global"],
+        ["list", "--dir", "elsewhere"],
+    ],
+    ids=["slip-for-due", "global-after-command", "dir-after-command"],
+)
+def test_a_location_option_after_the_command_is_refused_and_creates_nothing(
+    project: Path,
+    home: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
+):
+    # `-d` and `-D` differ by one Shift. On the top-level parser a slip for `--due`
+    # is an unrecognized argument; a subcommand that also took `-d` would bind
+    # `2026-11-02` as a directory and create it on the first save.
+    with pytest.raises(SystemExit) as exit_info:
+        main(argv)
+
+    assert exit_info.value.code == 2
+    assert "unrecognized arguments" in capsys.readouterr().err
+    assert list(tmp_path.iterdir()) == []
+    assert list(home.iterdir()) == []
