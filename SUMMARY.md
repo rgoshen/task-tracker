@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-08 16:56] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`--global` on a machine with no findable home directory prints one line, `task-tracker: error: cannot find the home directory; use --dir PATH to name a directory`, and exits 1 with nothing written.
+
+**Rationale:**
+`Path.home()` raises `RuntimeError` when `HOME` is unset and the user has no password-file entry, as in a container started with an arbitrary user ID.
+`main` catches only `ValueError` and `OSError`, on purpose (M6: a bug elsewhere must stay visible), so `_list_path` converts exactly this one call to a `ValueError` and the existing handler does the rest.
+The message points at `--dir`, which works without a home.
+Red first: the `RuntimeError` escaped `main` (`Could not determine home directory`).
+The test patches `os.path.expanduser` to return its argument, which its documentation says it does when it cannot expand. I also ran the real case, with `HOME` removed and the password-file lookup failing, and it prints the same line with exit 1. 408 pass.
+Break: removing the handler is the Red, so it is not run a second time.
+Accepted, not guarded: an empty `HOME` gives `/` and a relative `HOME` gives a relative list that moves with the cwd.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 8
+- Issue: #11
+
 ## [2026-11-08 16:55] Commit Summary
 
 **Change Type:** Feature

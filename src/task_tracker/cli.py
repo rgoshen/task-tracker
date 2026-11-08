@@ -361,7 +361,15 @@ def _directory(text: str) -> Path:
 def _list_path(args: argparse.Namespace) -> Path:
     """Return the list file the command works on: the global one or the project's."""
     if args.use_global:
-        return Path.home() / _GLOBAL_DIR / _LIST_FILE
+        try:
+            home = Path.home()
+        except RuntimeError:
+            # `main` does not catch RuntimeError, on purpose: a bug elsewhere must stay
+            # visible. This call raises it when no home directory can be found.
+            raise ValueError(
+                "cannot find the home directory; use --dir PATH to name a directory"
+            ) from None
+        return home / _GLOBAL_DIR / _LIST_FILE
     if args.directory is not None:
         # `absolute()` joins a relative path to the cwd and leaves an absolute one
         # alone without reading the cwd, which `Path.cwd() / directory` would do.

@@ -1896,3 +1896,23 @@ def test_a_location_option_after_the_command_is_refused_and_creates_nothing(
     assert "unrecognized arguments" in capsys.readouterr().err
     assert list(tmp_path.iterdir()) == []
     assert list(home.iterdir()) == []
+
+
+def test_global_without_a_home_directory_gives_one_error_line(
+    project: Path,
+    home: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    # `expanduser` returns its argument when it cannot expand, and `Path.home()` then
+    # raises RuntimeError (HOME unset, and no password-file entry for the user, as in
+    # a container started with an arbitrary user ID).
+    monkeypatch.setattr("os.path.expanduser", lambda path: path)
+
+    exit_code = main(["--global", "add", "Milk"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "home directory")
+    assert list(tmp_path.iterdir()) == []
+    assert list(home.iterdir()) == []
