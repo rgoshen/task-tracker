@@ -1,5 +1,29 @@
 # Summary
 
+## [2026-11-08 16:11] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Plan M7 (`--global` and `--dir`). `TODO.md` gets a "Feature: M7 Global list" entry with eight test-first steps, the tests, and the decisions with their costs. The M7 section of the plan gets five more acceptance boxes and a "Decided (2026-11-08)" block. No code changes.
+
+**Rationale:**
+The "Think about" points of M7 were open questions, so each is answered before any code, as for M6.
+Placement: the options go on the top-level parser. A probe on Python 3.14.7 showed `add Milk -d 2026-11-02` exits 2 there, and silently binds `directory='2026-11-02'` when `--dir` belongs to the `add` subparser, so top-level is the only placement that meets the last acceptance criterion with no guard code of our own.
+Four cases the issue does not list came out of checking: `--dir=~/x` is not expanded by Zsh or Bash and would create a directory named `~`; `--dir ""` becomes the current directory; `--global` has the default attribute name `global`, a keyword; and `Path.home()` raises `RuntimeError`, which `main` does not catch (reproduced with the password-file lookup failing).
+Each has a box and a step.
+`--dir` naming a regular file needs no code: `load` and `save` both raise `OSError` there, and `main` already turns that into one line.
+Rejected: requiring a `--dir` directory to exist (a second rule and an extra command to start a list), and the options on every subparser (the silent slip above).
+The `~` decision changed during planning: the first draft left it to the shell, until the check showed the shell does not expand it in `--dir=~/x`.
+The M7 notes also correct a claim made in conversation: `filelock` is a development dependency pulled in by other tools, not a dependency of the program, so the fix for #27 is not free (`dependencies = []`).
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list
+- Issue: #11
+
 ## [2026-11-07 16:33] Commit Summary
 
 **Change Type:** Docs

@@ -513,3 +513,67 @@ One test-first commit per comment or group, each with its own `SUMMARY.md` entry
   New test-only commits use `test(cli):`.
 - **Weak spot in #9.** The directory case passes with the second read broken, because the failing `save` gives the same one line. Only the corrupt case pins the second read.
 - **Found on the way.** `ruff format` at 0.16 and CI's mypy and flake8 disagree about `except A, B:`. Nothing in the repository uses that form now.
+
+## [2026-11-08] Feature: M7 Global list
+
+**Objective:**
+Let every command choose which list it works on. `--global` (`-g`) selects `~/.task-tracker/tasks.json`, `--dir PATH` (`-d PATH`) selects `PATH/tasks.json`, and with neither flag the list stays `./tasks.json`. The two flags are mutually exclusive. Covers issue #11, feature 2 of `README.md`, and the M7 section of `docs/implementation-plan.md`.
+This entry answers the five "Think about" points of that section, and the cases found while checking them, so the code steps have nothing left to decide.
+
+**Approach:**
+Branch `feature/global-list` (from `develop`, after M6 merged as PR #30). Test-first, one atomic commit per step, each with its own `SUMMARY.md` entry.
+Standard library only, so `uv.lock` does not change. No change to `Task` or `storage.py`: `save` already creates missing directories (M2) and `load` already returns `[]` for a file or directory that does not exist.
+The code is in `cli.py`; the tests are a `# --- M7 ---` section of `tests/test_cli.py`, which keeps the shared fixtures (whether to split that module is M8's question).
+
+1. The home list. Add an autouse fixture `home` that makes `tmp_path / "home"` and points `HOME` at it, so no test in the module can reach the real home directory.
+   Add `--global`/`-g` to the top-level parser (`dest="use_global"`, `store_true`) and `_list_path(args: argparse.Namespace) -> Path`, which returns `Path.home() / ".task-tracker" / "tasks.json"` for `--global` and `Path.cwd() / "tasks.json"` otherwise.
+   `main` passes `_list_path(args)` to `args.run` from inside its existing `try`.
+   Red: `--global` exits 2 because argparse does not know it. Covers plan boxes 1 to 3. Commit: `feat(cli): add --global to use the list in the home directory`.
+2. The chosen directory. Add `--dir`/`-d` to the top-level parser (`dest="directory"`, `metavar="PATH"`, `type=_directory`).
+   `_directory(text: str) -> Path` raises `argparse.ArgumentTypeError` for the empty string and returns `Path(text)` otherwise. `_list_path` returns `Path.cwd() / directory.expanduser() / "tasks.json"`: an absolute `--dir` replaces the cwd, a relative one is joined to it.
+   Red: `--dir` exits 2. Covers plan boxes 4 and 6. Commit: `feat(cli): add --dir to choose the directory of the list`.
+3. The exclusion. Put both options in one `parser.add_mutually_exclusive_group()`. Red: with both flags given, `--global` wins silently. Covers plan box 5. Commit: `feat(cli): refuse --dir together with --global`.
+4. The slip. A location option after the command is refused. This passes at once, because the placement is the safety (see Risks). Show that it can fail: add `--dir` to the `add` subparser and watch the slip case go red, then remove it. Covers plan box 7. Commit: `test(cli): pin that a location option after the command is refused`.
+5. No home directory. `_list_path` wraps its two home lookups, `Path.home()` and `Path.expanduser()`, in one `except RuntimeError` that raises `ValueError`, so `main`'s existing handler prints one line and exits 1. Red: the `RuntimeError` escapes `main` as a traceback. Commit: `feat(cli): report a missing home directory in one line`.
+6. Prove the tests can fail. Break `_list_path` in turn (ignore `directory`, ignore `use_global`, drop `expanduser`, drop the `RuntimeError` handler) and drop the exclusive group, and write down which tests go red for each. Disable bytecode caching and clear `__pycache__` for every mutant, or the run reuses the unbroken code. The result goes in the `SUMMARY.md` entry of step 5.
+7. Docs: tick the M7 boxes in the plan and issue #11, record the decisions below in both, add the two options to `README.md` with the rule that they come before the command, and update the project state in `CLAUDE.md` (features 2 to 7 exist, only the install is left). Commit: `docs(plan): record the M7 decisions`.
+8. Done when the tests pass locally, coverage on changed code is at least 80%, the CI-version linters, the Markdown linters, JSCPD, and codespell are clean locally, and both options work in a scratch directory with a throwaway `HOME`, never the real one. Pushing the code and opening the PR into `develop` wait for the project owner.
+
+**Tests:**
+The seven Given/When/Then items are in the M7 section of the plan. They use the existing `project` fixture (the cwd is `tmp_path`) and the new `home` fixture. In addition:
+
+- `--global add "Renew passport"` stores task 1 in `home / ".task-tracker" / "tasks.json"`, creates `.task-tracker` (it did not exist), writes no `tasks.json` in the cwd, exits 0, and prints `Added task 1: Renew passport`.
+- `list` and `--global list` (also `-g list`, one parametrized test) each show only their own list.
+- `--global list` with no file prints `No current tasks in <home>/.task-tracker/tasks.json`, exits 0, and creates nothing (Review Focus 3).
+- `--dir`, `-d` with an absolute path, and `-d` with a relative one (one parametrized test) store the task in `<dir>/tasks.json`. The empty-list message names the absolute path in all three.
+- `--dir=~/groceries` and `--dir ~/groceries` both use `home / "groceries" / "tasks.json"`, and nothing named `~` appears in the cwd. A shell expands `~` only in the second form.
+- `--dir ""` exits 2, the error names `--dir`, and nothing is written. `Path("")` is `Path(".")`, so without the check an empty shell variable would select the cwd.
+- `--dir` naming a regular file, for `list` and for `add`, exits 1 with one error line and leaves the file as it was. Both `load` and `save` raise `OSError` there (checked 2026-11-08), so no new code is expected.
+- `--dir` with `--global`, in the orders `--dir`/`--global`, `-d`/`-g`, and `--global`/`--dir`, exits 2 with `not allowed with` on standard error and writes nothing, neither a file nor the directory.
+- `add Milk -d 2026-11-02`, `add Milk --global`, and `list --dir elsewhere` exit 2 with `unrecognized arguments` and leave `tmp_path` holding only `home`.
+- With `os.path.expanduser` patched to return its argument (what its documentation says it does when it cannot expand), `--global list` and `--dir ~/x list` exit 1 with one error line naming the home directory and write nothing.
+- Every existing test passes unchanged: none of them gives a location option.
+
+**Risks & Trade-offs:**
+
+- **Where the flags live, decided 2026-11-08.** On the top-level parser, before the command: `task-tracker --global add ...`, `task-tracker -d DIR list`.
+  Checked on Python 3.14.7: with `--dir` on the top-level parser, `add Milk -d 2026-11-02` exits 2 (`unrecognized arguments: -d 2026-11-02`); on the `add` subparser the same line binds `directory='2026-11-02'` and creates that directory on the first save.
+  The argparse documentation also says a parent option and a subparser option with one `dest` share one attribute.
+  Cost: `task-tracker add Milk --global` exits 2 instead of working, and `add --help` does not list the two options (the top-level `--help` does). Both fail safe, and `README.md` states the order. Rejected: the options on every subparser (the slip above), and a shared parent parser (the same slip).
+- **Attribute names, decided 2026-11-08.** `--global` has no valid default `dest`: it would be `global`, a Python keyword, so `args.global` is a syntax error. The names are `use_global` and `directory`, and no subparser may use either, because parent and subparser would share one attribute.
+- **Exclusion, decided 2026-11-08.** One `add_mutually_exclusive_group()`. argparse words the error (`argument --global/-g: not allowed with argument --dir/-d`) and exits 2, in either order, so there is no check of our own to maintain.
+- **A `--dir` that does not exist, decided 2026-11-08.** `list` reports an empty list and creates nothing (plan box 6). `add` creates it, as the first `--global add` creates `.task-tracker/` (plan box 3): `save` already makes the parents (M2) and no new code is needed.
+  Cost: a typo such as `--dir grocereis` creates a stray directory and stores the task in a list the user never meant, and `add` prints only the ID, not the path.
+  Rejected: requiring the directory to exist, which needs a second rule next to the global one and an extra command to start a new list.
+- **`~` is expanded by the program, decided 2026-11-08, changed from the first draft.** Zsh and Bash expand `~` in `--dir ~/x` but not in `--dir=~/x` (checked 2026-11-08), which would create a directory literally named `~`, possibly inside a Git repository.
+  `Path.expanduser()` costs one call and shares the `RuntimeError` handler with `Path.home()`.
+  Cost: a real directory whose name starts with `~` must be written `./~name`.
+- **An empty `--dir`, decided 2026-11-08.** Refused with exit 2. `Path("")` is `Path(".")`, so `--dir "$PROJECT"` with `PROJECT` unset would quietly use the current directory, which is the wrong list with no sign of it.
+- **Path form, decided 2026-11-08.** `Path.cwd() / directory`: an absolute right-hand side replaces the left (checked), so one expression covers both cases and the printed path stays absolute, as it is today. No `resolve()`: it follows symbolic links and would change the path shown, and `save` already resolves the one it writes. A `..` in the path is kept as typed.
+- **No home directory, decided 2026-11-08.** `Path.home()` and `Path.expanduser()` raise `RuntimeError` when `HOME` is unset and the user has no password-file entry, as in a container started with an arbitrary user ID (reproduced 2026-11-08).
+  `main` does not catch `RuntimeError`, on purpose (M6: a bug inside `input` must stay visible), so `_list_path` converts exactly these two calls.
+  An empty `HOME` gives `/`, so the list would be `/.task-tracker/tasks.json`; that is accepted, because `HOME=/` is legitimate in containers.
+- **HOME in tests, decided 2026-11-08.** `Path.home()` goes through `os.path.expanduser`, which reads `HOME` first on POSIX, so `monkeypatch.setenv("HOME", ...)` isolates a test. On Windows it reads `USERPROFILE`; CI runs on `ubuntu-latest` and the project has no Windows target, so only `HOME` is set. The fixture is autouse so a test that forgets it cannot write to the real home.
+- **More exposure to #27.** A global list can be reached from any directory and any terminal, so two `add` commands at once are likelier than with a project list.
+  #27 stays open and out of scope. Its fix is not free: `dependencies = []` is a project constraint, and `filelock` is only a development dependency pulled in by other tools (`uv.lock`), so a lock needs either the standard library or a decision to lift that constraint.
+- **Scope held back.** No walk-up to a `.git` directory (D2). No change to what `add` prints, so the typo case above stays visible only through `list`. Whether `list` should always name the file it read (the M3 note under D2) is left to the owner. No `--yes` (Q5). No change to the layout of `cli.py` (M8).

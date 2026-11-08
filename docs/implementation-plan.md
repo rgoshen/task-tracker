@@ -341,6 +341,11 @@ Produces: one place that turns the global flag, `--dir`, the cwd, and the home d
 - [ ] Given `--dir` and `--global` together, or `-d` and `-g`, then argparse exits with code 2, an error line is printed, and no file is written.
 - [ ] Given `--dir` naming a directory that does not exist, when `list`, then the empty-list message is printed and the directory is not created.
 - [ ] Given `add "Milk" -d 2026-11-02` (a slip for `-D`), then no file or directory named `2026-11-02` is created.
+- [ ] Given the options after the command, such as `add "Milk" --global` or `list --dir elsewhere`, then argparse exits with code 2 (`unrecognized arguments`) and nothing is created. (planned 2026-11-08)
+- [ ] Given `--dir=~/groceries` or `--dir ~/groceries` with `HOME` at the fake home, then the list is `home / "groceries" / "tasks.json"` and nothing named `~` is created in the cwd. (planned 2026-11-08)
+- [ ] Given `--dir ""`, then the exit code is 2, the error names `--dir`, and nothing is written. (planned 2026-11-08)
+- [ ] Given `--dir` naming a regular file, when `list` or `add`, then the exit code is 1, one error line is printed, and the file is unchanged. (planned 2026-11-08)
+- [ ] Given a home directory that cannot be found, when `--global list` or `--dir ~/x list`, then the exit code is 1, one error line names the home directory, and nothing is written. (planned 2026-11-08)
 
 **Think about:**
 
@@ -349,6 +354,18 @@ Produces: one place that turns the global flag, `--dir`, the cwd, and the home d
 - How do you make `--dir` and `--global` mutually exclusive in argparse? Check the argparse docs for groups.
 - A typo'd `--dir` creates a new directory on the first `add`, because M2 creates missing parents. Is that acceptable, or should `add` require the directory to exist?
 - Why does setting `HOME` isolate this test? Follow [Path.home] to [os.path.expanduser].
+
+**Decided (2026-11-08):**
+
+- Both options go on the top-level parser, before the command: `task-tracker --global add "Milk"`, `task-tracker -d DIR list`.
+  Checked on Python 3.14.7: `add Milk -d 2026-11-02` exits 2 there and silently binds `directory='2026-11-02'` on the `add` subparser.
+  After the command the options are refused (exit 2), which fails safe. The attributes are `use_global` and `directory`: `--global` would default to `global`, a keyword.
+- The two options share one `add_mutually_exclusive_group()`, so argparse words the error and exits 2 in either order.
+- `list` on a `--dir` that does not exist reports an empty list and creates nothing. `add` creates it, as the first `--global add` creates `.task-tracker/`; `save` already does this (M2). Rejected: requiring the directory to exist.
+- `--dir` expands a leading `~` itself, because Zsh and Bash do not expand it in `--dir=~/x`. An empty `--dir` is refused, because `Path("")` is the current directory. A relative `--dir` is joined to the cwd, so the printed path stays absolute.
+- A home directory that cannot be found (`RuntimeError` from `Path.home()` or `Path.expanduser()`) is one error line and exit 1. `main` still does not catch `RuntimeError`.
+- `HOME` isolates the tests because `Path.home()` calls `os.path.expanduser`, which reads `HOME` first on POSIX. The fixture is autouse. Windows reads `USERPROFILE` and is not covered: CI runs on `ubuntu-latest`.
+- Taken as defaults, not separately confirmed: all of the above. The costs are in the `TODO.md` entry for 2026-11-08 (stray directory on a typo, `add` prints no path, more exposure to #27).
 
 ### M8. Refactor
 
