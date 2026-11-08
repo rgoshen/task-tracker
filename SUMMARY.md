@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-08 16:43] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Revise the M7 plan after a `spec-gap-auditor` review by a fresh Opus agent (no blockers, eleven gaps). `TODO.md` and the plan say the same thing again.
+The old step 2 is four steps (plain `--dir`, the `~`, a `~` that cannot be expanded, an empty value), and the break-the-code step is folded into each step.
+The docs step names every text that would go stale. The plan gains three acceptance boxes (`~name` with no such user, `--help`, and the `add` form of the missing-home case) and loses none. No code changes.
+
+**Rationale:**
+Each finding was checked before it was accepted. Confirmed by probe on Python 3.14.7: `--dir "" list` fails today with `invalid choice`, so the empty-value and `~` tests would have gone red for the wrong reason; a `RuntimeError` from `expanduser` escapes argparse; `Path("/abs").absolute()` works with the cwd deleted where `Path.cwd() / directory` fails.
+Changed because of it: `~` expansion moved from `_list_path` into the `--dir` converter, so a `~name` with no such user is a bad option value (exit 2, the text in the message) and not a home-directory error (exit 1), which also fixes a message that blamed the wrong thing.
+The path is `args.directory.absolute()`. The fake home is made outside the cwd, as plan box 1 says, and the slip test asserts both are empty.
+Both options get `help=` and a test, as the review of PR #29 asked for every option. The exclusion test uses `add`, because "nothing written" means nothing for `list`. Step 9 lists the `README.md` lines that say "in the current directory", the exit codes, and the issue.
+Declined: a guard for a relative `HOME`. It would add a branch and a test for a value the user sets on purpose, and POSIX expects an absolute one. The sentence that claimed the printed path always stays absolute now says where it does not. Issue #11 is not edited yet: the M6 entry updated its issue in the docs step, and the plan names the missing boxes there.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list
+- Issue: #11
+
 ## [2026-11-08 16:11] Commit Summary
 
 **Change Type:** Docs
