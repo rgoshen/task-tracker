@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-08 16:50] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`--dir PATH` (`-d PATH`) selects `PATH/tasks.json`. It sits on the top-level parser beside `--global`, so it comes before the command. `_directory(text)` turns the value into a path, and `_list_path` returns `args.directory.absolute() / "tasks.json"`: a relative path is joined to the cwd, an absolute one is used as it is.
+
+**Rationale:**
+`absolute()` over `Path.cwd() / directory`: the two give the same paths, but the second reads the cwd even for an absolute `--dir` and fails when the cwd has been deleted (checked on Python 3.14.7 while planning).
+Red first: nine tests failed, all with argparse taking the path for the command (`invalid choice`). 398 pass now.
+`--dir` naming a regular file needs no code. `load` and `save` both raise `OSError` for `plain/tasks.json` and `main` already turns that into one line, so its tests were red only because the option did not exist yet; they pin the behavior from here on.
+Breaks, whole suite, bytecode caching off: ignoring `directory` fails eight tests (every one that passes `--dir`); dropping `absolute()` fails exactly one, the relative-path message check, which is why that case stays in the parametrized list.
+The two tests that share the three path forms use one decorator, because the JSCPD check has threshold 0.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 2
+- Issue: #11
+
 ## [2026-11-08 16:49] Commit Summary
 
 **Change Type:** Feature

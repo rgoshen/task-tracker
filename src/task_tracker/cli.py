@@ -341,10 +341,19 @@ _DUE_OPTION: dict[str, Any] = {
 }
 
 
+def _directory(text: str) -> Path:
+    """Turn the value of `--dir` into a path."""
+    return Path(text)
+
+
 def _list_path(args: argparse.Namespace) -> Path:
     """Return the list file the command works on: the global one or the project's."""
     if args.use_global:
         return Path.home() / _GLOBAL_DIR / _LIST_FILE
+    if args.directory is not None:
+        # `absolute()` joins a relative path to the cwd and leaves an absolute one
+        # alone without reading the cwd, which `Path.cwd() / directory` would do.
+        return args.directory.absolute() / _LIST_FILE
     return Path.cwd() / _LIST_FILE
 
 
@@ -361,6 +370,14 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="use_global",
         action="store_true",
         help="use the list in ~/.task-tracker, not the one in the current directory",
+    )
+    parser.add_argument(
+        "--dir",
+        "-d",
+        dest="directory",
+        metavar="PATH",
+        type=_directory,
+        help="use PATH/tasks.json, not the list in the current directory",
     )
     commands = parser.add_subparsers(dest="command", required=True)
     add = commands.add_parser("add", help="add a task")

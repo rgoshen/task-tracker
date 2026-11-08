@@ -1722,7 +1722,7 @@ def test_global_list_with_no_file_says_so_and_creates_nothing(
     assert not (home / ".task-tracker").exists()
 
 
-@pytest.mark.parametrize("option", ["--global"])
+@pytest.mark.parametrize("option", ["--global", "--dir PATH"])
 def test_the_top_level_help_lists_the_location_options(
     capsys: pytest.CaptureFixture[str], option: str
 ):
@@ -1731,3 +1731,69 @@ def test_the_top_level_help_lists_the_location_options(
 
     assert exit_info.value.code == 0
     assert option in capsys.readouterr().out
+
+
+# The three ways to name a directory: both option spellings, and a relative path.
+_DIRECTORY_FORMS = pytest.mark.parametrize(
+    ("flag", "relative"),
+    [("--dir", False), ("-d", False), ("-d", True)],
+    ids=["long-absolute", "short-absolute", "short-relative"],
+)
+
+
+def _directory_argument(tmp_path: Path, name: str, *, relative: bool) -> str:
+    return name if relative else str(tmp_path / name)
+
+
+@_DIRECTORY_FORMS
+def test_dir_stores_the_task_in_that_directory(
+    project: Path, tmp_path: Path, flag: str, relative: bool
+):
+    groceries = tmp_path / "groceries"
+    argument = _directory_argument(tmp_path, "groceries", relative=relative)
+
+    exit_code = main([flag, argument, "add", "Milk"])
+
+    assert exit_code == 0
+    assert [task.name for task in load(groceries / "tasks.json")] == ["Milk"]
+    assert not project.exists()
+
+
+@_DIRECTORY_FORMS
+def test_list_on_a_directory_that_does_not_exist_says_so_and_creates_nothing(
+    project: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    flag: str,
+    relative: bool,
+):
+    missing = tmp_path / "missing"
+    argument = _directory_argument(tmp_path, "missing", relative=relative)
+
+    exit_code = main([flag, argument, "list"])
+
+    # The message names the absolute path, even for a relative option value.
+    assert exit_code == 0
+    assert capsys.readouterr().out == f"No current tasks in {missing / 'tasks.json'}\n"
+    assert not missing.exists()
+    assert not project.exists()
+
+
+@pytest.mark.parametrize("command", [["list"], ["add", "Milk"]], ids=["list", "add"])
+def test_dir_naming_a_regular_file_gives_one_error_line(
+    project: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    command: list[str],
+):
+    # `load` and `save` both raise OSError for `plain/tasks.json`, which `main`
+    # already turns into one line, so this needs no code of its own.
+    plain = tmp_path / "plain"
+    plain.write_text("not a directory", encoding="utf-8")
+
+    exit_code = main(["--dir", str(plain), *command])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "plain")
+    assert plain.read_text(encoding="utf-8") == "not a directory"
+    assert not project.exists()
