@@ -1825,3 +1825,16 @@ def test_dir_with_a_tilde_that_cannot_be_expanded_is_a_bad_option_value(
     assert "--dir" in error
     assert "~no-such-user-m7/x" in error
     assert list(tmp_path.iterdir()) == []
+
+
+def test_an_empty_dir_is_a_bad_option_value(
+    project: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    # `Path("")` is `Path(".")`, so `--dir "$PROJECT"` with PROJECT unset would
+    # quietly use the list in the cwd.
+    with pytest.raises(SystemExit) as exit_info:
+        main(["--dir", "", "add", "Milk"])
+
+    assert exit_info.value.code == 2
+    assert "--dir" in capsys.readouterr().err
+    assert list(tmp_path.iterdir()) == []

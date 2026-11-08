@@ -345,8 +345,11 @@ def _directory(text: str) -> Path:
     """Turn the value of `--dir` into a path, with a leading `~` expanded.
 
     A shell expands `~` in `--dir ~/x` but not in `--dir=~/x`, which would make a
-    directory literally named `~`.
+    directory literally named `~`. An empty value is refused: `Path("")` is the
+    current directory, so an unset shell variable would pick the wrong list.
     """
+    if not text:
+        raise argparse.ArgumentTypeError("must not be empty")
     try:
         return Path(text).expanduser()
     except RuntimeError:

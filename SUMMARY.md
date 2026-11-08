@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-08 16:53] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+An empty `--dir` (`--dir ""`) is refused as a bad option value: exit 2, and the usage error names `--dir/-d`.
+
+**Rationale:**
+`Path("")` is `Path(".")`, so `--dir "$PROJECT"` with `PROJECT` unset would quietly use the list in the current directory: the wrong list, with no sign of it.
+Red first: the command did not raise, it ran against the cwd list (`DID NOT RAISE SystemExit`). Before step 2 the same input failed for another reason (argparse took the empty string for the command), which is why this check was not written earlier. 401 pass now.
+Break: dropping the check is the Red, so it is not run a second time.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 5
+- Issue: #11
+
 ## [2026-11-08 16:52] Commit Summary
 
 **Change Type:** Feature
