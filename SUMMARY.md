@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-08 16:49] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`--global` (`-g`) selects the list in `~/.task-tracker/tasks.json`. It is an option of the top-level parser, so it comes before the command: `task-tracker --global add "Renew passport"`.
+`_list_path(args)` is the one place that turns the option and the cwd into a file path, and `main` calls it inside its existing `try`.
+The tests get an autouse `home` fixture that points `HOME` at a directory outside the cwd, so no test can reach the real home.
+
+**Rationale:**
+Placement on the top-level parser is the safe one: a location option that a subcommand also accepted would turn `add Milk -d 2026-11-02` into a directory (checked on Python 3.14.7).
+The `dest` is `use_global` because `--global` would default to `global`, a keyword.
+The D2 comment moved next to the constants, and the first line of the test module docstring now says what the module covers (it still left out `delete`).
+Red first: five tests failed with `unrecognized arguments: --global` (three behavior tests, the `-g` case, and the `--help` listing). 389 pass now: the 384 that existed plus these five.
+Breaks, each run on the whole suite with bytecode caching off: ignoring `use_global` fails four tests (the add, both list cases, and the empty-list message); leaving `.task-tracker` out of the path fails the same four. The `--help` test only checks the listing, so the option text can change freely.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 1
+- Issue: #11
+
 ## [2026-11-08 16:43] Commit Summary
 
 **Change Type:** Docs

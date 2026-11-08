@@ -13,8 +13,10 @@ from task_tracker.status import Status
 from task_tracker.storage import load, save
 from task_tracker.task import Task, as_naive_datetime
 
-# D2: the project list is `tasks.json` in the current directory.
+# D2: the project list is `tasks.json` in the current directory; the global list is
+# the same file name inside `.task-tracker` in the home directory.
 _LIST_FILE = "tasks.json"
+_GLOBAL_DIR = ".task-tracker"
 
 
 def _add(args: argparse.Namespace, path: Path) -> list[str]:
@@ -339,8 +341,27 @@ _DUE_OPTION: dict[str, Any] = {
 }
 
 
+def _list_path(args: argparse.Namespace) -> Path:
+    """Return the list file the command works on: the global one or the project's."""
+    if args.use_global:
+        return Path.home() / _GLOBAL_DIR / _LIST_FILE
+    return Path.cwd() / _LIST_FILE
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="task-tracker")
+    # On the top-level parser, before the command, on purpose: a location option that
+    # a subcommand also accepted would turn a slip such as `add Milk -d 2026-11-02`
+    # (for `-D`) into a directory. Here argparse refuses it. The `dest` is explicit
+    # because `--global` would default to `global`, a keyword, and no subparser may
+    # reuse it: parent and subparser would share one attribute.
+    parser.add_argument(
+        "--global",
+        "-g",
+        dest="use_global",
+        action="store_true",
+        help="use the list in ~/.task-tracker, not the one in the current directory",
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     add = commands.add_parser("add", help="add a task")
     add.add_argument("name")
@@ -407,7 +428,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     try:
-        lines = args.run(args, Path.cwd() / _LIST_FILE)
+        lines = args.run(args, _list_path(args))
     except (ValueError, OSError) as error:
         # `Task` and `load` raise ValueError for a blank name or a corrupt file
         # (M2 made it the one type); OSError is a file that cannot be read or written.

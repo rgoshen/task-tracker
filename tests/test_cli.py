@@ -1,4 +1,4 @@
-"""Tests for the command line: `add`, `list`, and `update`."""
+"""Tests for the command line: the five commands and the options that pick a list."""
 
 # Test names state the intent, so per-test docstrings would only repeat them.
 # pylint: disable=missing-function-docstring
@@ -47,6 +47,20 @@ def _project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Run from an empty directory and return where its task list will live."""
     monkeypatch.chdir(tmp_path)
     return tmp_path / "tasks.json"
+
+
+@pytest.fixture(name="home", autouse=True)
+def _home(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    """Point HOME at an empty directory outside the cwd and return it.
+
+    Autouse, so no test in this module can reach the real home directory.
+    `Path.home()` reads HOME first on POSIX (via `os.path.expanduser`).
+    """
+    home = tmp_path_factory.mktemp("home")
+    monkeypatch.setenv("HOME", str(home))
+    return home
 
 
 @pytest.fixture
@@ -1657,3 +1671,63 @@ def test_delete_with_standard_output_closed_gives_one_error_line(tmp_path: Path)
     assert error.startswith("task-tracker: error: ")
     assert "Traceback" not in error
     assert (tmp_path / "tasks.json").read_bytes() == before
+
+
+# --- M7: --global and --dir ---
+
+
+def _global_list(home: Path) -> Path:
+    return home / ".task-tracker" / "tasks.json"
+
+
+def test_global_add_stores_the_task_under_the_home_directory(
+    project: Path, home: Path, capsys: pytest.CaptureFixture[str]
+):
+    # Given a first run: the home directory has no `.task-tracker` yet
+    assert not (home / ".task-tracker").exists()
+
+    exit_code = main(["--global", "add", "Renew passport"])
+
+    # Then the task is in the global list, and the project list was not touched
+    assert exit_code == 0
+    assert [(task.id, task.name) for task in load(_global_list(home))] == [
+        (1, "Renew passport")
+    ]
+    assert not project.exists()
+    assert "Added task 1: Renew passport" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("flag", ["--global", "-g"])
+def test_list_shows_only_the_list_it_was_asked_for(
+    project: Path, home: Path, capsys: pytest.CaptureFixture[str], flag: str
+):
+    save([Task(1, "Project")], project)
+    save([Task(1, "Global")], _global_list(home))
+
+    main(["list"])
+    project_names = _listed_names(capsys)
+    main([flag, "list"])
+    global_names = _listed_names(capsys)
+
+    assert (project_names, global_names) == (["Project"], ["Global"])
+
+
+def test_global_list_with_no_file_says_so_and_creates_nothing(
+    home: Path, capsys: pytest.CaptureFixture[str]
+):
+    exit_code = main(["--global", "list"])
+
+    assert exit_code == 0
+    assert capsys.readouterr().out == f"No current tasks in {_global_list(home)}\n"
+    assert not (home / ".task-tracker").exists()
+
+
+@pytest.mark.parametrize("option", ["--global"])
+def test_the_top_level_help_lists_the_location_options(
+    capsys: pytest.CaptureFixture[str], option: str
+):
+    with pytest.raises(SystemExit) as exit_info:
+        main(["--help"])
+
+    assert exit_info.value.code == 0
+    assert option in capsys.readouterr().out
