@@ -1978,3 +1978,44 @@ def test_dir_with_dotdot_after_a_missing_directory_lists_the_existing_list(
 
     assert exit_code == 0
     assert _listed_names(capsys) == ["Existing"]
+
+
+# --- review of PR #31: a relative or root home directory ---
+
+
+@pytest.mark.parametrize(
+    "location",
+    [["--global"], ["--dir", "~/groceries"]],
+    ids=["global", "dir-with-tilde"],
+)
+@pytest.mark.usefixtures("project")
+def test_a_relative_home_directory_is_refused_and_creates_nothing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    location: list[str],
+):
+    # With `HOME=relative/home` the "global" list would sit under whichever directory
+    # the command ran in, so there would be one list per directory, not one.
+    monkeypatch.setenv("HOME", "relative/home")
+
+    exit_code = main([*location, "add", "Milk"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "not an absolute path")
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.usefixtures("project")
+def test_a_home_directory_of_slash_is_accepted(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    # Containers and service users have `HOME=/`. It names one list from every
+    # directory, which is all `--global` promises, so it is not refused. `list` only
+    # reads, so the test cannot create `/.task-tracker`.
+    monkeypatch.setenv("HOME", "/")
+
+    exit_code = main(["--global", "list"])
+
+    assert exit_code == 0
+    assert capsys.readouterr().out == "No current tasks in /.task-tracker/tasks.json\n"

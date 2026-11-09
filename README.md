@@ -113,7 +113,7 @@ uv run task-tracker --dir ~/groceries list
   If the task changed or was removed while the prompt was open, nothing is deleted and the command exits with code 1.
 - Exit codes: 0 on success, 2 for a bad option value (an unknown priority or status, a `--due` that is not a local date or date and time, an ID that is not a whole number of 1 or more, `--due` given with `--clear-due`, `--dir` given with `--global`, an empty `--dir`, or `--global` or `--dir` after the command).
   1 for anything else that goes wrong (a blank name or one UTF-8 cannot hold, a change the task rules refuse, no task with the given ID, an `update` with no option to change, no answer to a `delete` prompt, a task that changed while `delete` was prompting, a corrupt or unreadable task file, an output that cannot be written,
-  a home directory that cannot be found, for `--global` or for the `~` of a `--dir`, or a `~name` with no such user).
+  a home directory that cannot be found or is not an absolute path, for `--global` or for the `~` of a `--dir`, or a `~name` with no such user).
   An error prints one line on standard error and never a traceback.
 - `add`, `update` and `delete` store their change before they print, so an error about the output means the change is stored. A reader that closes the pipe early (`task-tracker list | head -1`) ends the output quietly, with exit code 1. With standard output closed (`task-tracker list >&-`) there is nowhere to print, and `add`, `update` and `list` finish with exit code 0.
   `delete` needs standard output for its prompt, so with it closed `delete` exits with code 1 and deletes nothing.

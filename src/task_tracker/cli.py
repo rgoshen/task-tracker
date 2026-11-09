@@ -361,16 +361,22 @@ def _expanded(path: Path) -> Path:
     path `~/.task-tracker/tasks.json`, so it goes through here too.
     """
     try:
-        return path.expanduser()
+        expanded = path.expanduser()
     except RuntimeError:
         # `main` does not catch RuntimeError, on purpose: a bug elsewhere must stay
         # visible. `expanduser` raises it when there is no home directory to find:
         # HOME unset and no password-file entry (a container started with an
         # arbitrary user ID), or `~name` for a user who does not exist.
-        raise ValueError(
-            f"cannot expand {str(path)!r}: no home directory found; "
-            "use --dir with a full path"
-        ) from None
+        problem = "no home directory found"
+    else:
+        # A relative HOME would put the "global" list under whichever directory the
+        # command runs in. A `path` without `~` comes back unchanged and may be relative.
+        if expanded == path or expanded.is_absolute():
+            return expanded
+        problem = "the home directory is not an absolute path"
+    raise ValueError(
+        f"cannot expand {str(path)!r}: {problem}; use --dir with a full path"
+    )
 
 
 def _list_path(args: argparse.Namespace) -> Path:

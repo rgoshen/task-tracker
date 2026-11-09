@@ -1,5 +1,30 @@
 # Summary
 
+## [2026-11-08 19:25] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** CLI (`src/task_tracker/cli.py`), `README.md` and the tests
+
+**Summary:**
+`_expanded` refuses a `~` that expands to a relative path, which is what a relative `HOME` gives. `--global` and `--dir ~/x` then exit 1 with `cannot expand '~/.task-tracker/tasks.json': the home directory is not an absolute path; use --dir with a full path`, and nothing is created.
+A path without `~` is returned unchanged and may still be relative (`--dir groceries`). Review of PR #31, thread 2, in part.
+
+**Rationale:**
+Reproduced before the change: `HOME=rel task-tracker --global add X` created `./rel/.task-tracker/`, so "the global list" depended on the directory the command ran in, and each directory got its own. That breaks what `--global` promises, and POSIX wants an absolute `HOME`.
+It is a branch and a test; the plan had declined it as a value the user sets on purpose, and the reviewer's point that `add` then prints only the ID, with no sign of where the list went, is what changes that.
+Not changed, and the thread stays open: the reviewer also asked to reject a home of `/` or an empty one. `HOME=/` names one list from every directory, which is all `--global` promises, and it is how some containers and service users are set up. After `expanduser` an empty `HOME` cannot be told from `/` without reading the environment a second time.
+A test pins that choice (`--global list` with `HOME=/` names `/.task-tracker/tasks.json`), so a later change to it fails a test. `list` only reads, so the test cannot create anything in `/`.
+Breaks: no guard fails 2 tests; a guard that also refuses a relative `--dir` without `~` fails 2; a guard that refuses `HOME=/` fails the pin. 415 pass (412 before).
+
+**Bugfix Context:**
+Root cause: `expanduser` returns whatever `HOME` holds, and nothing checked that it was a place rather than a spot relative to the cwd.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Fix: PR #31 review, step 3
+- Issue: #11, PR #31 thread 2
+
 ## [2026-11-08 19:05] Commit Summary
 
 **Change Type:** Fix
