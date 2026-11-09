@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-08 16:59] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `CLAUDE.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Document `--global` and `--dir`. `README.md` gets two usage examples, a paragraph on which list a command works on (the options, `~` expansion, the first `add` creating a missing directory, and the rule that they go before the command), the lines for `add`, `update` and `delete` that said "in the current directory" (they now say "the chosen list"), and the new exit-code cases.
+`CLAUDE.md` says features 2 to 7 exist and only the install is left, and why the options sit on the top-level parser. The plan's M7 boxes are ticked, and the seven added on 2026-11-08 are marked as added.
+
+**Rationale:**
+The project rule is to update the plan, the matching issue and `README.md` together. Issue #11 had only the original seven boxes and no decisions, so its body now has the fourteen boxes (all ticked, each backed by a passing test) and the "Decided (2026-11-08)" block, and its footer date matches. It stays open until the merge, as #10 did.
+The previous body is kept outside the repository in case it is wanted back.
+Nothing in the plan changed while the code was written, so the "Decided" block is as planned.
+The exit-code list now names the cases the code produces: exit 2 for `--dir` with `--global`, an empty `--dir` or one whose `~name` has no such user, and an option after the command; exit 1 for a home directory that cannot be found.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 9
+- Issue: #11
+
 ## [2026-11-08 16:56] Commit Summary
 
 **Change Type:** Feature

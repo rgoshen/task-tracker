@@ -5,8 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project state
 
 `task-tracker` is a Python 3.14 CLI for task management, grown in vertical slices, one milestone at a time.
-`README.md` is the product spec (task fields, status/priority enums, the seven features); the code implements the task model, storage, and the first slice of commands so far (M1 to M6).
-Of the seven features, 3 (`list`, the current tasks), 4 (`list --all`, short `-a`), 5 (`add`), 6 (`update`) and 7 (`delete`) exist, for the project list in `./tasks.json` only. The other two (install, the `--dir` and `--global` flags) are not built.
+`README.md` is the product spec (task fields, status/priority enums, the seven features); the code implements the task model, storage, and the first slice of commands so far (M1 to M7).
+Of the seven features, 2 (`--global` and `--dir PATH`, the choice of list), 3 (`list`, the current tasks), 4 (`list --all`, short `-a`), 5 (`add`), 6 (`update`) and 7 (`delete`) exist. Only 1 (install) is not built.
+The two list options belong to the top-level parser and go before the command (`task-tracker --global add ...`): a subcommand that also took `-d` would turn the slip `add Milk -d 2026-11-02` (for `-D`) into a directory. `_list_path` in `cli.py` is the one place that turns them, the cwd and the home directory into the list file.
 What exists: `main()` and the `add`, `list` (with `list --all`), `update` and `delete` commands in `src/task_tracker/cli.py` (`__init__.py` reexports `main`), the `Status` / `Priority` `StrEnum`s, the `Task` dataclass in `src/task_tracker/task.py` (with `Task.restore` for rebuilding a stored task and `Task.update` for changing one), and `load` / `save` in `src/task_tracker/storage.py`.
 `main` returns the exit code and the console script passes it to `sys.exit`: 0 on success, 2 for a bad option value (argparse), 1 for anything else that goes wrong, with one `task-tracker: error:` line and no traceback.
 

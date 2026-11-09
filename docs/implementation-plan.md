@@ -334,20 +334,20 @@ Branch `feature/global-list`. Covers feature 2.
 
 Produces: one place that turns the global flag, `--dir`, the cwd, and the home directory into a file path.
 
-- [ ] Given `HOME` set to `tmp_path / "home"` and cwd `tmp_path / "project"`, when `--global add "Renew passport"`, then the task is in the global file under `tmp_path / "home"` and no project file exists.
-- [ ] Given one project task and one global task, then `list` shows only the project task and `--global list` shows only the global one.
-- [ ] Given no `.task-tracker/` under the fake home, then the first global add creates it.
-- [ ] Given `--dir tmp_path / "groceries"`, when `add "Milk"`, then the task is in `tmp_path / "groceries" / "tasks.json"` and no `tasks.json` exists in the cwd (D2). `-d` behaves the same.
-- [ ] Given `--dir` and `--global` together, or `-d` and `-g`, then argparse exits with code 2, an error line is printed, and no file is written.
-- [ ] Given `--dir` naming a directory that does not exist, when `list`, then the empty-list message is printed and the directory is not created.
-- [ ] Given `add "Milk" -d 2026-11-02` (a slip for `-D`), then no file or directory named `2026-11-02` is created.
-- [ ] Given the options after the command, such as `add "Milk" --global` or `list --dir elsewhere`, then argparse exits with code 2 (`unrecognized arguments`) and nothing is created. (planned 2026-11-08)
-- [ ] Given `--dir ~/groceries` with `HOME` at the fake home (a shell does not expand `~` in `--dir=~/groceries`, and the program gets the same text either way), then the list is `home / "groceries" / "tasks.json"` and nothing named `~` is created in the cwd. (planned 2026-11-08)
-- [ ] Given `--dir ~no-such-user/x`, then the exit code is 2 and the error names `--dir` and the text. (planned 2026-11-08)
-- [ ] Given `--dir ""`, then the exit code is 2, the error names `--dir`, and nothing is written. (planned 2026-11-08)
-- [ ] Given `--dir` naming a regular file, when `list` or `add`, then the exit code is 1, one error line is printed, and the file is unchanged. (planned 2026-11-08)
-- [ ] Given a home directory that cannot be found, when `--global add "Milk"`, then the exit code is 1, one error line names the home directory, and nothing is written. (planned 2026-11-08)
-- [ ] Given `--help`, then `--global` and `--dir PATH` are listed. (planned 2026-11-08)
+- [x] Given `HOME` set to `tmp_path / "home"` and cwd `tmp_path / "project"`, when `--global add "Renew passport"`, then the task is in the global file under `tmp_path / "home"` and no project file exists.
+- [x] Given one project task and one global task, then `list` shows only the project task and `--global list` shows only the global one.
+- [x] Given no `.task-tracker/` under the fake home, then the first global add creates it.
+- [x] Given `--dir tmp_path / "groceries"`, when `add "Milk"`, then the task is in `tmp_path / "groceries" / "tasks.json"` and no `tasks.json` exists in the cwd (D2). `-d` behaves the same.
+- [x] Given `--dir` and `--global` together, or `-d` and `-g`, then argparse exits with code 2, an error line is printed, and no file is written.
+- [x] Given `--dir` naming a directory that does not exist, when `list`, then the empty-list message is printed and the directory is not created.
+- [x] Given `add "Milk" -d 2026-11-02` (a slip for `-D`), then no file or directory named `2026-11-02` is created.
+- [x] Given the options after the command, such as `add "Milk" --global` or `list --dir elsewhere`, then argparse exits with code 2 (`unrecognized arguments`) and nothing is created. (added 2026-11-08)
+- [x] Given `--dir ~/groceries` with `HOME` at the fake home (a shell does not expand `~` in `--dir=~/groceries`, and the program gets the same text either way), then the list is `home / "groceries" / "tasks.json"` and nothing named `~` is created in the cwd. (added 2026-11-08)
+- [x] Given `--dir ~no-such-user/x`, then the exit code is 2 and the error names `--dir` and the text. (added 2026-11-08)
+- [x] Given `--dir ""`, then the exit code is 2, the error names `--dir`, and nothing is written. (added 2026-11-08)
+- [x] Given `--dir` naming a regular file, when `list` or `add`, then the exit code is 1, one error line is printed, and the file is unchanged. (added 2026-11-08)
+- [x] Given a home directory that cannot be found, when `--global add "Milk"`, then the exit code is 1, one error line names the home directory, and nothing is written. (added 2026-11-08)
+- [x] Given `--help`, then `--global` and `--dir PATH` are listed. (added 2026-11-08)
 
 **Think about:**
 
