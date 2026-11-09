@@ -1,5 +1,31 @@
 # Summary
 
+## [2026-11-08 18:45] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** storage (`src/task_tracker/storage.py`) and its tests
+
+**Summary:**
+`load` opens `path.resolve()` instead of `path`, as `save` already writes to `path.resolve()`. Three tests: a storage test (a list saved to `tasks.json` loads back through `missing/../tasks.json`), and two CLI tests (`--dir nonexistent/../y` with `add` adds to the existing list, and with `list` shows it).
+Review of PR #31, thread 1. This also adds the `TODO.md` entry for the whole review round, with the plan for the seven threads.
+
+**Rationale:**
+`save` resolves its path, and `Path.resolve()` removes `..` without looking at the disk (pathlib docs: the path is "resolved as far as possible and any remainder is appended without checking").
+`load` opened the path as typed, and the disk refuses `nonexistent/..`, which `load` reads as "no file yet", an empty list. So `add` read nothing and wrote one task over a list of two. Reproduced on the branch before the change: both existing tasks were gone.
+The fix is in `load`, not in `_list_path`, because the two functions disagreeing is the defect, and any later caller would meet it too. `_list_path` returning a resolved path would also have worked, and the reviewer offered it; it would leave the pair able to disagree for the next caller.
+The M7 plan said "a `..` in the path is kept as typed", and it still is for what the user sees: `list` on an empty list prints the path as typed. The plan did not consider that `save` resolves.
+Break shown: without the `resolve()` all three new tests go red (an empty list, and the message that names `nonexistent/../y`). 411 pass (408 before).
+
+**Bugfix Context:**
+Root cause: `load` and `save` derived the file from the same path in two ways.
+Data loss needs `..` after a component that does not exist, such as a typo in the middle of `--dir ~/<typo>/../groceries`. A symlink or an existing directory before the `..` behaves the same in both, so no earlier test noticed. Now both read and write `path.resolve()`.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Fix: PR #31 review, step 1
+- Issue: #11, PR #31 thread 1
+
 ## [2026-11-08 17:25] Commit Summary
 
 **Change Type:** Fix

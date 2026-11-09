@@ -30,7 +30,9 @@ def _to_json_value(value: object) -> object:
 
 def _read_records(path: Path) -> list[Any]:
     try:
-        with path.open(encoding="utf-8") as file:
+        # Resolved, as `save` resolves the path it writes: `missing/../x` is `x` to
+        # `save`, but the disk would refuse it, and `load` would read an empty list.
+        with path.resolve().open(encoding="utf-8") as file:
             records = json.load(file)
     except ValueError as error:
         # JSONDecodeError and UnicodeDecodeError are both ValueErrors.

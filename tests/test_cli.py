@@ -1936,3 +1936,40 @@ def test_global_without_a_home_directory_gives_one_error_line(
     _assert_one_line_error(capsys, "home directory")
     assert not list(tmp_path.iterdir())
     assert not list(home.iterdir())
+
+
+# --- review of PR #31: a `..` after a missing directory ---
+
+
+@pytest.fixture(name="existing_list")
+def _existing_list(tmp_path: Path) -> Path:
+    """A list in `y` next to a directory name that does not exist, and where it is."""
+    save([Task(1, "Existing")], tmp_path / "y" / "tasks.json")
+    return tmp_path / "y" / "tasks.json"
+
+
+@pytest.mark.usefixtures("project")
+def test_dir_with_dotdot_after_a_missing_directory_adds_to_the_existing_list(
+    tmp_path: Path, existing_list: Path
+):
+    # `nonexistent/..` is not on the disk, but `save` removes it from the path by
+    # looking at the text. If `load` asked the disk, the list would read as empty and
+    # the save would replace it with the one new task.
+    through_a_typo = tmp_path / "nonexistent" / ".." / "y"
+
+    exit_code = main(["--dir", str(through_a_typo), "add", "New"])
+
+    assert exit_code == 0
+    assert [task.name for task in load(existing_list)] == ["Existing", "New"]
+
+
+@pytest.mark.usefixtures("project", "existing_list")
+def test_dir_with_dotdot_after_a_missing_directory_lists_the_existing_list(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    through_a_typo = tmp_path / "nonexistent" / ".." / "y"
+
+    exit_code = main(["--dir", str(through_a_typo), "list"])
+
+    assert exit_code == 0
+    assert _listed_names(capsys) == ["Existing"]

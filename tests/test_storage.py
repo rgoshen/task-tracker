@@ -132,6 +132,19 @@ def test_saving_creates_the_missing_directories(tmp_path: Path):
     assert path.is_file()
 
 
+def test_load_reads_the_file_that_save_writes_for_a_dotdot_after_a_missing_directory(
+    tmp_path: Path,
+):
+    # `save` resolves its path, which removes `..` without asking the disk, so
+    # `missing/../tasks.json` is `tasks.json`. `load` opened the path as typed, where
+    # `missing/..` fails and reads as an empty list, so the next save replaced the list.
+    save([Task(1, "Buy milk")], tmp_path / "tasks.json")
+
+    loaded = load(tmp_path / "missing" / ".." / "tasks.json")
+
+    assert [task.name for task in loaded] == ["Buy milk"]
+
+
 def a_record(**overrides: object) -> dict[str, object]:
     """A valid stored record; each test changes only the field it is about."""
     record: dict[str, object] = {

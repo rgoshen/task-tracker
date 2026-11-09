@@ -595,3 +595,40 @@ The seven Given/When/Then items in the M7 section of the plan, and the ones adde
   the fake home is outside the cwd; both options get `help=` and a test; `--dir` expands `~` in the converter and exits 2 on failure; the path uses `absolute()`; the exclusion test uses `add`; the missing-directory case has its own test; the fixture is written the way `project` is.
   Declined: a guard for a relative `HOME` (see above). Issue #11 is updated in the docs step together with the plan, as the M6 entry did in its step 5, not before.
 - **Scope held back.** No walk-up to a `.git` directory (D2). No change to what `add` prints, so the typo case above stays visible only through `list`. Whether `list` should always name the file it read (the M3 note under D2) is left to the owner. No `--yes` (Q5). No change to the layout of `cli.py` (M8).
+
+## [2026-11-08] Fix: PR #31 review
+
+**Objective:**
+Answer the seven inline comments on PR #31 (M7, global list). Each claim was reproduced first with the installed console script, a throwaway `HOME` and a scratch directory (#1 to #5); #6 and #7 were read against the diff. Six are fixed and resolved (#1, #3, #4, #5, #6, #7), and one is fixed in part and left open for the reviewer (#2).
+
+**Approach:**
+One test-first commit per comment or group on `feature/global-list`, each with its own `SUMMARY.md` entry and each broken on purpose before it is trusted:
+
+1. #1, data loss: `--dir missing/../y` made `load` and `save` use two different files. `save` calls `path.resolve()`, which removes `..` without looking at the disk, and `load` opens the path as typed, where `missing/..` fails.
+   `load` now resolves the same way, so the pair cannot disagree for any caller. The plan's "a `..` in the path is kept as typed" stays true for what the user sees; it was wrong that nothing else needed to change.
+   Tests: a storage test (a list saved through `a/../b` loads back from `a/../b`) and a CLI test (`--dir missing/../y` over an existing list adds to it). Commit type `fix(storage)`.
+2. #4, one home lookup: `_expanded(path)` does `expanduser` once and turns the `RuntimeError` into a `ValueError`, so `--global`, `--dir ~/x` and `--dir ~name/x` all exit 1 with one line. `_directory` keeps only the empty check.
+   This reverses the 2026-11-08 decision to expand in the converter and exit 2: the reviewer reproduced the same missing home giving exit 2 for `--dir` and exit 1 for `--global`, and a missing home is the environment's fault, not a bad option value.
+   Tests: the existing `~name` and missing-home tests change to exit 1, and `--dir ~/x` with no home gets its own. Commit type `fix(cli)`.
+3. #2, relative `HOME`: `_expanded` also refuses a `~` that expands to a relative path, because then the "global" list follows the cwd. Not changed: an empty `HOME` or `HOME=/`. Both give `/.task-tracker/tasks.json` from every directory, which is one list, and `HOME=/` is legitimate in containers and for service users. After `expanduser` an empty `HOME` cannot be told from `/`.
+   Test: `HOME=relative/home` with `--global` and with `--dir ~/x` exits 1 and creates nothing. Commit type `fix(cli)`.
+4. #3, directory mode: `save` creates the directory that holds a new list with `mode=0o700`, as the file already is owner-only. `mkdir` applies the mode to the last directory only ([pathlib]), which is the one that holds the list. Tests: `save` into a missing directory under `umask(0)` gives `0o700`; `--global add` gives `~/.task-tracker` `0o700`. Commit type `fix(storage)`.
+5. #5, colour: an autouse fixture sets `PYTHON_COLORS=0`, which beats `NO_COLOR` and `FORCE_COLOR` ([cmdline]). Red: `FORCE_COLOR=1 uv run pytest` fails 8 tests (6 are the existing `update --help` ones). Commit type `test(cli)`.
+6. #6, coverage: `update` and `delete` run with `--global` and with `--dir`. These pass at once, so each is broken on purpose (the command ignores the path it is given). Commit type `test(cli)`.
+7. #7 and the documents: the `_list_path` docstring and the `CLAUDE.md` sentence say what the code does after steps 2 and 3; `README.md` exit-code lines, the plan's "Decided" block and issue #11 change with them.
+
+**Tests:**
+
+- The new tests are listed per step above; the whole suite must pass with and without `FORCE_COLOR=1`.
+- Each step is broken on purpose with bytecode caching off and `__pycache__` cleared, and its `SUMMARY.md` entry says which tests go red.
+
+**Risks & Trade-offs:**
+
+- **#2, `/` and empty `HOME`, not changed.** The reviewer also asked to reject a home of `/`. That is one list from every directory, so "global" still means one file, and `HOME=/` is how some containers and service users are set up. The cost is that `HOME=` (an exported empty variable) writes to `/.task-tracker`, which fails on a read-only root and succeeds as root. The thread stays open.
+- **#2, "nothing says which file was used", not changed.** `add` prints only the ID (`README.md` feature 5). Whether commands should name the file is the open question under D2, and it is the owner's call.
+- **#1, the shown path.** `list` on an empty `missing/../y` still prints the path as typed. It names the file that is read, which is now the right one.
+- **#3 reaches `--dir` too.** A directory that `save` creates for `--dir PATH` is also `0o700`, which is the file's own default. The intermediate directories of a deep new path keep the umask default, because `mkdir` has no mode for them before Python 3.15.
+- **Exit code for `~name`.** It was 2 in the first M7 plan and is 1 now. A script that tested for 2 on a bad username sees 1. M7 is unreleased, so nothing depends on it.
+
+[pathlib]: https://docs.python.org/3/library/pathlib.html#pathlib.Path.mkdir
+[cmdline]: https://docs.python.org/3/using/cmdline.html#controlling-color
