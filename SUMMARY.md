@@ -1,5 +1,442 @@
 # Summary
 
+## [2026-11-08 20:45] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `CLAUDE.md` and `docs/implementation-plan.md` (and issue #11, which mirrors it)
+
+**Summary:**
+`CLAUDE.md` now says what the code does: `_list_path` is the one place that chooses the list file from the options and the cwd, and `_expanded` is the one place that looks up the home directory, for `--global` and for a leading `~` in `--dir`, with one error line and exit 1 when there is none or it is relative.
+The plan's M7 section changes with the code: two boxes changed and four added (the `..` case, the relative `HOME`, the directory mode, `update` and `delete` on the chosen list), and the "Decided" block records the `~` change, the `load` resolve, the relative `HOME`, the directory mode and this review round. Review of PR #31, thread 7.
+
+**Rationale:**
+The reviewer was right that the old sentence was not quite true: `_directory` also read the home directory when it converted `--dir ~/x`, and the `_list_path` docstring left out `--dir`. The docstring was fixed with the home lookup in the commit that added `_expanded`; the sentence here is the other half, since this file is guidance for later sessions.
+The plan, the issue and `README.md` change together (the project rule in `CLAUDE.md`). `README.md` changed with the code in the three commits before this one. Issue #11 gets the same text as the plan (18 boxes, same Decided block), updated after this commit; the body from before this round is saved in the scratchpad.
+No code changes: 422 pass, the gate and the CI-version linters are clean, and JSCPD finds 0 clones.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Fix: PR #31 review, step 7
+- Issue: #11, PR #31 thread 7
+
+## [2026-11-08 20:20] Commit Summary
+
+**Change Type:** Test
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+`update` and `delete` now run with `--global` and with `--dir`. A `chosen` fixture (parametrized over the two options) makes two lists, the project's with a task 1 and the chosen one with tasks 1 and 2, and returns the options and the chosen list.
+One test per command checks that the chosen list changed (`update 1 --name Renamed` gives `Renamed`, `Other`; `delete 1` gives `Other`) and the project list did not. Four tests in all. Review of PR #31, thread 6. No production code changes.
+
+**Rationale:**
+The `README.md` lines for `update` and `delete` say they work on "the chosen list", and until now only `add` and `list` were tested with the options. `main` hands `_list_path(args)` to every command, so this was a gap and not a bug (the reviewer had also tried `-g update 1 --status DONE` by hand), but a command that stopped using its `path` argument would not have been caught.
+These pass at once, so each was broken on purpose, with bytecode caching off: `update` reading the project list, `update` saving to it, `delete` reading it for the prompt, `delete` reading it again after the prompt, and `delete` saving to it. Each fails both parametrized cases of its command.
+The first version of the fixture held one task in each list, and `update` reading the project list but saving to the chosen path SURVIVED: the rename overwrote the only task, so the result looked right. The chosen list now has a second task, which that bug loses, and the break is caught.
+Commit type `test`: no production code changes. 422 pass (418 before), and JSCPD finds 0 clones.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Fix: PR #31 review, step 6
+- Issue: #11, PR #31 thread 6
+
+## [2026-11-08 20:00] Commit Summary
+
+**Change Type:** Test
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+An autouse fixture, `_plain_help`, sets `PYTHON_COLORS=0` for every test in the module, so argparse does not colour `--help` whatever the developer's shell sets. Review of PR #31, thread 5. No production code changes.
+
+**Rationale:**
+Python 3.14 argparse colours its help when `FORCE_COLOR` or `PYTHON_COLORS` is set, even into a pipe. The help tests look for the line that starts with an option name (`line.lstrip().startswith(option)`), which colour codes in front of the name defeat, so `next(...)` raised `StopIteration`.
+Reproduced before the change: `FORCE_COLOR=1 uv run pytest` failed 8 tests, 2 of them the new location-option help test and 6 the existing `update --help` test whose pattern it copies. CI sets neither variable, so only local runs failed.
+`PYTHON_COLORS` is read before `NO_COLOR`, which is read before `FORCE_COLOR` (Python command-line docs, "Controlling color"), so `PYTHON_COLORS=0` covers all three. The reviewer suggested `NO_COLOR`; that would not cover a developer with `PYTHON_COLORS=1`.
+Now the suite passes (418) under `FORCE_COLOR=1`, `PYTHON_COLORS=1`, both, `NO_COLOR=1` and none.
+Breaks: with the variable renamed so it does nothing, 8 tests fail under `FORCE_COLOR=1`. With `NO_COLOR=1` set instead of `PYTHON_COLORS=0`, all pass under `FORCE_COLOR=1`, as the precedence says, and 8 fail under `PYTHON_COLORS=1`.
+(The mutation helper printed "SURVIVED" for the first run because pytest coloured its own summary under `FORCE_COLOR`, which hid the `FAILED` lines it matches; the counts are what it printed.)
+Commit type `test`: the commit changes a test file only.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Fix: PR #31 review, step 5
+- Issue: #11, PR #31 thread 5
+
+## [2026-11-08 19:45] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** storage (`src/task_tracker/storage.py`), `README.md` and the tests
+
+**Summary:**
+`save` creates the directory that holds a new list with mode `0o700`: `target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)`. Three tests: a directory made by `save` is `0o700` under a cleared umask, a directory that already exists keeps its mode, and `--global add` makes `~/.task-tracker` `0o700` under the usual umask.
+Review of PR #31, thread 3. `README.md` says the directory is for its owner only, as the file is.
+
+**Rationale:**
+Reproduced before the change: `--global add` made `~/.task-tracker` `drwxr-xr-x` (umask 022) around a `0600` file, so every user on the machine could see that a task list exists and when it changed. `~/.task-tracker` is the first directory this project creates under `$HOME`, and the user-level rule is least privilege.
+The fix is in `save`, which creates the directory, not in `_list_path`, because `list` must not create anything (a test pins that). It reaches `--dir PATH` too: a new directory for a list is owner-only like the file, and `chmod` loosens it.
+`mkdir` applies `mode` to the last directory only; the missing parents of a deep new path get the default mode (the `parent_mode` argument is new in Python 3.15). A directory that exists is not touched.
+Breaks: `mode=0o755` fails the storage test and the CLI test; a `chmod` of the existing directory after `mkdir` fails the keeps-its-mode test. The umask is cleared in the storage tests, or a mode that `save` asked for could hide behind it. 418 pass (415 before).
+
+**Bugfix Context:**
+Root cause: `Path.mkdir` without a mode uses `0o777` minus the umask, and the file's own `0600` (from `mkstemp`) did not extend to the directory around it.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Fix: PR #31 review, step 4
+- Issue: #11, PR #31 thread 3
+
+## [2026-11-08 19:25] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** CLI (`src/task_tracker/cli.py`), `README.md` and the tests
+
+**Summary:**
+`_expanded` refuses a `~` that expands to a relative path, which is what a relative `HOME` gives. `--global` and `--dir ~/x` then exit 1 with `cannot expand '~/.task-tracker/tasks.json': the home directory is not an absolute path; use --dir with a full path`, and nothing is created.
+A path without `~` is returned unchanged and may still be relative (`--dir groceries`). Review of PR #31, thread 2, in part.
+
+**Rationale:**
+Reproduced before the change: `HOME=rel task-tracker --global add X` created `./rel/.task-tracker/`, so "the global list" depended on the directory the command ran in, and each directory got its own. That breaks what `--global` promises, and POSIX wants an absolute `HOME`.
+It is a branch and a test; the plan had declined it as a value the user sets on purpose, and the reviewer's point that `add` then prints only the ID, with no sign of where the list went, is what changes that.
+Not changed, and the thread stays open: the reviewer also asked to reject a home of `/` or an empty one. `HOME=/` names one list from every directory, which is all `--global` promises, and it is how some containers and service users are set up. After `expanduser` an empty `HOME` cannot be told from `/` without reading the environment a second time.
+A test pins that choice (`--global list` with `HOME=/` names `/.task-tracker/tasks.json`), so a later change to it fails a test. `list` only reads, so the test cannot create anything in `/`.
+Breaks: no guard fails 2 tests; a guard that also refuses a relative `--dir` without `~` fails 2; a guard that refuses `HOME=/` fails the pin. 415 pass (412 before).
+
+**Bugfix Context:**
+Root cause: `expanduser` returns whatever `HOME` holds, and nothing checked that it was a place rather than a spot relative to the cwd.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Fix: PR #31 review, step 3
+- Issue: #11, PR #31 thread 2
+
+## [2026-11-08 19:05] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** CLI (`src/task_tracker/cli.py`), `README.md` and the tests
+
+**Summary:**
+One helper, `_expanded(path)`, now looks up the home directory for both `--global` and a `~` in `--dir`. It calls `Path.expanduser()` once and turns the `RuntimeError` into a `ValueError`, so `main` prints one line and returns 1 for all of them: no home directory, and `~name` for a user who does not exist.
+`_directory` keeps only the empty check. `--global` is the path `~/.task-tracker/tasks.json`, so it goes through the same helper, and `Path.home()` is no longer called.
+Review of PR #31, thread 4. `README.md` moves the `~name` case from the exit-2 line to the exit-1 line.
+
+**Rationale:**
+The reviewer's reproduction held: with no home directory, `--dir ~/x list` exited 2 (`argument --dir/-d: cannot expand '~/x'`) and `--global list` exited 1, for the same failure, in two `try/except RuntimeError` blocks.
+Exit 2 says "your command line is wrong", and for `--dir ~/x` it is not: the value is fine and the environment has no home. So the single code is 1, the code `main` uses for a runtime failure. This reverses the 2026-11-08 plan decision to expand in the converter and exit 2; the plan and issue #11 are updated in the last commit of this review round.
+Cost: a script that tested for exit 2 on `~name` with no such user sees 1. M7 is unreleased. The message still quotes the text (`cannot expand '~no-such-user-m7/x': no home directory found; use --dir with a full path`).
+Kept: `main` still does not catch `RuntimeError`, so a bug elsewhere stays visible.
+Breaks, each run on the whole suite with bytecode caching off: not catching `RuntimeError` fails 3 tests; `--dir` not expanded fails 3; `--global` not expanded fails 5; a message without the quoted text fails 1. The old exit-2 test is now an exit-1 test, and the missing-home test runs for `--global` and for `--dir ~/groceries`. 412 pass (411 before).
+
+**Bugfix Context:**
+Root cause: the home directory was looked up in two places with two error policies, `_directory` (argparse, exit 2) and `_list_path` (`ValueError`, exit 1). Now there is one place and one policy.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Fix: PR #31 review, step 2
+- Issue: #11, PR #31 thread 4
+
+## [2026-11-08 18:45] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** storage (`src/task_tracker/storage.py`) and its tests
+
+**Summary:**
+`load` opens `path.resolve()` instead of `path`, as `save` already writes to `path.resolve()`. Three tests: a storage test (a list saved to `tasks.json` loads back through `missing/../tasks.json`), and two CLI tests (`--dir nonexistent/../y` with `add` adds to the existing list, and with `list` shows it).
+Review of PR #31, thread 1. This also adds the `TODO.md` entry for the whole review round, with the plan for the seven threads.
+
+**Rationale:**
+`save` resolves its path, and `Path.resolve()` removes `..` without looking at the disk (pathlib docs: the path is "resolved as far as possible and any remainder is appended without checking").
+`load` opened the path as typed, and the disk refuses `nonexistent/..`, which `load` reads as "no file yet", an empty list. So `add` read nothing and wrote one task over a list of two. Reproduced on the branch before the change: both existing tasks were gone.
+The fix is in `load`, not in `_list_path`, because the two functions disagreeing is the defect, and any later caller would meet it too. `_list_path` returning a resolved path would also have worked, and the reviewer offered it; it would leave the pair able to disagree for the next caller.
+The M7 plan said "a `..` in the path is kept as typed", and it still is for what the user sees: `list` on an empty list prints the path as typed. The plan did not consider that `save` resolves.
+Break shown: without the `resolve()` all three new tests go red (an empty list, and the message that names `nonexistent/../y`). 411 pass (408 before).
+
+**Bugfix Context:**
+Root cause: `load` and `save` derived the file from the same path in two ways.
+Data loss needs `..` after a component that does not exist, such as a typo in the middle of `--dir ~/<typo>/../groceries`. A symlink or an existing directory before the `..` behaves the same in both, so no earlier test noticed. Now both read and write `path.resolve()`.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Fix: PR #31 review, step 1
+- Issue: #11, PR #31 thread 1
+
+## [2026-11-08 17:25] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+Make three assertions in the M7 tests able to fail. The `--help` test now finds the line of each option in the options section and checks its explanation (`~/.task-tracker`, `PATH/tasks.json`), as the `update --help` test does for its options.
+The two tests that claim "the error names `--dir`" look at the last line of standard error only, and the empty-value test also checks the message `must not be empty`.
+
+**Rationale:**
+Found by the whole-branch review (a fresh Opus reviewer): no Critical or Important findings, but two tests did not test what they claimed. The old help test passed with both `help=` lines deleted, because it only looked for the option names, which the usage line prints.
+The old `"--dir" in stderr` checks could never fail, because the usage line above the error always contains `--dir PATH`; the module already looks at the last line for this reason.
+Each is shown with a break that the old assertion missed: deleting the `--global` help text, deleting the `--dir` help text, and giving the empty-value error a blank message each fail exactly one test now. 408 pass, same count.
+Commit type `test`: no production code changes.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 10 (final review)
+- Issue: #11
+
+## [2026-11-08 17:13] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+Make the M7 tests pass pylint, which super-linter runs and `ruff` and `pyright` do not. Five tests that took the `project` fixture only for its `chdir` now use `@pytest.mark.usefixtures("project")`, as the `fixed_clock` tests already do, and eight `list(directory.iterdir()) == []` assertions read `not list(directory.iterdir())`.
+
+**Rationale:**
+Found by the done check of step 10: pylint 4.0.6 (the CI version) scored the file 9.92 with eleven messages (`unused-argument` and `use-implicit-booleaness-not-comparison`) while every other tool was clean, which is the gap the project notes describe.
+The behavior is unchanged: 408 tests pass, and the assertions are equivalent, so the breaks recorded in the earlier entries still apply. A separate commit, because steps 1 to 8 are already committed.
+Now all of ruff 0.15.17, isort, black, flake8, mypy (no extra packages) and pylint pass, as do JSCPD (0 clones), codespell over every tracked file, and the Markdown checks. Coverage is 97.6% overall; the lines `cli.py` leaves uncovered are the existing standard-output handling.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 10
+- Issue: #11
+
+## [2026-11-08 16:59] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`README.md`, `CLAUDE.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Document `--global` and `--dir`. `README.md` gets two usage examples, a paragraph on which list a command works on (the options, `~` expansion, the first `add` creating a missing directory, and the rule that they go before the command), the lines for `add`, `update` and `delete` that said "in the current directory" (they now say "the chosen list"), and the new exit-code cases.
+`CLAUDE.md` says features 2 to 7 exist and only the install is left, and why the options sit on the top-level parser. The plan's M7 boxes are ticked, and the seven added on 2026-11-08 are marked as added.
+
+**Rationale:**
+The project rule is to update the plan, the matching issue and `README.md` together. Issue #11 had only the original seven boxes and no decisions, so its body now has the fourteen boxes (all ticked, each backed by a passing test) and the "Decided (2026-11-08)" block, and its footer date matches. It stays open until the merge, as #10 did.
+The previous body is kept outside the repository in case it is wanted back.
+Nothing in the plan changed while the code was written, so the "Decided" block is as planned.
+The exit-code list now names the cases the code produces: exit 2 for `--dir` with `--global`, an empty `--dir` or one whose `~name` has no such user, and an option after the command; exit 1 for a home directory that cannot be found.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 9
+- Issue: #11
+
+## [2026-11-08 16:56] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`--global` on a machine with no findable home directory prints one line, `task-tracker: error: cannot find the home directory; use --dir PATH to name a directory`, and exits 1 with nothing written.
+
+**Rationale:**
+`Path.home()` raises `RuntimeError` when `HOME` is unset and the user has no password-file entry, as in a container started with an arbitrary user ID.
+`main` catches only `ValueError` and `OSError`, on purpose (M6: a bug elsewhere must stay visible), so `_list_path` converts exactly this one call to a `ValueError` and the existing handler does the rest.
+The message points at `--dir`, which works without a home.
+Red first: the `RuntimeError` escaped `main` (`Could not determine home directory`).
+The test patches `os.path.expanduser` to return its argument, which its documentation says it does when it cannot expand. I also ran the real case, with `HOME` removed and the password-file lookup failing, and it prints the same line with exit 1. 408 pass.
+Break: removing the handler is the Red, so it is not run a second time.
+Accepted, not guarded: an empty `HOME` gives `/` and a relative `HOME` gives a relative list that moves with the cwd.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 8
+- Issue: #11
+
+## [2026-11-08 16:55] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+A location option after the command is refused and creates nothing. Three cases, each exit 2 with `unrecognized arguments`: `add Milk -d 2026-11-02` (the slip for `-D`), `add Milk --global`, and `list --dir elsewhere`. The cwd and the fake home stay empty.
+
+**Rationale:**
+This passes the moment it is written, because the safety is where the options live (the top-level parser), not code of its own. So it is shown to be able to fail. Putting `--dir` on the `add` subparser fails six tests, the slip case among them, and putting it on `list` fails five, the after-command case among them.
+The breaks also failed the tilde and regular-file tests, which is the shared-`dest` hazard the argparse documentation warns about: the subparser's default of `None` overwrites the value the parent parsed, so even a correct `--dir` is lost. 407 pass.
+Commit type `test`: no production code changes, so nothing reaches the changelog.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 7
+- Issue: #11
+
+## [2026-11-08 16:54] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`--dir` and `--global` share one `add_mutually_exclusive_group()`. Giving both, in either order and in the long or the short spelling, exits 2 with argparse's `not allowed with` message and writes nothing.
+
+**Rationale:**
+Each option names a list, so both together contradict each other. argparse words the error and exits 2, so there is no check of our own to keep in step.
+Red first, three cases: with no group, both options were accepted and `--global` won (`DID NOT RAISE SystemExit`). The tests use `add`, because "nothing written" means nothing for `list`: they check that the cwd holds no project file and no `elsewhere` directory, and that the fake home is empty. They check only `not allowed with`, because the rest of the wording changes with the order. 404 pass now.
+Break: dropping the group is the Red, so it is not run a second time.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 6
+- Issue: #11
+
+## [2026-11-08 16:53] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+An empty `--dir` (`--dir ""`) is refused as a bad option value: exit 2, and the usage error names `--dir/-d`.
+
+**Rationale:**
+`Path("")` is `Path(".")`, so `--dir "$PROJECT"` with `PROJECT` unset would quietly use the list in the current directory: the wrong list, with no sign of it.
+Red first: the command did not raise, it ran against the cwd list (`DID NOT RAISE SystemExit`). Before step 2 the same input failed for another reason (argparse took the empty string for the command), which is why this check was not written earlier. 401 pass now.
+Break: dropping the check is the Red, so it is not run a second time.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 5
+- Issue: #11
+
+## [2026-11-08 16:52] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+A `--dir` value such as `~no-such-user/x` is refused as a bad option value: exit 2, one usage error that names `--dir/-d` and quotes the text.
+
+**Rationale:**
+`expanduser` raises `RuntimeError` when the home directory of a named user cannot be found, and argparse only turns `ArgumentTypeError`, `TypeError` and `ValueError` from a converter into a usage error. Without the conversion the error ended `main` in a traceback (the Red: `RuntimeError: Could not determine home directory`).
+The conversion lives in the converter, not in `_list_path`, so a bad value exits 2 like every other bad option value and the message names the text the user typed instead of blaming the home directory.
+The test needs no patch: the password-file lookup finds no user called `no-such-user-m7`. 400 pass now.
+Break: removing the handler is the Red, so it is not run a second time.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 4
+- Issue: #11
+
+## [2026-11-08 16:51] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`--dir` expands a leading `~`: `_directory` returns `Path(text).expanduser()`.
+
+**Rationale:**
+Zsh and Bash expand `~` in `--dir ~/x` but not in `--dir=~/x` (checked while planning), so the second form would have created a directory literally named `~`, possibly inside a Git repository. The program receives the same text in both forms, so one test covers them.
+Red first: the task went into `<cwd>/~/groceries` and nothing was under the fake home. 399 pass now.
+Break: dropping `expanduser` fails exactly that test, so the break and the Red are the same thing.
+Cost: a real directory whose name starts with `~` must be written `./~name`.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 3
+- Issue: #11
+
+## [2026-11-08 16:50] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`--dir PATH` (`-d PATH`) selects `PATH/tasks.json`. It sits on the top-level parser beside `--global`, so it comes before the command. `_directory(text)` turns the value into a path, and `_list_path` returns `args.directory.absolute() / "tasks.json"`: a relative path is joined to the cwd, an absolute one is used as it is.
+
+**Rationale:**
+`absolute()` over `Path.cwd() / directory`: the two give the same paths, but the second reads the cwd even for an absolute `--dir` and fails when the cwd has been deleted (checked on Python 3.14.7 while planning).
+Red first: nine tests failed, all with argparse taking the path for the command (`invalid choice`). 398 pass now.
+`--dir` naming a regular file needs no code. `load` and `save` both raise `OSError` for `plain/tasks.json` and `main` already turns that into one line, so its tests were red only because the option did not exist yet; they pin the behavior from here on.
+Breaks, whole suite, bytecode caching off: ignoring `directory` fails eight tests (every one that passes `--dir`); dropping `absolute()` fails exactly one, the relative-path message check, which is why that case stays in the parametrized list.
+The two tests that share the three path forms use one decorator, because the JSCPD check has threshold 0.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 2
+- Issue: #11
+
+## [2026-11-08 16:49] Commit Summary
+
+**Change Type:** Feature
+
+**Scope:** cli (`src/task_tracker/cli.py`, `tests/test_cli.py`)
+
+**Summary:**
+`--global` (`-g`) selects the list in `~/.task-tracker/tasks.json`. It is an option of the top-level parser, so it comes before the command: `task-tracker --global add "Renew passport"`.
+`_list_path(args)` is the one place that turns the option and the cwd into a file path, and `main` calls it inside its existing `try`.
+The tests get an autouse `home` fixture that points `HOME` at a directory outside the cwd, so no test can reach the real home.
+
+**Rationale:**
+Placement on the top-level parser is the safe one: a location option that a subcommand also accepted would turn `add Milk -d 2026-11-02` into a directory (checked on Python 3.14.7).
+The `dest` is `use_global` because `--global` would default to `global`, a keyword.
+The D2 comment moved next to the constants, and the first line of the test module docstring now says what the module covers (it still left out `delete`).
+Red first: five tests failed with `unrecognized arguments: --global` (three behavior tests, the `-g` case, and the `--help` listing). 389 pass now: the 384 that existed plus these five.
+Breaks, each run on the whole suite with bytecode caching off: ignoring `use_global` fails four tests (the add, both list cases, and the empty-list message); leaving `.task-tracker` out of the path fails the same four. The `--help` test only checks the listing, so the option text can change freely.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 1
+- Issue: #11
+
+## [2026-11-08 16:43] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Revise the M7 plan after a `spec-gap-auditor` review by a fresh Opus agent (no blockers, eleven gaps). `TODO.md` and the plan say the same thing again.
+The old step 2 is four steps (plain `--dir`, the `~`, a `~` that cannot be expanded, an empty value), and the break-the-code step is folded into each step.
+The docs step names every text that would go stale. The plan gains three acceptance boxes (`~name` with no such user, `--help`, and the `add` form of the missing-home case) and loses none. No code changes.
+
+**Rationale:**
+Each finding was checked before it was accepted. Confirmed by probe on Python 3.14.7: `--dir "" list` fails today with `invalid choice`, so the empty-value and `~` tests would have gone red for the wrong reason; a `RuntimeError` from `expanduser` escapes argparse; `Path("/abs").absolute()` works with the cwd deleted where `Path.cwd() / directory` fails.
+Changed because of it: `~` expansion moved from `_list_path` into the `--dir` converter, so a `~name` with no such user is a bad option value (exit 2, the text in the message) and not a home-directory error (exit 1), which also fixes a message that blamed the wrong thing.
+The path is `args.directory.absolute()`. The fake home is made outside the cwd, as plan box 1 says, and the slip test asserts both are empty.
+Both options get `help=` and a test, as the review of PR #29 asked for every option. The exclusion test uses `add`, because "nothing written" means nothing for `list`. Step 9 lists the `README.md` lines that say "in the current directory", the exit codes, and the issue.
+Declined: a guard for a relative `HOME`. It would add a branch and a test for a value the user sets on purpose, and POSIX expects an absolute one. The sentence that claimed the printed path always stays absolute now says where it does not. Issue #11 is not edited yet: the M6 entry updated its issue in the docs step, and the plan names the missing boxes there.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list
+- Issue: #11
+
+## [2026-11-08 16:11] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** docs (`TODO.md`, `docs/implementation-plan.md`)
+
+**Summary:**
+Plan M7 (`--global` and `--dir`). `TODO.md` gets a "Feature: M7 Global list" entry with eight test-first steps, the tests, and the decisions with their costs. The M7 section of the plan gets five more acceptance boxes and a "Decided (2026-11-08)" block. No code changes.
+
+**Rationale:**
+The "Think about" points of M7 were open questions, so each is answered before any code, as for M6.
+Placement: the options go on the top-level parser. A probe on Python 3.14.7 showed `add Milk -d 2026-11-02` exits 2 there, and silently binds `directory='2026-11-02'` when `--dir` belongs to the `add` subparser, so top-level is the only placement that meets the last acceptance criterion with no guard code of our own.
+Four cases the issue does not list came out of checking: `--dir=~/x` is not expanded by Zsh or Bash and would create a directory named `~`; `--dir ""` becomes the current directory; `--global` has the default attribute name `global`, a keyword; and `Path.home()` raises `RuntimeError`, which `main` does not catch (reproduced with the password-file lookup failing).
+Each has a box and a step.
+`--dir` naming a regular file needs no code: `load` and `save` both raise `OSError` there, and `main` already turns that into one line.
+Rejected: requiring a `--dir` directory to exist (a second rule and an extra command to start a list), and the options on every subparser (the silent slip above).
+The `~` decision changed during planning: the first draft left it to the shell, until the check showed the shell does not expand it in `--dir=~/x`.
+The M7 notes also correct a claim made in conversation: `filelock` is a development dependency pulled in by other tools, not a dependency of the program, so the fix for #27 is not free (`dependencies = []`).
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list
+- Issue: #11
+
 ## [2026-11-07 16:33] Commit Summary
 
 **Change Type:** Docs

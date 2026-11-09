@@ -1,4 +1,4 @@
-"""Tests for the command line: `add`, `list`, and `update`."""
+"""Tests for the command line: the five commands and the options that pick a list."""
 
 # Test names state the intent, so per-test docstrings would only repeat them.
 # pylint: disable=missing-function-docstring
@@ -8,6 +8,7 @@
 import io
 import json
 import os
+import stat
 import subprocess
 import sys
 from collections.abc import Callable, Iterator
@@ -47,6 +48,31 @@ def _project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Run from an empty directory and return where its task list will live."""
     monkeypatch.chdir(tmp_path)
     return tmp_path / "tasks.json"
+
+
+@pytest.fixture(name="home", autouse=True)
+def _home(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    """Point HOME at an empty directory outside the cwd and return it.
+
+    Autouse, so no test in this module can reach the real home directory.
+    `Path.home()` reads HOME first on POSIX (via `os.path.expanduser`).
+    """
+    home = tmp_path_factory.mktemp("home")
+    monkeypatch.setenv("HOME", str(home))
+    return home
+
+
+@pytest.fixture(autouse=True)
+def _plain_help(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep argparse from colouring its output, whatever the developer's shell sets.
+
+    Python 3.14 colours `--help` when `FORCE_COLOR` or `PYTHON_COLORS` is set, even
+    into a pipe, and the help tests look for a line that starts with an option name.
+    `PYTHON_COLORS` is read before `NO_COLOR`, which is read before `FORCE_COLOR`.
+    """
+    monkeypatch.setenv("PYTHON_COLORS", "0")
 
 
 @pytest.fixture
@@ -1657,3 +1683,410 @@ def test_delete_with_standard_output_closed_gives_one_error_line(tmp_path: Path)
     assert error.startswith("task-tracker: error: ")
     assert "Traceback" not in error
     assert (tmp_path / "tasks.json").read_bytes() == before
+
+
+# --- M7: --global and --dir ---
+
+
+def _global_list(home: Path) -> Path:
+    return home / ".task-tracker" / "tasks.json"
+
+
+def test_global_add_stores_the_task_under_the_home_directory(
+    project: Path, home: Path, capsys: pytest.CaptureFixture[str]
+):
+    # Given a first run: the home directory has no `.task-tracker` yet
+    assert not (home / ".task-tracker").exists()
+
+    exit_code = main(["--global", "add", "Renew passport"])
+
+    # Then the task is in the global list, and the project list was not touched
+    assert exit_code == 0
+    assert [(task.id, task.name) for task in load(_global_list(home))] == [
+        (1, "Renew passport")
+    ]
+    assert not project.exists()
+    assert "Added task 1: Renew passport" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("flag", ["--global", "-g"])
+def test_list_shows_only_the_list_it_was_asked_for(
+    project: Path, home: Path, capsys: pytest.CaptureFixture[str], flag: str
+):
+    save([Task(1, "Project")], project)
+    save([Task(1, "Global")], _global_list(home))
+
+    main(["list"])
+    project_names = _listed_names(capsys)
+    main([flag, "list"])
+    global_names = _listed_names(capsys)
+
+    assert (project_names, global_names) == (["Project"], ["Global"])
+
+
+def test_global_list_with_no_file_says_so_and_creates_nothing(
+    home: Path, capsys: pytest.CaptureFixture[str]
+):
+    exit_code = main(["--global", "list"])
+
+    assert exit_code == 0
+    assert capsys.readouterr().out == f"No current tasks in {_global_list(home)}\n"
+    assert not (home / ".task-tracker").exists()
+
+
+@pytest.mark.parametrize(
+    ("option", "explanation"),
+    [("--global", "~/.task-tracker"), ("--dir", "PATH/tasks.json")],
+)
+def test_the_top_level_help_explains_each_location_option(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    option: str,
+    explanation: str,
+):
+    # A wide terminal, so argparse does not wrap the line being checked. The usage
+    # line also names both options, so look for the line of the options section.
+    monkeypatch.setenv("COLUMNS", "200")
+
+    with pytest.raises(SystemExit) as exit_info:
+        main(["--help"])
+
+    option_line = next(
+        line
+        for line in capsys.readouterr().out.splitlines()
+        if line.lstrip().startswith(option)
+    )
+    assert exit_info.value.code == 0
+    assert explanation in option_line
+
+
+# The three ways to name a directory: both option spellings, and a relative path.
+_DIRECTORY_FORMS = pytest.mark.parametrize(
+    ("flag", "relative"),
+    [("--dir", False), ("-d", False), ("-d", True)],
+    ids=["long-absolute", "short-absolute", "short-relative"],
+)
+
+
+def _directory_argument(tmp_path: Path, name: str, *, relative: bool) -> str:
+    return name if relative else str(tmp_path / name)
+
+
+@_DIRECTORY_FORMS
+def test_dir_stores_the_task_in_that_directory(
+    project: Path, tmp_path: Path, flag: str, relative: bool
+):
+    groceries = tmp_path / "groceries"
+    argument = _directory_argument(tmp_path, "groceries", relative=relative)
+
+    exit_code = main([flag, argument, "add", "Milk"])
+
+    assert exit_code == 0
+    assert [task.name for task in load(groceries / "tasks.json")] == ["Milk"]
+    assert not project.exists()
+
+
+@_DIRECTORY_FORMS
+def test_list_on_a_directory_that_does_not_exist_says_so_and_creates_nothing(
+    project: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    flag: str,
+    relative: bool,
+):
+    missing = tmp_path / "missing"
+    argument = _directory_argument(tmp_path, "missing", relative=relative)
+
+    exit_code = main([flag, argument, "list"])
+
+    # The message names the absolute path, even for a relative option value.
+    assert exit_code == 0
+    assert capsys.readouterr().out == f"No current tasks in {missing / 'tasks.json'}\n"
+    assert not missing.exists()
+    assert not project.exists()
+
+
+@pytest.mark.parametrize("command", [["list"], ["add", "Milk"]], ids=["list", "add"])
+def test_dir_naming_a_regular_file_gives_one_error_line(
+    project: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    command: list[str],
+):
+    # `load` and `save` both raise OSError for `plain/tasks.json`, which `main`
+    # already turns into one line, so this needs no code of its own.
+    plain = tmp_path / "plain"
+    plain.write_text("not a directory", encoding="utf-8")
+
+    exit_code = main(["--dir", str(plain), *command])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "plain")
+    assert plain.read_text(encoding="utf-8") == "not a directory"
+    assert not project.exists()
+
+
+def test_dir_expands_a_leading_tilde_to_the_home_directory(
+    project: Path, home: Path, tmp_path: Path
+):
+    # A shell leaves `~` alone in `--dir=~/groceries`, so the program gets the same
+    # text for both spellings and must expand it, or it makes a directory named `~`.
+    exit_code = main(["--dir", "~/groceries", "add", "Milk"])
+
+    assert exit_code == 0
+    assert [task.name for task in load(home / "groceries" / "tasks.json")] == ["Milk"]
+    assert not (tmp_path / "~").exists()
+    assert not project.exists()
+
+
+@pytest.mark.usefixtures("project")
+def test_dir_with_a_tilde_that_cannot_be_expanded_gives_one_error_line(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    # `~name` for a user who does not exist: `expanduser` raises RuntimeError, which
+    # `main` does not catch, so without a conversion this ends in a traceback. Exit 1
+    # like the missing home directory below: both are `expanduser` finding no home.
+    exit_code = main(["--dir", "~no-such-user-m7/x", "list"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "'~no-such-user-m7/x'")
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.usefixtures("project")
+def test_an_empty_dir_is_a_bad_option_value(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    # `Path("")` is `Path(".")`, so `--dir "$PROJECT"` with PROJECT unset would
+    # quietly use the list in the cwd.
+    with pytest.raises(SystemExit) as exit_info:
+        main(["--dir", "", "add", "Milk"])
+
+    # Only the last line: the usage line above it always names `--dir PATH`.
+    error = capsys.readouterr().err.splitlines()[-1]
+    assert exit_info.value.code == 2
+    assert "--dir" in error
+    assert "must not be empty" in error
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--dir", "{dir}", "--global"],
+        ["-d", "{dir}", "-g"],
+        ["--global", "--dir", "{dir}"],
+    ],
+    ids=["long", "short", "reversed"],
+)
+@pytest.mark.usefixtures("project")
+def test_dir_together_with_global_is_refused_and_writes_nothing(
+    home: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    options: list[str],
+):
+    elsewhere = tmp_path / "elsewhere"
+    argv = [option.replace("{dir}", str(elsewhere)) for option in options]
+
+    with pytest.raises(SystemExit) as exit_info:
+        main([*argv, "add", "Milk"])
+
+    # argparse words the rest of the message differently for each order.
+    assert exit_info.value.code == 2
+    assert "not allowed with" in capsys.readouterr().err
+    # No project file, no `elsewhere` directory, nothing under the fake home.
+    assert not list(tmp_path.iterdir())
+    assert not list(home.iterdir())
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["add", "Milk", "-d", "2026-11-02"],
+        ["add", "Milk", "--global"],
+        ["list", "--dir", "elsewhere"],
+    ],
+    ids=["slip-for-due", "global-after-command", "dir-after-command"],
+)
+@pytest.mark.usefixtures("project")
+def test_a_location_option_after_the_command_is_refused_and_creates_nothing(
+    home: Path,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
+):
+    # `-d` and `-D` differ by one Shift. On the top-level parser a slip for `--due`
+    # is an unrecognized argument; a subcommand that also took `-d` would bind
+    # `2026-11-02` as a directory and create it on the first save.
+    with pytest.raises(SystemExit) as exit_info:
+        main(argv)
+
+    assert exit_info.value.code == 2
+    assert "unrecognized arguments" in capsys.readouterr().err
+    assert not list(tmp_path.iterdir())
+    assert not list(home.iterdir())
+
+
+@pytest.mark.parametrize(
+    "location",
+    [["--global"], ["--dir", "~/groceries"]],
+    ids=["global", "dir-with-tilde"],
+)
+@pytest.mark.usefixtures("project")
+def test_a_missing_home_directory_gives_one_error_line_for_every_use_of_it(
+    home: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    location: list[str],
+):
+    # `expanduser` returns its argument when it cannot expand, and `Path.expanduser`
+    # then raises RuntimeError (HOME unset, and no password-file entry for the user, as
+    # in a container started with an arbitrary user ID). `--global` and `--dir ~/x`
+    # both need the home directory, so they fail the same way.
+    monkeypatch.setattr("os.path.expanduser", lambda path: path)
+
+    exit_code = main([*location, "add", "Milk"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "home directory")
+    assert not list(tmp_path.iterdir())
+    assert not list(home.iterdir())
+
+
+# --- review of PR #31: a `..` after a missing directory ---
+
+
+@pytest.fixture(name="existing_list")
+def _existing_list(tmp_path: Path) -> Path:
+    """A list in `y` next to a directory name that does not exist, and where it is."""
+    save([Task(1, "Existing")], tmp_path / "y" / "tasks.json")
+    return tmp_path / "y" / "tasks.json"
+
+
+@pytest.mark.usefixtures("project")
+def test_dir_with_dotdot_after_a_missing_directory_adds_to_the_existing_list(
+    tmp_path: Path, existing_list: Path
+):
+    # `nonexistent/..` is not on the disk, but `save` removes it from the path by
+    # looking at the text. If `load` asked the disk, the list would read as empty and
+    # the save would replace it with the one new task.
+    through_a_typo = tmp_path / "nonexistent" / ".." / "y"
+
+    exit_code = main(["--dir", str(through_a_typo), "add", "New"])
+
+    assert exit_code == 0
+    assert [task.name for task in load(existing_list)] == ["Existing", "New"]
+
+
+@pytest.mark.usefixtures("project", "existing_list")
+def test_dir_with_dotdot_after_a_missing_directory_lists_the_existing_list(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    through_a_typo = tmp_path / "nonexistent" / ".." / "y"
+
+    exit_code = main(["--dir", str(through_a_typo), "list"])
+
+    assert exit_code == 0
+    assert _listed_names(capsys) == ["Existing"]
+
+
+# --- review of PR #31: a relative or root home directory ---
+
+
+@pytest.mark.parametrize(
+    "location",
+    [["--global"], ["--dir", "~/groceries"]],
+    ids=["global", "dir-with-tilde"],
+)
+@pytest.mark.usefixtures("project")
+def test_a_relative_home_directory_is_refused_and_creates_nothing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    location: list[str],
+):
+    # With `HOME=relative/home` the "global" list would sit under whichever directory
+    # the command ran in, so there would be one list per directory, not one.
+    monkeypatch.setenv("HOME", "relative/home")
+
+    exit_code = main([*location, "add", "Milk"])
+
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "not an absolute path")
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.usefixtures("project")
+def test_a_home_directory_of_slash_is_accepted(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    # Containers and service users have `HOME=/`. It names one list from every
+    # directory, which is all `--global` promises, so it is not refused. `list` only
+    # reads, so the test cannot create `/.task-tracker`.
+    monkeypatch.setenv("HOME", "/")
+
+    exit_code = main(["--global", "list"])
+
+    assert exit_code == 0
+    assert capsys.readouterr().out == "No current tasks in /.task-tracker/tasks.json\n"
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="Windows has no owner, group, and other bits"
+)
+@pytest.mark.usefixtures("project")
+def test_global_add_creates_the_global_directory_for_its_owner_only(home: Path):
+    # The usual umask (022) would make the directory `drwxr-xr-x`.
+    main(["--global", "add", "Milk"])
+
+    assert stat.S_IMODE((home / ".task-tracker").stat().st_mode) == 0o700
+
+
+# --- review of PR #31: update and delete on the chosen list ---
+
+
+@pytest.fixture(name="chosen", params=["global", "dir"])
+def _chosen(
+    request: pytest.FixtureRequest, project: Path, home: Path, tmp_path: Path
+) -> tuple[list[str], Path]:
+    """Two lists: the project's, and the one the options name, with one more task.
+
+    Both lists have a task 1, so only the file a command works on tells them apart.
+    The extra task 2 is what a command reading the wrong list would lose.
+    Returns the location options and the list they name.
+    """
+    if request.param == "global":
+        options, chosen = ["--global"], _global_list(home)
+    else:
+        elsewhere = tmp_path / "elsewhere"
+        options, chosen = ["--dir", str(elsewhere)], elsewhere / "tasks.json"
+    save([Task(1, "Chosen"), Task(2, "Other")], chosen)
+    save([Task(1, "Project")], project)
+    return options, chosen
+
+
+def test_update_changes_the_task_in_the_chosen_list_only(
+    project: Path, chosen: tuple[list[str], Path]
+):
+    options, chosen_list = chosen
+
+    exit_code = main([*options, "update", "1", "--name", "Renamed"])
+
+    assert exit_code == 0
+    assert [task.name for task in load(chosen_list)] == ["Renamed", "Other"]
+    assert [task.name for task in load(project)] == ["Project"]
+
+
+def test_delete_removes_the_task_from_the_chosen_list_only(
+    project: Path, chosen: tuple[list[str], Path], monkeypatch: pytest.MonkeyPatch
+):
+    options, chosen_list = chosen
+    _answer_with(monkeypatch, "y")
+
+    exit_code = main([*options, "delete", "1"])
+
+    assert exit_code == 0
+    assert [task.name for task in load(chosen_list)] == ["Other"]
+    assert [task.name for task in load(project)] == ["Project"]

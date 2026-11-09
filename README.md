@@ -89,25 +89,31 @@ uv run task-tracker list
 uv run task-tracker list --all
 uv run task-tracker update 1 --status DONE
 uv run task-tracker delete 1
+uv run task-tracker --global add "Renew passport"
+uv run task-tracker --dir ~/groceries list
 ```
 
-- `add NAME` stores a task in `tasks.json` in the current directory and prints its ID. `--priority` (`-p`) takes `CRITICAL`, `HIGH`, `MEDIUM`, or `LOW` and defaults to `LOW`. `--due` (`-D`) takes `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SS`, in local time: a value with a UTC offset is refused.
+- Which list a command works on: with no option, `tasks.json` in the current directory. `--global` (`-g`) selects `tasks.json` in `~/.task-tracker/`, and `--dir PATH` (`-d`) selects `tasks.json` in `PATH`. They cannot be given together.
+  `--dir` takes a relative `PATH` from the current directory and expands a leading `~` (a shell does not expand it in `--dir=~/x`). The first `add` creates a missing directory for its owner only (the file is owner-only too); `list` on one that does not exist prints the empty-list message and creates nothing.
+  Both options go before the command: `task-tracker --global add "Milk"`. After the command they are refused, so a slip such as `add "Milk" -d 2026-11-02` (for `-D`) creates nothing.
+- `add NAME` stores a task in the chosen list and prints its ID. `--priority` (`-p`) takes `CRITICAL`, `HIGH`, `MEDIUM`, or `LOW` and defaults to `LOW`. `--due` (`-D`) takes `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SS`, in local time: a value with a UTC offset is refused.
 - `list` shows the current tasks, one per line: ID, status, priority, due date (`-` when there is none), and name. The earliest due date comes first and tasks without one come last, then the highest priority, then the lowest ID. When nothing is current it says so and names the file it read.
   A name is shown with control characters and text-direction controls as escapes (`\n`, `\x1b`, `\u202e`), so one task is always one line and a shared file cannot change how a line is drawn.
 - `list --all` (`-a`) shows every task: the current tasks first, in the order above, then the done tasks by date completed, the earliest first, then the lowest ID. The lines are the same, so the date completed is not shown; it only sets the order.
   When the file holds no tasks it prints `No tasks in <path>`. Plain `list` still prints `No current tasks in <path>` when nothing is current, including when every task is done.
-- `update ID` changes one stored task in `tasks.json` in the current directory and prints one line, `Updated task ID: NAME`, where `NAME` is the name after the change.
+- `update ID` changes one stored task in the chosen list and prints one line, `Updated task ID: NAME`, where `NAME` is the name after the change.
   `--name` (`-n`), `--priority` (`-p`), `--status` (`-s`), and `--due` (`-D`) change those fields, and `--clear-due` (`-C`) removes the due date. `--due` and `--clear-due` cannot be given together. `ID` is a whole number of 1 or more in plain digits: a sign, a space, an underscore, or `0` is a bad value.
   Giving a task the values it already has changes nothing: the file is not written, `updated` does not move, and the line is `No change to task ID: NAME` (exit code 0). Moving a task to `DONE` sets its date completed to now, or to its stop time if the clock is behind it (after a change of time zone, for one). `updated` likewise never moves back.
   Moving a `DONE` task to `TO_DO` or `IN_PROGRESS` clears it, and `DONE` to `DONE` keeps the original. `created`, the ID, `description`, `start`, and `stop` cannot be changed by `update`.
   A change the task rules refuse, or an `update` with no option to change, is refused and the file is left unchanged.
-- `delete ID` removes one stored task from `tasks.json` in the current directory. It first asks `Delete task 2: Buy milk? [y/N]`, with the ID and the name, because an ID can be reused: deleting the highest-numbered task frees its ID, so the next `add` gets it again, and the name is the check that you mean the right task.
+- `delete ID` removes one stored task from the chosen list. It first asks `Delete task 2: Buy milk? [y/N]`, with the ID and the name, because an ID can be reused: deleting the highest-numbered task frees its ID, so the next `add` gets it again, and the name is the check that you mean the right task.
   Answer `y` or `yes` in any case to delete; any other answer, an empty one included, keeps the task. The line is `Deleted task 2: Buy milk` or `Kept task 2: Buy milk`, and a kept task leaves the file unchanged.
   The prompt goes to standard output, so it is not visible when standard output is redirected to a file. A script can answer on standard input (`echo y | task-tracker delete 1`); a `--yes` flag is not built.
   With no answer (standard input empty, at its end, not valid text or closed; standard output or error closed; Ctrl-C), nothing is deleted and the command exits with code 1. On a terminal the error starts on its own line.
   If the task changed or was removed while the prompt was open, nothing is deleted and the command exits with code 1.
-- Exit codes: 0 on success, 2 for a bad option value (an unknown priority or status, a `--due` that is not a local date or date and time, an ID that is not a whole number of 1 or more, or `--due` given with `--clear-due`).
-  1 for anything else that goes wrong (a blank name or one UTF-8 cannot hold, a change the task rules refuse, no task with the given ID, an `update` with no option to change, no answer to a `delete` prompt, a task that changed while `delete` was prompting, a corrupt or unreadable task file, an output that cannot be written).
+- Exit codes: 0 on success, 2 for a bad option value (an unknown priority or status, a `--due` that is not a local date or date and time, an ID that is not a whole number of 1 or more, `--due` given with `--clear-due`, `--dir` given with `--global`, an empty `--dir`, or `--global` or `--dir` after the command).
+  1 for anything else that goes wrong (a blank name or one UTF-8 cannot hold, a change the task rules refuse, no task with the given ID, an `update` with no option to change, no answer to a `delete` prompt, a task that changed while `delete` was prompting, a corrupt or unreadable task file, an output that cannot be written,
+  a home directory that cannot be found or is not an absolute path, for `--global` or for the `~` of a `--dir`, or a `~name` with no such user).
   An error prints one line on standard error and never a traceback.
 - `add`, `update` and `delete` store their change before they print, so an error about the output means the change is stored. A reader that closes the pipe early (`task-tracker list | head -1`) ends the output quietly, with exit code 1. With standard output closed (`task-tracker list >&-`) there is nowhere to print, and `add`, `update` and `list` finish with exit code 0.
   `delete` needs standard output for its prompt, so with it closed `delete` exits with code 1 and deletes nothing.
