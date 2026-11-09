@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-08 17:13] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+Make the M7 tests pass pylint, which super-linter runs and `ruff` and `pyright` do not. Five tests that took the `project` fixture only for its `chdir` now use `@pytest.mark.usefixtures("project")`, as the `fixed_clock` tests already do, and eight `list(directory.iterdir()) == []` assertions read `not list(directory.iterdir())`.
+
+**Rationale:**
+Found by the done check of step 10: pylint 4.0.6 (the CI version) scored the file 9.92 with eleven messages (`unused-argument` and `use-implicit-booleaness-not-comparison`) while every other tool was clean, which is the gap the project notes describe.
+The behavior is unchanged: 408 tests pass, and the assertions are equivalent, so the breaks recorded in the earlier entries still apply. A separate commit, because steps 1 to 8 are already committed.
+Now all of ruff 0.15.17, isort, black, flake8, mypy (no extra packages) and pylint pass, as do JSCPD (0 clones), codespell over every tracked file, and the Markdown checks. Coverage is 97.6% overall; the lines `cli.py` leaves uncovered are the existing standard-output handling.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 10
+- Issue: #11
+
 ## [2026-11-08 16:59] Commit Summary
 
 **Change Type:** Docs

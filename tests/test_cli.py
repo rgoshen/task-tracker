@@ -1812,8 +1812,9 @@ def test_dir_expands_a_leading_tilde_to_the_home_directory(
     assert not project.exists()
 
 
+@pytest.mark.usefixtures("project")
 def test_dir_with_a_tilde_that_cannot_be_expanded_is_a_bad_option_value(
-    project: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ):
     # `~name` for a user who does not exist: `expanduser` raises RuntimeError, which
     # argparse does not catch, so without a conversion this ends in a traceback.
@@ -1824,11 +1825,12 @@ def test_dir_with_a_tilde_that_cannot_be_expanded_is_a_bad_option_value(
     assert exit_info.value.code == 2
     assert "--dir" in error
     assert "~no-such-user-m7/x" in error
-    assert list(tmp_path.iterdir()) == []
+    assert not list(tmp_path.iterdir())
 
 
+@pytest.mark.usefixtures("project")
 def test_an_empty_dir_is_a_bad_option_value(
-    project: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ):
     # `Path("")` is `Path(".")`, so `--dir "$PROJECT"` with PROJECT unset would
     # quietly use the list in the cwd.
@@ -1837,7 +1839,7 @@ def test_an_empty_dir_is_a_bad_option_value(
 
     assert exit_info.value.code == 2
     assert "--dir" in capsys.readouterr().err
-    assert list(tmp_path.iterdir()) == []
+    assert not list(tmp_path.iterdir())
 
 
 @pytest.mark.parametrize(
@@ -1849,8 +1851,8 @@ def test_an_empty_dir_is_a_bad_option_value(
     ],
     ids=["long", "short", "reversed"],
 )
+@pytest.mark.usefixtures("project")
 def test_dir_together_with_global_is_refused_and_writes_nothing(
-    project: Path,
     home: Path,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -1866,8 +1868,8 @@ def test_dir_together_with_global_is_refused_and_writes_nothing(
     assert exit_info.value.code == 2
     assert "not allowed with" in capsys.readouterr().err
     # No project file, no `elsewhere` directory, nothing under the fake home.
-    assert list(tmp_path.iterdir()) == []
-    assert list(home.iterdir()) == []
+    assert not list(tmp_path.iterdir())
+    assert not list(home.iterdir())
 
 
 @pytest.mark.parametrize(
@@ -1879,8 +1881,8 @@ def test_dir_together_with_global_is_refused_and_writes_nothing(
     ],
     ids=["slip-for-due", "global-after-command", "dir-after-command"],
 )
+@pytest.mark.usefixtures("project")
 def test_a_location_option_after_the_command_is_refused_and_creates_nothing(
-    project: Path,
     home: Path,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -1894,12 +1896,12 @@ def test_a_location_option_after_the_command_is_refused_and_creates_nothing(
 
     assert exit_info.value.code == 2
     assert "unrecognized arguments" in capsys.readouterr().err
-    assert list(tmp_path.iterdir()) == []
-    assert list(home.iterdir()) == []
+    assert not list(tmp_path.iterdir())
+    assert not list(home.iterdir())
 
 
+@pytest.mark.usefixtures("project")
 def test_global_without_a_home_directory_gives_one_error_line(
-    project: Path,
     home: Path,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1914,5 +1916,5 @@ def test_global_without_a_home_directory_gives_one_error_line(
 
     assert exit_code == 1
     _assert_one_line_error(capsys, "home directory")
-    assert list(tmp_path.iterdir()) == []
-    assert list(home.iterdir()) == []
+    assert not list(tmp_path.iterdir())
+    assert not list(home.iterdir())
