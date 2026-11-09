@@ -1722,15 +1722,30 @@ def test_global_list_with_no_file_says_so_and_creates_nothing(
     assert not (home / ".task-tracker").exists()
 
 
-@pytest.mark.parametrize("option", ["--global", "--dir PATH"])
-def test_the_top_level_help_lists_the_location_options(
-    capsys: pytest.CaptureFixture[str], option: str
+@pytest.mark.parametrize(
+    ("option", "explanation"),
+    [("--global", "~/.task-tracker"), ("--dir", "PATH/tasks.json")],
+)
+def test_the_top_level_help_explains_each_location_option(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    option: str,
+    explanation: str,
 ):
+    # A wide terminal, so argparse does not wrap the line being checked. The usage
+    # line also names both options, so look for the line of the options section.
+    monkeypatch.setenv("COLUMNS", "200")
+
     with pytest.raises(SystemExit) as exit_info:
         main(["--help"])
 
+    option_line = next(
+        line
+        for line in capsys.readouterr().out.splitlines()
+        if line.lstrip().startswith(option)
+    )
     assert exit_info.value.code == 0
-    assert option in capsys.readouterr().out
+    assert explanation in option_line
 
 
 # The three ways to name a directory: both option spellings, and a relative path.
@@ -1821,7 +1836,7 @@ def test_dir_with_a_tilde_that_cannot_be_expanded_is_a_bad_option_value(
     with pytest.raises(SystemExit) as exit_info:
         main(["--dir", "~no-such-user-m7/x", "list"])
 
-    error = capsys.readouterr().err
+    error = capsys.readouterr().err.splitlines()[-1]
     assert exit_info.value.code == 2
     assert "--dir" in error
     assert "~no-such-user-m7/x" in error
@@ -1837,8 +1852,11 @@ def test_an_empty_dir_is_a_bad_option_value(
     with pytest.raises(SystemExit) as exit_info:
         main(["--dir", "", "add", "Milk"])
 
+    # Only the last line: the usage line above it always names `--dir PATH`.
+    error = capsys.readouterr().err.splitlines()[-1]
     assert exit_info.value.code == 2
-    assert "--dir" in capsys.readouterr().err
+    assert "--dir" in error
+    assert "must not be empty" in error
     assert not list(tmp_path.iterdir())
 
 

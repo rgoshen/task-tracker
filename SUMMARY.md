@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-08 17:25] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+Make three assertions in the M7 tests able to fail. The `--help` test now finds the line of each option in the options section and checks its explanation (`~/.task-tracker`, `PATH/tasks.json`), as the `update --help` test does for its options.
+The two tests that claim "the error names `--dir`" look at the last line of standard error only, and the empty-value test also checks the message `must not be empty`.
+
+**Rationale:**
+Found by the whole-branch review (a fresh Opus reviewer): no Critical or Important findings, but two tests did not test what they claimed. The old help test passed with both `help=` lines deleted, because it only looked for the option names, which the usage line prints.
+The old `"--dir" in stderr` checks could never fail, because the usage line above the error always contains `--dir PATH`; the module already looks at the last line for this reason.
+Each is shown with a break that the old assertion missed: deleting the `--global` help text, deleting the `--dir` help text, and giving the empty-value error a blank message each fail exactly one test now. 408 pass, same count.
+Commit type `test`: no production code changes.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Feature: M7 Global list, step 10 (final review)
+- Issue: #11
+
 ## [2026-11-08 17:13] Commit Summary
 
 **Change Type:** Refactor
