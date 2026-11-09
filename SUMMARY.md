@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-08 20:00] Commit Summary
+
+**Change Type:** Test
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+An autouse fixture, `_plain_help`, sets `PYTHON_COLORS=0` for every test in the module, so argparse does not colour `--help` whatever the developer's shell sets. Review of PR #31, thread 5. No production code changes.
+
+**Rationale:**
+Python 3.14 argparse colours its help when `FORCE_COLOR` or `PYTHON_COLORS` is set, even into a pipe. The help tests look for the line that starts with an option name (`line.lstrip().startswith(option)`), which colour codes in front of the name defeat, so `next(...)` raised `StopIteration`.
+Reproduced before the change: `FORCE_COLOR=1 uv run pytest` failed 8 tests, 2 of them the new location-option help test and 6 the existing `update --help` test whose pattern it copies. CI sets neither variable, so only local runs failed.
+`PYTHON_COLORS` is read before `NO_COLOR`, which is read before `FORCE_COLOR` (Python command-line docs, "Controlling color"), so `PYTHON_COLORS=0` covers all three. The reviewer suggested `NO_COLOR`; that would not cover a developer with `PYTHON_COLORS=1`.
+Now the suite passes (418) under `FORCE_COLOR=1`, `PYTHON_COLORS=1`, both, `NO_COLOR=1` and none.
+Breaks: with the variable renamed so it does nothing, 8 tests fail under `FORCE_COLOR=1`. With `NO_COLOR=1` set instead of `PYTHON_COLORS=0`, all pass under `FORCE_COLOR=1`, as the precedence says, and 8 fail under `PYTHON_COLORS=1`.
+(The mutation helper printed "SURVIVED" for the first run because pytest coloured its own summary under `FORCE_COLOR`, which hid the `FAILED` lines it matches; the counts are what it printed.)
+Commit type `test`: the commit changes a test file only.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Fix: PR #31 review, step 5
+- Issue: #11, PR #31 thread 5
+
 ## [2026-11-08 19:45] Commit Summary
 
 **Change Type:** Fix

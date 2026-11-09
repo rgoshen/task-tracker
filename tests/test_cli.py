@@ -64,6 +64,17 @@ def _home(
     return home
 
 
+@pytest.fixture(autouse=True)
+def _plain_help(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep argparse from colouring its output, whatever the developer's shell sets.
+
+    Python 3.14 colours `--help` when `FORCE_COLOR` or `PYTHON_COLORS` is set, even
+    into a pipe, and the help tests look for a line that starts with an option name.
+    `PYTHON_COLORS` is read before `NO_COLOR`, which is read before `FORCE_COLOR`.
+    """
+    monkeypatch.setenv("PYTHON_COLORS", "0")
+
+
 @pytest.fixture
 def fixed_clock(monkeypatch: pytest.MonkeyPatch) -> None:
     # Two runs of `add` a moment apart must stamp the same time, or comparing
