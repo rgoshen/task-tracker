@@ -1,5 +1,25 @@
 # Summary
 
+## [2026-11-08 20:45] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `CLAUDE.md` and `docs/implementation-plan.md` (and issue #11, which mirrors it)
+
+**Summary:**
+`CLAUDE.md` now says what the code does: `_list_path` is the one place that chooses the list file from the options and the cwd, and `_expanded` is the one place that looks up the home directory, for `--global` and for a leading `~` in `--dir`, with one error line and exit 1 when there is none or it is relative.
+The plan's M7 section changes with the code: two boxes changed and four added (the `..` case, the relative `HOME`, the directory mode, `update` and `delete` on the chosen list), and the "Decided" block records the `~` change, the `load` resolve, the relative `HOME`, the directory mode and this review round. Review of PR #31, thread 7.
+
+**Rationale:**
+The reviewer was right that the old sentence was not quite true: `_directory` also read the home directory when it converted `--dir ~/x`, and the `_list_path` docstring left out `--dir`. The docstring was fixed with the home lookup in the commit that added `_expanded`; the sentence here is the other half, since this file is guidance for later sessions.
+The plan, the issue and `README.md` change together (the project rule in `CLAUDE.md`). `README.md` changed with the code in the three commits before this one. Issue #11 gets the same text as the plan (18 boxes, same Decided block), updated after this commit; the body from before this round is saved in the scratchpad.
+No code changes: 422 pass, the gate and the CI-version linters are clean, and JSCPD finds 0 clones.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Fix: PR #31 review, step 7
+- Issue: #11, PR #31 thread 7
+
 ## [2026-11-08 20:20] Commit Summary
 
 **Change Type:** Test

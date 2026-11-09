@@ -343,11 +343,15 @@ Produces: one place that turns the global flag, `--dir`, the cwd, and the home d
 - [x] Given `add "Milk" -d 2026-11-02` (a slip for `-D`), then no file or directory named `2026-11-02` is created.
 - [x] Given the options after the command, such as `add "Milk" --global` or `list --dir elsewhere`, then argparse exits with code 2 (`unrecognized arguments`) and nothing is created. (added 2026-11-08)
 - [x] Given `--dir ~/groceries` with `HOME` at the fake home (a shell does not expand `~` in `--dir=~/groceries`, and the program gets the same text either way), then the list is `home / "groceries" / "tasks.json"` and nothing named `~` is created in the cwd. (added 2026-11-08)
-- [x] Given `--dir ~no-such-user/x`, then the exit code is 2 and the error names `--dir` and the text. (added 2026-11-08)
+- [x] Given `--dir ~no-such-user/x`, then the exit code is 1, one error line quotes the text, and nothing is written. (added 2026-11-08, changed in the review of PR #31)
 - [x] Given `--dir ""`, then the exit code is 2, the error names `--dir`, and nothing is written. (added 2026-11-08)
 - [x] Given `--dir` naming a regular file, when `list` or `add`, then the exit code is 1, one error line is printed, and the file is unchanged. (added 2026-11-08)
-- [x] Given a home directory that cannot be found, when `--global add "Milk"`, then the exit code is 1, one error line names the home directory, and nothing is written. (added 2026-11-08)
+- [x] Given a home directory that cannot be found, when `--global add "Milk"` or `--dir ~/groceries add "Milk"`, then the exit code is 1, one error line names the home directory, and nothing is written. (added 2026-11-08, the `--dir` case added in the review of PR #31)
 - [x] Given `--help`, then `--global` and `--dir PATH` are listed. (added 2026-11-08)
+- [x] Given `--dir nonexistent/../y` over an existing list in `y`, when `add` or `list`, then the existing tasks are kept and shown, because `load` and `save` resolve the same path. (added in the review of PR #31)
+- [x] Given `HOME=relative/home`, when `--global add "Milk"` or `--dir ~/groceries add "Milk"`, then the exit code is 1, one error line says the home directory is not an absolute path, and nothing is created. `HOME=/` is accepted. (added in the review of PR #31)
+- [x] Given a first save, then the directory that holds the list is created with mode `0o700`, and a directory that exists keeps its mode. (added in the review of PR #31)
+- [x] Given a chosen list and a project list that both hold a task 1, when `update` or `delete` runs with `--global` or `--dir`, then only the chosen list changes. (added in the review of PR #31)
 
 **Think about:**
 
@@ -364,12 +368,18 @@ Produces: one place that turns the global flag, `--dir`, the cwd, and the home d
   After the command the options are refused (exit 2), which fails safe. The attributes are `use_global` and `directory`: `--global` would default to `global`, a keyword.
 - The two options share one `add_mutually_exclusive_group()`, so argparse words the error and exits 2 in either order.
 - `list` on a `--dir` that does not exist reports an empty list and creates nothing. `add` creates it, as the first `--global add` creates `.task-tracker/`; `save` already does this (M2). Rejected: requiring the directory to exist.
-- `--dir` expands a leading `~` itself, because Zsh and Bash do not expand it in `--dir=~/x`. The expansion is in the option's converter: a `~name` with no such user raises `RuntimeError`, which argparse does not catch, so the converter turns it into a bad option value (exit 2, the text in the message). An empty `--dir` is refused the same way, because `Path("")` is the current directory.
+- `--dir` expands a leading `~` itself, because Zsh and Bash do not expand it in `--dir=~/x`. `_expanded` does it once, for `--dir` and for `--global` (the path `~/.task-tracker/tasks.json`), and turns the `RuntimeError` that `expanduser` raises (no home directory, or `~name` for a user who does not exist) into one error line and exit 1.
+  Changed in the review of PR #31: it first expanded in the option's converter and exited 2, so one missing home exited 2 for `--dir` and 1 for `--global`. An empty `--dir` is still refused as a bad option value (exit 2), because `Path("")` is the current directory.
 - The path is `args.directory.absolute() / "tasks.json"`: a relative `--dir` is joined to the cwd, an absolute one is kept and the cwd is never read (`Path.cwd() / directory` fails for an absolute `--dir` when the cwd has been deleted), and the printed path stays absolute.
-- A home directory that cannot be found (`RuntimeError` from `Path.home()`) is one error line and exit 1, for `--global` only. `main` still does not catch `RuntimeError`. A relative `HOME` is accepted as it is.
+  `load` and `save` both resolve the path (`save` always did), so `missing/../y` is `y` to both; `load` had asked the disk and read an empty list (review of PR #31). `list` still prints the path as typed.
+- A home directory that cannot be found is one error line and exit 1, for `--global` and for the `~` of a `--dir`. `main` still does not catch `RuntimeError`.
+  A relative `HOME` is refused too ("the home directory is not an absolute path"), because the global list would follow the cwd (review of PR #31; first accepted). `HOME=/`, and an empty `HOME`, which is the same `/` after `expanduser`, are accepted: they name one list from every directory, and `HOME=/` is how some containers and service users are set up.
 - `HOME` isolates the tests because `Path.home()` calls `os.path.expanduser`, which reads `HOME` first on POSIX. The fixture is autouse, and the fake home is made with `tmp_path_factory.mktemp("home")`, outside the cwd, so the tests use the existing `project` fixture unchanged. Windows reads `USERPROFILE` and is not covered: CI runs on `ubuntu-latest`.
 - Both options have `help=` text and a test that the top-level `--help` lists them (review of PR #29, point 6).
-- Taken as defaults, not separately confirmed: all of the above. The costs are in the `TODO.md` entry for 2026-11-08 (stray directory on a typo, `add` prints no path, more exposure to #27).
+- The directory that holds a new list is created with mode `0o700`, like the file; one that exists keeps its mode (review of PR #31).
+- Review of PR #31, 2026-11-08: seven threads. Fixed: a `..` after a missing directory (`load` resolves the path as `save` does), the directory mode, one home lookup with one exit code,
+  help tests that ignore colour settings, `update` and `delete` tests on the chosen list, a `CLAUDE.md` sentence, and a relative `HOME` (in part: `/` and an empty `HOME` stay accepted).
+- Taken as defaults, not separately confirmed: all of the above. The costs are in the `TODO.md` entries for 2026-11-08 (stray directory on a typo, `add` prints no path, more exposure to #27).
 
 ### M8. Refactor
 
