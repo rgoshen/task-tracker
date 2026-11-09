@@ -342,38 +342,49 @@ _DUE_OPTION: dict[str, Any] = {
 
 
 def _directory(text: str) -> Path:
-    """Turn the value of `--dir` into a path, with a leading `~` expanded.
+    """Turn the value of `--dir` into a path.
 
-    A shell expands `~` in `--dir ~/x` but not in `--dir=~/x`, which would make a
-    directory literally named `~`. An empty value is refused: `Path("")` is the
-    current directory, so an unset shell variable would pick the wrong list.
+    An empty value is refused: `Path("")` is the current directory, so an unset
+    shell variable would pick the wrong list. A leading `~` is expanded later, by
+    `_expanded`, because the home directory is looked up in one place.
     """
     if not text:
         raise argparse.ArgumentTypeError("must not be empty")
+    return Path(text)
+
+
+def _expanded(path: Path) -> Path:
+    """Return `path` with a leading `~` replaced by the home directory it names.
+
+    A shell expands `~` in `--dir ~/x` but not in `--dir=~/x`, which would make a
+    directory literally named `~`, so the program expands it. `--global` is the
+    path `~/.task-tracker/tasks.json`, so it goes through here too.
+    """
     try:
-        return Path(text).expanduser()
+        return path.expanduser()
     except RuntimeError:
-        # `~name` for a user who does not exist. argparse only turns
-        # ArgumentTypeError, TypeError and ValueError into a usage error (exit 2).
-        raise argparse.ArgumentTypeError(f"cannot expand {text!r}") from None
+        # `main` does not catch RuntimeError, on purpose: a bug elsewhere must stay
+        # visible. `expanduser` raises it when there is no home directory to find:
+        # HOME unset and no password-file entry (a container started with an
+        # arbitrary user ID), or `~name` for a user who does not exist.
+        raise ValueError(
+            f"cannot expand {str(path)!r}: no home directory found; "
+            "use --dir with a full path"
+        ) from None
 
 
 def _list_path(args: argparse.Namespace) -> Path:
-    """Return the list file the command works on: the global one or the project's."""
+    """Return the list file the command works on.
+
+    That is the global list for `--global`, `PATH/tasks.json` for `--dir PATH`, and
+    the list in the current directory for neither.
+    """
     if args.use_global:
-        try:
-            home = Path.home()
-        except RuntimeError:
-            # `main` does not catch RuntimeError, on purpose: a bug elsewhere must stay
-            # visible. This call raises it when no home directory can be found.
-            raise ValueError(
-                "cannot find the home directory; use --dir PATH to name a directory"
-            ) from None
-        return home / _GLOBAL_DIR / _LIST_FILE
+        return _expanded(Path("~") / _GLOBAL_DIR / _LIST_FILE)
     if args.directory is not None:
         # `absolute()` joins a relative path to the cwd and leaves an absolute one
         # alone without reading the cwd, which `Path.cwd() / directory` would do.
-        return args.directory.absolute() / _LIST_FILE
+        return _expanded(args.directory).absolute() / _LIST_FILE
     return Path.cwd() / _LIST_FILE
 
 

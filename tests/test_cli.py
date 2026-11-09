@@ -1828,18 +1828,16 @@ def test_dir_expands_a_leading_tilde_to_the_home_directory(
 
 
 @pytest.mark.usefixtures("project")
-def test_dir_with_a_tilde_that_cannot_be_expanded_is_a_bad_option_value(
+def test_dir_with_a_tilde_that_cannot_be_expanded_gives_one_error_line(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ):
     # `~name` for a user who does not exist: `expanduser` raises RuntimeError, which
-    # argparse does not catch, so without a conversion this ends in a traceback.
-    with pytest.raises(SystemExit) as exit_info:
-        main(["--dir", "~no-such-user-m7/x", "list"])
+    # `main` does not catch, so without a conversion this ends in a traceback. Exit 1
+    # like the missing home directory below: both are `expanduser` finding no home.
+    exit_code = main(["--dir", "~no-such-user-m7/x", "list"])
 
-    error = capsys.readouterr().err.splitlines()[-1]
-    assert exit_info.value.code == 2
-    assert "--dir" in error
-    assert "~no-such-user-m7/x" in error
+    assert exit_code == 1
+    _assert_one_line_error(capsys, "'~no-such-user-m7/x'")
     assert not list(tmp_path.iterdir())
 
 
@@ -1918,19 +1916,26 @@ def test_a_location_option_after_the_command_is_refused_and_creates_nothing(
     assert not list(home.iterdir())
 
 
+@pytest.mark.parametrize(
+    "location",
+    [["--global"], ["--dir", "~/groceries"]],
+    ids=["global", "dir-with-tilde"],
+)
 @pytest.mark.usefixtures("project")
-def test_global_without_a_home_directory_gives_one_error_line(
+def test_a_missing_home_directory_gives_one_error_line_for_every_use_of_it(
     home: Path,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    location: list[str],
 ):
-    # `expanduser` returns its argument when it cannot expand, and `Path.home()` then
-    # raises RuntimeError (HOME unset, and no password-file entry for the user, as in
-    # a container started with an arbitrary user ID).
+    # `expanduser` returns its argument when it cannot expand, and `Path.expanduser`
+    # then raises RuntimeError (HOME unset, and no password-file entry for the user, as
+    # in a container started with an arbitrary user ID). `--global` and `--dir ~/x`
+    # both need the home directory, so they fail the same way.
     monkeypatch.setattr("os.path.expanduser", lambda path: path)
 
-    exit_code = main(["--global", "add", "Milk"])
+    exit_code = main([*location, "add", "Milk"])
 
     assert exit_code == 1
     _assert_one_line_error(capsys, "home directory")

@@ -1,5 +1,31 @@
 # Summary
 
+## [2026-11-08 19:05] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** CLI (`src/task_tracker/cli.py`), `README.md` and the tests
+
+**Summary:**
+One helper, `_expanded(path)`, now looks up the home directory for both `--global` and a `~` in `--dir`. It calls `Path.expanduser()` once and turns the `RuntimeError` into a `ValueError`, so `main` prints one line and returns 1 for all of them: no home directory, and `~name` for a user who does not exist.
+`_directory` keeps only the empty check. `--global` is the path `~/.task-tracker/tasks.json`, so it goes through the same helper, and `Path.home()` is no longer called.
+Review of PR #31, thread 4. `README.md` moves the `~name` case from the exit-2 line to the exit-1 line.
+
+**Rationale:**
+The reviewer's reproduction held: with no home directory, `--dir ~/x list` exited 2 (`argument --dir/-d: cannot expand '~/x'`) and `--global list` exited 1, for the same failure, in two `try/except RuntimeError` blocks.
+Exit 2 says "your command line is wrong", and for `--dir ~/x` it is not: the value is fine and the environment has no home. So the single code is 1, the code `main` uses for a runtime failure. This reverses the 2026-11-08 plan decision to expand in the converter and exit 2; the plan and issue #11 are updated in the last commit of this review round.
+Cost: a script that tested for exit 2 on `~name` with no such user sees 1. M7 is unreleased. The message still quotes the text (`cannot expand '~no-such-user-m7/x': no home directory found; use --dir with a full path`).
+Kept: `main` still does not catch `RuntimeError`, so a bug elsewhere stays visible.
+Breaks, each run on the whole suite with bytecode caching off: not catching `RuntimeError` fails 3 tests; `--dir` not expanded fails 3; `--global` not expanded fails 5; a message without the quoted text fails 1. The old exit-2 test is now an exit-1 test, and the missing-home test runs for `--global` and for `--dir ~/groceries`. 412 pass (411 before).
+
+**Bugfix Context:**
+Root cause: the home directory was looked up in two places with two error policies, `_directory` (argparse, exit 2) and `_list_path` (`ValueError`, exit 1). Now there is one place and one policy.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Fix: PR #31 review, step 2
+- Issue: #11, PR #31 thread 4
+
 ## [2026-11-08 18:45] Commit Summary
 
 **Change Type:** Fix
