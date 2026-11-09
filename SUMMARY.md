@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-08 20:20] Commit Summary
+
+**Change Type:** Test
+
+**Scope:** tests (`tests/test_cli.py`)
+
+**Summary:**
+`update` and `delete` now run with `--global` and with `--dir`. A `chosen` fixture (parametrized over the two options) makes two lists, the project's with a task 1 and the chosen one with tasks 1 and 2, and returns the options and the chosen list.
+One test per command checks that the chosen list changed (`update 1 --name Renamed` gives `Renamed`, `Other`; `delete 1` gives `Other`) and the project list did not. Four tests in all. Review of PR #31, thread 6. No production code changes.
+
+**Rationale:**
+The `README.md` lines for `update` and `delete` say they work on "the chosen list", and until now only `add` and `list` were tested with the options. `main` hands `_list_path(args)` to every command, so this was a gap and not a bug (the reviewer had also tried `-g update 1 --status DONE` by hand), but a command that stopped using its `path` argument would not have been caught.
+These pass at once, so each was broken on purpose, with bytecode caching off: `update` reading the project list, `update` saving to it, `delete` reading it for the prompt, `delete` reading it again after the prompt, and `delete` saving to it. Each fails both parametrized cases of its command.
+The first version of the fixture held one task in each list, and `update` reading the project list but saving to the chosen path SURVIVED: the rename overwrote the only task, so the result looked right. The chosen list now has a second task, which that bug loses, and the break is caught.
+Commit type `test`: no production code changes. 422 pass (418 before), and JSCPD finds 0 clones.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Fix: PR #31 review, step 6
+- Issue: #11, PR #31 thread 6
+
 ## [2026-11-08 20:00] Commit Summary
 
 **Change Type:** Test

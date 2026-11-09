@@ -2042,3 +2042,51 @@ def test_global_add_creates_the_global_directory_for_its_owner_only(home: Path):
     main(["--global", "add", "Milk"])
 
     assert stat.S_IMODE((home / ".task-tracker").stat().st_mode) == 0o700
+
+
+# --- review of PR #31: update and delete on the chosen list ---
+
+
+@pytest.fixture(name="chosen", params=["global", "dir"])
+def _chosen(
+    request: pytest.FixtureRequest, project: Path, home: Path, tmp_path: Path
+) -> tuple[list[str], Path]:
+    """Two lists: the project's, and the one the options name, with one more task.
+
+    Both lists have a task 1, so only the file a command works on tells them apart.
+    The extra task 2 is what a command reading the wrong list would lose.
+    Returns the location options and the list they name.
+    """
+    if request.param == "global":
+        options, chosen = ["--global"], _global_list(home)
+    else:
+        elsewhere = tmp_path / "elsewhere"
+        options, chosen = ["--dir", str(elsewhere)], elsewhere / "tasks.json"
+    save([Task(1, "Chosen"), Task(2, "Other")], chosen)
+    save([Task(1, "Project")], project)
+    return options, chosen
+
+
+def test_update_changes_the_task_in_the_chosen_list_only(
+    project: Path, chosen: tuple[list[str], Path]
+):
+    options, chosen_list = chosen
+
+    exit_code = main([*options, "update", "1", "--name", "Renamed"])
+
+    assert exit_code == 0
+    assert [task.name for task in load(chosen_list)] == ["Renamed", "Other"]
+    assert [task.name for task in load(project)] == ["Project"]
+
+
+def test_delete_removes_the_task_from_the_chosen_list_only(
+    project: Path, chosen: tuple[list[str], Path], monkeypatch: pytest.MonkeyPatch
+):
+    options, chosen_list = chosen
+    _answer_with(monkeypatch, "y")
+
+    exit_code = main([*options, "delete", "1"])
+
+    assert exit_code == 0
+    assert [task.name for task in load(chosen_list)] == ["Other"]
+    assert [task.name for task in load(project)] == ["Project"]
