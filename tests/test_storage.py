@@ -549,3 +549,38 @@ def test_a_new_file_is_readable_and_writable_by_its_owner_only(tmp_path: Path):
     save([], path)
 
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+
+# --- review of PR #31: the directory that holds a new list ---
+
+
+@pytest.fixture(name="no_umask")
+def _no_umask():
+    """Clear the umask, so a mode that `save` asks for is not hidden by it."""
+    previous = os.umask(0)
+    yield
+    os.umask(previous)
+
+
+@only_on_posix
+@pytest.mark.usefixtures("no_umask")
+def test_a_directory_that_save_creates_is_for_its_owner_only(tmp_path: Path):
+    # The file is owner-only already. A directory made with the default mode would
+    # list its name and times to everyone on the machine; `~/.task-tracker` is the
+    # first directory this project creates under the home directory.
+    path = tmp_path / "private" / "tasks.json"
+
+    save([], path)
+
+    assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+
+
+@only_on_posix
+@pytest.mark.usefixtures("no_umask")
+def test_a_directory_that_already_exists_keeps_its_mode(tmp_path: Path):
+    # A project directory that was shared on purpose must not be tightened by a save.
+    tmp_path.chmod(0o755)
+
+    save([], tmp_path / "tasks.json")
+
+    assert stat.S_IMODE(tmp_path.stat().st_mode) == 0o755

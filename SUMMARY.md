@@ -1,5 +1,29 @@
 # Summary
 
+## [2026-11-08 19:45] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** storage (`src/task_tracker/storage.py`), `README.md` and the tests
+
+**Summary:**
+`save` creates the directory that holds a new list with mode `0o700`: `target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)`. Three tests: a directory made by `save` is `0o700` under a cleared umask, a directory that already exists keeps its mode, and `--global add` makes `~/.task-tracker` `0o700` under the usual umask.
+Review of PR #31, thread 3. `README.md` says the directory is for its owner only, as the file is.
+
+**Rationale:**
+Reproduced before the change: `--global add` made `~/.task-tracker` `drwxr-xr-x` (umask 022) around a `0600` file, so every user on the machine could see that a task list exists and when it changed. `~/.task-tracker` is the first directory this project creates under `$HOME`, and the user-level rule is least privilege.
+The fix is in `save`, which creates the directory, not in `_list_path`, because `list` must not create anything (a test pins that). It reaches `--dir PATH` too: a new directory for a list is owner-only like the file, and `chmod` loosens it.
+`mkdir` applies `mode` to the last directory only; the missing parents of a deep new path get the default mode (the `parent_mode` argument is new in Python 3.15). A directory that exists is not touched.
+Breaks: `mode=0o755` fails the storage test and the CLI test; a `chmod` of the existing directory after `mkdir` fails the keeps-its-mode test. The umask is cleared in the storage tests, or a mode that `save` asked for could hide behind it. 418 pass (415 before).
+
+**Bugfix Context:**
+Root cause: `Path.mkdir` without a mode uses `0o777` minus the umask, and the file's own `0600` (from `mkstemp`) did not extend to the directory around it.
+
+**References:**
+
+- `TODO.md`: 2026-11-08 Fix: PR #31 review, step 4
+- Issue: #11, PR #31 thread 3
+
 ## [2026-11-08 19:25] Commit Summary
 
 **Change Type:** Fix

@@ -89,6 +89,8 @@ def load(path: Path) -> list[Task]:
 def save(tasks: list[Task], path: Path) -> None:
     """Write `tasks` to `path`, creating the directories above it.
 
+    The directory that holds the list is created for its owner only (mode 0o700).
+
     Tasks that `load` would reject raise `ValueError` before anything is written.
     The file is replaced in one step, so a failure partway leaves the previous
     file as it was and no temporary file behind. A symbolic link is followed, so
@@ -102,7 +104,10 @@ def save(tasks: list[Task], path: Path) -> None:
     # os.replace on a symlink replaces the link, not the file it points to, so
     # work on the real file: a list kept in a synced folder stays linked.
     target = path.resolve()
-    target.parent.mkdir(parents=True, exist_ok=True)
+    # Owner-only, like the file (mkstemp, below). `mode` applies to the last
+    # directory only, the one that holds the list; its missing parents get the
+    # default mode. A directory that exists is left as it is.
+    target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     # Next to the target, not in the system temp directory: os.replace is atomic
     # only within one filesystem and may fail across two.
     file_descriptor, name = tempfile.mkstemp(

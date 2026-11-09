@@ -94,7 +94,7 @@ uv run task-tracker --dir ~/groceries list
 ```
 
 - Which list a command works on: with no option, `tasks.json` in the current directory. `--global` (`-g`) selects `tasks.json` in `~/.task-tracker/`, and `--dir PATH` (`-d`) selects `tasks.json` in `PATH`. They cannot be given together.
-  `--dir` takes a relative `PATH` from the current directory and expands a leading `~` (a shell does not expand it in `--dir=~/x`). The first `add` creates a missing directory; `list` on one that does not exist prints the empty-list message and creates nothing.
+  `--dir` takes a relative `PATH` from the current directory and expands a leading `~` (a shell does not expand it in `--dir=~/x`). The first `add` creates a missing directory for its owner only (the file is owner-only too); `list` on one that does not exist prints the empty-list message and creates nothing.
   Both options go before the command: `task-tracker --global add "Milk"`. After the command they are refused, so a slip such as `add "Milk" -d 2026-11-02` (for `-D`) creates nothing.
 - `add NAME` stores a task in the chosen list and prints its ID. `--priority` (`-p`) takes `CRITICAL`, `HIGH`, `MEDIUM`, or `LOW` and defaults to `LOW`. `--due` (`-D`) takes `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SS`, in local time: a value with a UTC offset is refused.
 - `list` shows the current tasks, one per line: ID, status, priority, due date (`-` when there is none), and name. The earliest due date comes first and tasks without one come last, then the highest priority, then the lowest ID. When nothing is current it says so and names the file it read.

@@ -8,6 +8,7 @@
 import io
 import json
 import os
+import stat
 import subprocess
 import sys
 from collections.abc import Callable, Iterator
@@ -2019,3 +2020,14 @@ def test_a_home_directory_of_slash_is_accepted(
 
     assert exit_code == 0
     assert capsys.readouterr().out == "No current tasks in /.task-tracker/tasks.json\n"
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="Windows has no owner, group, and other bits"
+)
+@pytest.mark.usefixtures("project")
+def test_global_add_creates_the_global_directory_for_its_owner_only(home: Path):
+    # The usual umask (022) would make the directory `drwxr-xr-x`.
+    main(["--global", "add", "Milk"])
+
+    assert stat.S_IMODE((home / ".task-tracker").stat().st_mode) == 0o700
