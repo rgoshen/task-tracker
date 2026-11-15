@@ -385,12 +385,43 @@ Produces: one place that turns the global flag, `--dir`, the cwd, and the home d
 
 Branch `feature/refactor-layers`. No behavior change: every test stays green, and tests change only their imports.
 
+Produces: three layers that depend only downward. `domain` holds what a task is and how a list of tasks is numbered, found and ordered. `infrastructure` holds the files: the task file and which one to use. `cli` holds argparse, the commands and the terminal.
+
+- [ ] Given every module under `src/task_tracker/domain/` and `src/task_tracker/infrastructure/`, when its imports are read with `ast`, then `domain` imports nothing from `task_tracker` outside `domain`, and `infrastructure` imports only `domain` and itself.
+      No import is relative, and none names the bare `task_tracker` package, which reexports `cli`. An empty layer fails the test, so it cannot pass by finding no files.
+- [ ] Given `priority.py`, `status.py` and `task.py` moved into `task_tracker/domain/`, then all 422 tests from M7 pass. The only test edits are imports and the four `task_tracker.task._now` patch strings, which are import paths too.
+- [ ] Given `domain/task_list.py` with `next_id`, `find`, `current_tasks` and `done_tasks`, then `cli.py` holds none of those rules, and breaking each on purpose (a count for the ID, a reversed priority rank, the first task for any ID, done tasks sorted by ID) fails a test.
+- [ ] Given a stored `DONE` task with no date completed, when `list` runs without `--all`, then the exit code is 0 and the task is not shown. The check that raises for it runs only under `--all` (new test, passes at once, pins the call).
+- [ ] Given `storage.py` moved into `task_tracker/infrastructure/`, then `test_storage.py` passes with only its imports changed.
+- [ ] Given `infrastructure/location.py` with `list_path(*, use_global: bool, directory: Path | None) -> Path`, then `cli.py` holds neither `_list_path`, `_expanded`, `_LIST_FILE` nor `_GLOBAL_DIR`, every M7 test passes, and the error texts are unchanged byte for byte.
+- [ ] Given `--help` for the program and for `add`, `list`, `update` and `delete`, captured with `NO_COLOR=1` and `COLUMNS=80`, then each output equals the one from `develop`.
+- [ ] Given `uv build`, then the wheel holds `domain/` and `infrastructure/`, and the installed `task-tracker list` runs from a directory outside the project.
+- [ ] Given `.github/workflows/tests.yml`, then it runs pytest with `--cov=task_tracker --cov-fail-under=80`, and the same run with `--cov-fail-under=99` fails locally.
+- [ ] Given `CLAUDE.md`, then its project state names the layers, no line still places `_list_path` or `_expanded` in `cli.py`, and the tests.yml and coverage lines match the workflow.
+- [ ] Given the work deferred here, then two issues exist: one to split `tests/test_cli.py` by layer, and one to add `ARCHITECTURE.md`.
+
 **Think about:**
 
 - Which code decides what happens (ordering, defaults, completion rules), which does I/O (files, paths), and which talks to the user (argparse, printing)? Your global CLAUDE.md wants these as domain, infrastructure, and CLI layers.
 - Could you swap JSON for SQLite by touching only the storage code? If not, what leaks?
 - Does `main()` fit on one screen?
 - Should CI enforce `--cov-fail-under=80`?
+
+**Decided (2026-11-15):**
+
+- Three layers, as the plan says, and no application layer. It would hold four thin functions, and each command's load, change, save sequence reads well in `cli.py` for now. #27's lock goes either around each command or in an `infrastructure` context manager, and that is decided in #27.
+- `cli.py` stays one module. The tests patch `task_tracker.cli.load` and `task_tracker.cli.save`, so splitting the commands out would change those targets, and the file is still one concern. `tests/test_cli.py` (2092 lines) is not split either, because that needs a `conftest.py` and breaks "only imports change". Both go to a follow-up issue.
+- The model moves as it is (`git mv`, so history follows). `domain/__init__.py` and `infrastructure/__init__.py` hold only a docstring and no reexports. Both must exist: without one, the directory is an implicit namespace package, and CI's pylint, which is given file paths, resolves the module name wrongly.
+- Which code is which: ordering and numbering (`_PRIORITY_RANK`, `_current_order`, `_done_order`, the filter in `_list`, highest ID plus one, `_find`) move to `domain/task_list.py`. File choice (`_LIST_FILE`, `_GLOBAL_DIR`, `_expanded`, `_list_path`) moves to `infrastructure/location.py`, which takes plain values so that argparse stays in `cli.py`. Everything that parses, prints or exits stays.
+- Messages move byte for byte, because M8 changes no output. `location.py` therefore carries one piece of CLI wording ("use --dir with a full path"). That is a known leak, listed below. The new `domain` docstrings use no CLI wording.
+- Swapping JSON for SQLite would not touch only the storage code. The leaks: `Path` is the store handle in `main`, in every command and in the "No tasks in {path}" message. `main` catches `ValueError` and `OSError`, and `sqlite3.Error` is neither. Every command loads and saves the whole list. `location.py` carries CLI wording.
+  No `Store` protocol is built: with one adapter it would be a hypothetical seam.
+- `main()` fits on one screen (19 lines). The module is the long part (494 lines before the move).
+- CI enforces `--cov-fail-under=80` on the total, which is 98% now. A per-file gate would be wrong: the terminal failure branches run in child processes, which pytest-cov does not measure (pytest-cov 7.0.0 dropped subprocess support). The two new modules are checked at 100% by hand, because a total gate does not by itself hold changed code to 80%.
+- The `--help` baseline is rebuilt from a `develop` worktree at the end, in the same fixed environment. Python 3.14 colours help and wraps it by width, so `NO_COLOR=1` and `COLUMNS=80` are set and `FORCE_COLOR` and `PYTHON_COLORS` are unset.
+- The decisions for M8 go in this block and not under new D numbers: D1 to D6 stay the M0 set.
+- Spec-gap audit, 2026-11-15: 11 findings (none Material, 2 Should-fix, 6 Minor, 3 Note), all closed in this section and in the `TODO.md` entry of the same date. The two Should-fix were a missing `infrastructure/__init__.py` and a lint file set that skips every moved module.
+- Taken as defaults, not separately confirmed: all of the above. The costs are in the `TODO.md` entry for 2026-11-15.
 
 ### M9. Install and first release
 

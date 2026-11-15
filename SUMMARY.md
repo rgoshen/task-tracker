@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-15 16:58] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `TODO.md` and `docs/implementation-plan.md` (and issue #12, which mirrors the plan)
+
+**Summary:**
+M8 (refactor into layers) is planned and nothing is built yet. `TODO.md` gets the entry for 2026-11-15 with eight steps (0 to 7), one commit each, and the plan's M8 section gets 11 acceptance boxes and a "Decided (2026-11-15)" block next to the existing "Think about" questions, which it answers.
+The layers are `domain` (the model, plus numbering, lookup and ordering in a new `task_list.py`), `infrastructure` (storage, plus the choice of list file in a new `location.py`) and `cli`. `cli.py` stays one module.
+
+**Rationale:**
+The tests patch `task_tracker.cli.load` and `task_tracker.cli.save`, so keeping the commands in `cli.py` is what lets "tests change only their imports" hold. Splitting `cli.py` or `tests/test_cli.py` would break that rule, so both go to follow-up issues. A `Store` protocol was rejected: one adapter is a hypothetical seam, and the plan answers the SQLite question by listing what leaks.
+The plan was audited by an independent Opus sub-agent with the spec-gap auditor before any code. It found 11 gaps (none Material, 2 Should-fix) and all are closed here.
+The two that mattered would have passed every local check: `infrastructure` without an `__init__.py` becomes an implicit namespace package that CI's pylint resolves wrongly, and the usual lint file set `src/task_tracker/*.py` skips every moved module.
+The M8 decisions go in a "Decided" block and not under new D numbers, because decisions since M3 have been recorded that way and D1 to D6 are the M0 set.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers
+- Issue: #12
+
 ## [2026-11-08 20:45] Commit Summary
 
 **Change Type:** Docs

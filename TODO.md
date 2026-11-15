@@ -630,5 +630,59 @@ One test-first commit per comment or group on `feature/global-list`, each with i
 - **#3 reaches `--dir` too.** A directory that `save` creates for `--dir PATH` is also `0o700`, which is the file's own default. The intermediate directories of a deep new path keep the umask default, because `mkdir` has no mode for them before Python 3.15.
 - **Exit code for `~name`.** It was 2 in the first M7 plan and is 1 now. A script that tested for 2 on a bad username sees 1. M7 is unreleased, so nothing depends on it.
 
+## [2026-11-15] Feature: M8 Refactor into layers
+
+**Objective:**
+Split the code into `domain`, `infrastructure` and `cli` layers that depend only downward, with no change in behavior. Covers issue #12 and the M8 section of `docs/implementation-plan.md`, and answers its four "Think about" points. The plan's rule is the acceptance test: every test stays green, and tests change only their imports.
+The plan was audited with the spec-gap auditor on 2026-11-15 (11 findings: none Material, 2 Should-fix, 6 Minor, 3 Note). All 11 are closed in this entry and in the plan's "Decided (2026-11-15)" block.
+
+**Approach:**
+Branch `feature/refactor-layers` (from `develop`, after M7 merged as PR #31). One atomic commit per step, each with its own `SUMMARY.md` entry. Standard library only, so `uv.lock` does not change. The code moves with `git mv`, so history follows the files.
+`cli.py` stays one module: the tests patch `task_tracker.cli.load` and `task_tracker.cli.save`, and those targets stay valid only while the commands stay there. Baseline before the first move: 422 tests pass, 98% coverage.
+Each break on purpose below runs with `PYTHONDONTWRITEBYTECODE=1` and a cleared `__pycache__`, or the run reuses the unbroken code. A break whose only effect is the step's own Red is not repeated.
+
+0. Paper (this commit). This entry, the M8 checklist and "Decided" block in the plan, issue #12 mirroring the plan. Commit: `docs(plan): plan M8 refactor`.
+1. The `domain` package. Red, in this order: add `tests/test_architecture.py` with `test_layers_only_import_downward`, parametrized over the layers.
+   It parses every `.py` file under the layer with [ast], visits `ast.Import` and `ast.ImportFrom`, and fails on a relative import (`level > 0`), on `from task_tracker import ...` and on any `task_tracker.<layer>` outside the layer's allowed set. It also fails when the layer has no modules, so an empty layer cannot pass.
+   Then change the test imports and the four `_now` patch strings (`test_task.py:34`, `test_cli.py:82`, `:1075`, `:1077`) and watch `ModuleNotFoundError` across the suite.
+   Green: `domain/__init__.py` (a docstring only), `git mv` of `priority.py`, `status.py` and `task.py`, and the imports in `task.py`, `storage.py` and `cli.py`. 422 plus the new test pass. Commit: `refactor(domain): move the task model into a domain package`.
+2. The domain rules. First add `test_list_without_all_ignores_a_done_task_without_a_date_completed` to `tests/test_cli.py`: the setup of the `--all` test at `test_cli.py:283`, but `main(["list"])` exits 0 and the broken task is not listed. It passes today and goes red if the check that raises is ever called without `--all`.
+   Then `domain/task_list.py`: `next_id(tasks: Sequence[Task]) -> int`, `find(tasks: Sequence[Task], task_id: int) -> Task` (raises `ValueError("no task with ID {n}")`), `current_tasks(tasks: Sequence[Task]) -> list[Task]` and `done_tasks(tasks: Sequence[Task]) -> list[Task]` (raises `ValueError` for a `DONE` task with no date completed).
+   The two orderings and `_PRIORITY_RANK` move with them as private names, and `cli.py` calls `done_tasks` only under `--all`. The docstrings say "raise", not "refuse the command".
+   No other new tests: the 422 are the characterization suite. Breaks: `len(tasks) + 1` for the ID, a reversed priority rank, `find` returning the first task, done tasks sorted by ID, `done_tasks` called without `--all`. Commit: `refactor(domain): move numbering, lookup and ordering out of the CLI`.
+3. The `infrastructure` package. Extend the architecture test with `infrastructure` (it may import `domain` and itself): red, because the layer has no modules.
+   Then `infrastructure/__init__.py` (a docstring only), `git mv storage.py`, and the imports in `test_storage.py`, `test_cli.py` and `cli.py` (`from task_tracker.storage import load, save`). Commit: `refactor(infrastructure): move storage into an infrastructure package`.
+4. The location. `infrastructure/location.py` with `list_path(*, use_global: bool, directory: Path | None) -> Path`, holding `_LIST_FILE`, `_GLOBAL_DIR` and `_expanded`. `main` calls it with `args.use_global` and `args.directory` inside its existing `try`, so the one-line error and exit 1 stay. The `_expanded` messages move byte for byte, and the `_directory` docstring is updated.
+   Breaks: the relative-`HOME` check, and the `RuntimeError` branch. Both fail M7 tests. Commit: `refactor(infrastructure): move list file selection out of the CLI`.
+5. The CI gate. Add `--cov=task_tracker --cov-fail-under=80` to the pytest step of `.github/workflows/tests.yml`, and show that `--cov-fail-under=99` fails locally. Commit: `ci(tests): fail under 80 percent coverage`.
+6. The documents. `CLAUDE.md` in three places: the "Project state" paragraph, the tests.yml bullet under "Lint and CI conventions", and the coverage line under "Testing". Finish with a `grep` of `CLAUDE.md` for `cli.py`, `storage.py` and `task.py`. Tick the plan's M8 boxes and mirror them in issue #12. Commit: `docs: record the M8 layers`.
+7. Verify. Lint with the recursive file set (`git ls-files '*.py'`, passed as a Bash array): pylint 4.0.6 twice (with `--with-editable .` and without, because CI gives it file paths and no editable install), isort 8.0.1, black 26.5.1, flake8 7.3.0, mypy 2.1.0 with no extra packages, and ruff 0.15.17 with `--config .github/linters/.ruff.toml`.
+   Then pyright, JSCPD, codespell over `git ls-files`, and the Markdown linters over every changed `*.md`. Run `uv build`, check that the wheel holds both packages, and run `task-tracker list` from the installed wheel in a directory outside the project. Rebuild the `--help` baseline from a `git worktree` of `develop` and diff it against the branch.
+   Confirm `task_list.py` and `location.py` show 100% under `--cov-report=term-missing`. If Docker is available, also run super-linter through `act` (the command is in `CLAUDE.md`). File the two follow-up issues. Pushing the branch and opening the PR into `develop` wait for the project owner.
+
+**Tests:**
+
+- `test_layers_only_import_downward[domain]` and `[infrastructure]` (new): the layers import only downward, with no relative import and no bare-package import, and no layer is empty.
+- `test_list_without_all_ignores_a_done_task_without_a_date_completed` (new): plain `list` exits 0 and does not show the broken task.
+- Every existing test passes with only its imports and the four `_now` strings changed (the plan's second box). Coverage stays at 98% or better, and the total gate is 80%.
+- The `--help` output of the program and of the four commands equals `develop`'s, captured with `NO_COLOR=1` and `COLUMNS=80`. The installed wheel runs `task-tracker list` from outside the project.
+
+**Risks & Trade-offs:**
+
+- **A missing `__init__.py` passes every local check.** Without it `infrastructure` is an implicit namespace package ([namespace packages]). pytest and the wheel build both work, but CI's pylint, which is given file paths, resolves the module name wrongly.
+  Both packages get an `__init__.py` in the step that creates them. Verified in the Lint log of run 42552303918: CI passes all 10 files in one call by absolute path.
+- **The usual lint recipe skips the moved modules.** `src/task_tracker/*.py` matches only `__init__.py` and `cli.py` after step 1. Step 7 names the recursive file set, and the memory recipe is updated afterwards.
+- **The four `_now` strings are import paths.** `monkeypatch.setattr("task_tracker.task._now", ...)` imports its dotted path, so a missed one fails loudly with `ModuleNotFoundError` and never silently. The rule "tests change only their imports" is read to include them, and the plan says so.
+- **Packaging.** `uv_build` includes every subpackage under the module root and leaves out only `__pycache__`, `*.pyc` and `*.pyo` ([uv build backend]), so no configuration is expected. The wheel check in step 7 proves it, and M9 would otherwise be the first to find out.
+- **CLI wording in `location.py`.** The `_expanded` message says "use --dir with a full path", and it moves unchanged because M8 changes no output. Reworded text, or a hint added in `cli.py`, is a later change. Recorded as a leak in the plan's SQLite answer.
+- **No direct unit tests for the four domain functions.** They are tested through the CLI, and the breaks in step 2 show the CLI tests pin them. Direct tests come when `tests/test_cli.py` is split, and that split is a follow-up issue because it breaks "only imports change".
+- **A total coverage gate is not "80% on changed code".** The two new modules are checked at 100% by hand in step 7, and diff-cover is not worth a new dependency. A per-file gate would be wrong: pytest-cov does not measure child processes ([pytest-cov changelog]), so the terminal failure branches of `cli.py` count as missed.
+- **#27's lock.** The load, change, save sequence stays in the commands on purpose. The lock then goes around each command or into an `infrastructure` context manager, and that choice is #27's.
+- **Scope held back.** No application layer, no `Store` protocol, no split of `cli.py` or `tests/test_cli.py`, and no `ARCHITECTURE.md` (the global rules ask for one, so step 7 files an issue for it).
+
+[ast]: https://docs.python.org/3/library/ast.html
+[namespace packages]: https://docs.python.org/3/reference/import.html#namespace-packages
+[uv build backend]: https://docs.astral.sh/uv/concepts/build-backend/
+[pytest-cov changelog]: https://pytest-cov.readthedocs.io/en/latest/changelog.html
 [pathlib]: https://docs.python.org/3/library/pathlib.html#pathlib.Path.mkdir
 [cmdline]: https://docs.python.org/3/using/cmdline.html#controlling-color
