@@ -8,6 +8,7 @@ the terminal and calls no `print`, `open` or `input`, and `infrastructure` impor
 no `argparse`. It is a tripwire for the likely slip, not a proof of purity.
 """
 
+# Test names state the intent, so per-test docstrings would only repeat them.
 # pylint: disable=missing-function-docstring
 
 import ast

@@ -1,5 +1,22 @@
 # Summary
 
+## [2026-11-15 20:42] Commit Summary
+
+**Change Type:** Test
+
+**Scope:** `tests/test_architecture.py`
+
+**Summary:**
+The `# pylint: disable=missing-function-docstring` at the top of `tests/test_architecture.py` now has its reason on the line above it: "Test names state the intent, so per-test docstrings would only repeat them." It is the same line the four other test modules carry.
+
+**Rationale:**
+Review comment #6 on PR #34 was right. The project `CLAUDE.md` says pylint suppressions are inline with the reason beside them, and this was the only test module with a bare one. A comment-only change: the CI-version Python gate (nine tools on 17 files) and the 486 tests are unchanged, and no new test is needed.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 7
+- PR: #34, review comment on `tests/test_architecture.py` line 7
+
 ## [2026-11-15 20:41] Commit Summary
 
 **Change Type:** Test
