@@ -48,7 +48,9 @@ act push -j build --container-architecture linux/amd64 --env RUN_LOCAL=true --en
 ## Testing
 
 Python tests use pytest with pytest-cov (D4) and live in `tests/`. Run them with `uv run pytest`; add `--cov=task_tracker --cov-report=term-missing` to see the missed lines.
-CI runs with `--cov=task_tracker --cov-fail-under=80`, so a total below 80% fails the job. The gate is on the total and not per file, because pytest-cov does not measure the child processes that run the terminal failure branches of `cli.py`. Work test-first: watch each test fail for the expected reason before writing the code that passes it.
+CI runs with `--cov=task_tracker --cov-fail-under=95`, so a total below 95% fails the job (the total is 100% now).
+`[tool.coverage.run] patch = ["subprocess"]` in `pyproject.toml` is what counts the child processes that run the terminal failure branches of `cli.py`: pytest-cov 7 no longer does it, and without the patch the total drops to 97.7%.
+The gate is on the total because coverage.py has no per-file threshold. Work test-first: watch each test fail for the expected reason before writing the code that passes it.
 
 The bump script has its own tests, `scripts/test_bump_version.sh`, a dependency-free Bash self-check. It builds throwaway Git repos in `mktemp` dirs, seeds them with Conventional Commits, runs `bump-version.sh`, and asserts the bump level and `CHANGELOG.md` contents. It needs `uv` on `PATH`. There is no single-test flag; to run one case, comment out the other calls at the bottom of the file.
 
@@ -65,7 +67,7 @@ Versioning is driven entirely by Conventional Commit messages, so commit message
 ## Lint and CI conventions
 
 - `.github/workflows/super-linter.yml` (super-linter v8.7.0) runs on every push and PR and excludes `.serena/` and `.claude/`. Third-party actions are pinned to full commit SHAs with a version comment. Keep that when bumping them.
-- `.github/workflows/tests.yml` runs `uv sync --locked` and `uv run pytest --cov=task_tracker --cov-fail-under=80` on every push and PR with read-only permissions. A `pytest` run that collects no tests exits with code 5 and fails the job.
+- `.github/workflows/tests.yml` runs `uv sync --locked` and `uv run pytest --cov=task_tracker --cov-fail-under=95` on every push and PR with read-only permissions. A `pytest` run that collects no tests exits with code 5 and fails the job.
 - Super-linter runs markdownlint (lines up to 400 characters) and textlint's terminology rule on every Markdown file, and pre-commit does not. Check Markdown locally before pushing, or the PR fails on wording such as `README` without its `.md` or the unhyphenated `Tradeoffs`.
 - Super-linter also runs pylint, isort, black, flake8, and mypy on Python files, each with its own pinned version and defaults, separately from ruff and pyright. They first mattered with the `Task` model: `ruff check` passed while pylint scored 8.67 and isort failed. Run them locally at the versions in the CI log before pushing Python.
   Give them the recursive file set (`git ls-files -co --exclude-standard '*.py'`), not `src/task_tracker/*.py`, which skips `domain/` and `infrastructure/`. CI passes every file to pylint in one call by absolute path with no editable install, and its config disables `import-error`.

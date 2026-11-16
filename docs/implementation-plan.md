@@ -396,7 +396,7 @@ Produces: three layers that depend only downward. `domain` holds what a task is 
 - [x] Given `infrastructure/location.py` with `list_path(*, use_global: bool, directory: Path | None) -> Path`, then `cli.py` holds neither `_list_path`, `_expanded`, `_LIST_FILE` nor `_GLOBAL_DIR`, every M7 test passes, and the error texts are unchanged byte for byte.
 - [x] Given `--help` for the program and for `add`, `list`, `update` and `delete`, captured with `NO_COLOR=1` and `COLUMNS=80`, then each output equals the one from `develop`.
 - [x] Given `uv build`, then the wheel holds `domain/` and `infrastructure/`, and the installed `task-tracker list` runs from a directory outside the project.
-- [x] Given `.github/workflows/tests.yml`, then it runs pytest with `--cov=task_tracker --cov-fail-under=80`, and the same run with `--cov-fail-under=99` fails locally.
+- [x] Given `.github/workflows/tests.yml`, then it runs pytest with `--cov=task_tracker --cov-fail-under=95`, and `pyproject.toml` counts the child processes with `[tool.coverage.run] patch = ["subprocess"]`, so a `--cov-fail-under=100` run passes only with the patch (the review of PR #34 changed this from 80).
 - [x] Given `CLAUDE.md`, then its project state names the layers, no line still places `_list_path` or `_expanded` in `cli.py`, and the tests.yml and coverage lines match the workflow.
 - [x] Given the work deferred here, then two issues exist: #32 to split `tests/test_cli.py` by layer, and #33 to add `ARCHITECTURE.md`.
 
@@ -417,7 +417,9 @@ Produces: three layers that depend only downward. `domain` holds what a task is 
 - Swapping JSON for SQLite would not touch only the storage code. The leaks: `Path` is the store handle in `main`, in every command and in the "No tasks in {path}" message. `main` catches `ValueError` and `OSError`, and `sqlite3.Error` is neither. Every command loads and saves the whole list. `location.py` carries CLI wording.
   No `Store` protocol is built: with one adapter it would be a hypothetical seam.
 - `main()` fits on one screen (19 lines). The module is the long part (494 lines before the move).
-- CI enforces `--cov-fail-under=80` on the total, which is 98% now. A per-file gate would be wrong: the terminal failure branches run in child processes, which pytest-cov does not measure (pytest-cov 7.0.0 dropped subprocess support). The two new modules are checked at 100% by hand, because a total gate does not by itself hold changed code to 80%.
+- CI enforces `--cov-fail-under=95` on the total, which is 100% now (revised in the review of PR #34; the first version said 80, when the total was 98%).
+  The terminal failure branches of `cli.py` run in child processes. pytest-cov 7.0.0 dropped its own subprocess support, and coverage 7.10 replaced it with `[tool.coverage.run] patch = ["subprocess"]`, which `pyproject.toml` now sets.
+  The first version called this a limit and was wrong: it was a missing setting. A per-file gate is still not offered, because coverage.py's `fail_under` is a total.
 - The `--help` baseline is rebuilt from a `develop` worktree at the end, in the same fixed environment. Python 3.14 colours help and wraps it by width, so `NO_COLOR=1` and `COLUMNS=80` are set and `FORCE_COLOR` and `PYTHON_COLORS` are unset.
 - The decisions for M8 go in this block and not under new D numbers: D1 to D6 stay the M0 set.
 - Spec-gap audit, 2026-11-15: 11 findings (none Material, 2 Should-fix, 6 Minor, 3 Note), all closed in this section and in the `TODO.md` entry of the same date. The two rated Should-fix were a missing `infrastructure/__init__.py` and a lint file set that skips every moved module. The first was tested in step 3 and does not fail CI, so it is withdrawn as a Should-fix and the file stays for the layout.

@@ -665,7 +665,7 @@ Each break on purpose below runs with `PYTHONDONTWRITEBYTECODE=1` and a cleared 
 - `test_layers_only_import_downward[domain]` and `[infrastructure]` (new): the layers import only downward, with no relative import and no bare-package import, and no layer is empty.
 - Two parametrized tests of the rule itself, added in step 1 (12 cases): one set of imports the check must flag, one it must accept. The rule lives in one small function, so a break of it fails a test of its own and not only the test that walks the files.
 - `test_list_without_all_ignores_a_done_task_without_a_date_completed` (new): plain `list` exits 0 and does not show the broken task.
-- Every existing test passes with only its imports and the four `_now` strings changed (the plan's second box). Coverage stays at 98% or better, and the total gate is 80%.
+- Every existing test passes with only its imports and the four `_now` strings changed (the plan's second box). Coverage stays at 98% or better, and the total gate is 80% (95% since the review of PR #34, which also counts the child processes).
 - The `--help` output of the program and of the four commands equals `develop`'s, captured with `NO_COLOR=1` and `COLUMNS=80`. The installed wheel runs `task-tracker list` from outside the project.
 
 **Risks & Trade-offs:**
@@ -678,7 +678,8 @@ Each break on purpose below runs with `PYTHONDONTWRITEBYTECODE=1` and a cleared 
 - **Packaging.** `uv_build` includes every subpackage under the module root and leaves out only `__pycache__`, `*.pyc` and `*.pyo` ([uv build backend]), so no configuration is expected. The wheel check in step 7 proves it, and M9 would otherwise be the first to find out.
 - **CLI wording in `location.py`.** The `_expanded` message says "use --dir with a full path", and it moves unchanged because M8 changes no output. Reworded text, or a hint added in `cli.py`, is a later change. Recorded as a leak in the plan's SQLite answer.
 - **No direct unit tests for the four domain functions.** They are tested through the CLI, and the breaks in step 2 show the CLI tests pin them. Direct tests come when `tests/test_cli.py` is split, and that split is a follow-up issue because it breaks "only imports change".
-- **A total coverage gate is not "80% on changed code".** The two new modules are checked at 100% by hand in step 7, and diff-cover is not worth a new dependency. A per-file gate would be wrong: pytest-cov does not measure child processes ([pytest-cov changelog]), so the terminal failure branches of `cli.py` count as missed.
+- **A total coverage gate is not "80% on changed code".** The two new modules are checked at 100% by hand in step 7, and diff-cover is not worth a new dependency. The claim that follows was wrong, and the review of PR #34 corrected it (2026-11-15): "a per-file gate would be wrong, because pytest-cov does not measure child processes".
+  That was a missing setting, `patch = ["subprocess"]` ([pytest-cov changelog]), and it is set now. The total is 100% and the gate is 95%. A per-file gate is still not built, because coverage.py's `fail_under` is a total.
 - **#27's lock.** The load, change, save sequence stays in the commands on purpose. The lock then goes around each command or into an `infrastructure` context manager, and that choice is #27's.
 - **Scope held back.** No application layer, no `Store` protocol, no split of `cli.py` or `tests/test_cli.py`, and no `ARCHITECTURE.md` (the global rules ask for one, so step 7 files an issue for it).
 

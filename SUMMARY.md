@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-15 20:38] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** `pyproject.toml`, `.github/workflows/tests.yml`, `CLAUDE.md`, `docs/implementation-plan.md`, `TODO.md`
+
+**Summary:**
+The coverage run now counts the child processes (`[tool.coverage.run] patch = ["subprocess"]`), and the CI gate goes from 80 to 95. With the same 437 tests, `cli.py` goes from 94% to 100% and the total from 97.71% to 100%.
+The statements that said the child processes cannot be measured are corrected in `CLAUDE.md`, the plan (the tests.yml box and the "Decided" block) and the M8 entry of `TODO.md`.
+
+**Rationale:**
+Review comment #1 on PR #34 was right. I had written that a per-file gate is wrong because pytest-cov does not measure the child processes, and treated that as a limit. It was a missing setting: pytest-cov 7.0 dropped its own subprocess support and says to enable coverage's `patch = subprocess` (coverage 7.10 and later, 7.17.0 here).
+Checked both ways: a `--cov-fail-under=100` run passes with the patch (100%) and fails without it (97.71%), so the gate depends on the setting. The owner picked 95 at the checkpoint: it fails a new untested module of more than about 22 statements and leaves room for one line that cannot run on another platform.
+Not done: a per-file gate. coverage.py's `fail_under` is a total, so it would need a script over a JSON report.
+Not verified yet: the CI run. The patch sets `parallel = true`, so data files are combined, and that works locally but the CI environment is a different one.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 1
+- PR: #34, review comment on `.github/workflows/tests.yml` line 37
+
 ## [2026-11-15 20:31] Commit Summary
 
 **Change Type:** Docs

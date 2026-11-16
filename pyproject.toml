@@ -36,3 +36,8 @@ dev = [
     "ruff>=0.16.6",
     "shellcheck-py>=0.11.0.1",
 ]
+
+[tool.coverage.run]
+# pytest-cov 7 no longer measures child processes, and the terminal failure branches
+# of `cli.py` run in them. coverage 7.10 measures them with this patch.
+patch = ["subprocess"]
