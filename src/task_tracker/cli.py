@@ -12,7 +12,7 @@ from task_tracker.domain.priority import Priority
 from task_tracker.domain.status import Status
 from task_tracker.domain.task import Task, as_naive_datetime
 from task_tracker.domain.task_list import current_tasks, done_tasks, find, next_id
-from task_tracker.storage import load, save
+from task_tracker.infrastructure.storage import load, save
 
 # D2: the project list is `tasks.json` in the current directory; the global list is
 # the same file name inside `.task-tracker` in the home directory.

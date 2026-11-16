@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-15 17:15] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** `infrastructure` package (`src/task_tracker/infrastructure/`), imports in `cli.py`, and the tests
+
+**Summary:**
+`storage.py` moved into a new `task_tracker/infrastructure/` package with `git mv`, and `infrastructure/__init__.py` holds a docstring only. `cli.py`, `test_storage.py` and `test_cli.py` import `load` and `save` from the new path, and nothing else changed in them.
+`tests/test_architecture.py` gained `infrastructure`, which may import `domain` and itself. 437 tests pass, and coverage is unchanged at 98%.
+
+**Rationale:**
+Test-first, as in step 1: the extended test failed with `infrastructure has no modules`, then repointing the imports failed the suite with `No module named 'task_tracker.infrastructure'`, then the move made it green. The patch targets `task_tracker.cli.load` and `task_tracker.cli.save` are untouched, because the commands still live in `cli.py`.
+Breaks on purpose, with bytecode off and `__pycache__` cleared: an upward import hidden in a function that never runs (`from task_tracker.cli import main` inside `storage.py`, which the layer test finds because it reads the source) and `infrastructure` no longer allowed to import `domain` (both turn the layer test red).
+The files were restored and compared with their backups.
+I also tested the claim that a missing `infrastructure/__init__.py` would fail CI. It does not: with the file removed, mypy 2.1.0 and pylint 4.0.6 (plain and editable) are clean on all 13 files.
+The audit had only inferred this, and the plan and `TODO.md` stated it as fact. The file stays because an explicit regular package is the better layout and matches `domain`, and the wording is corrected in the next commit.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 3
+- Issue: #12, audit finding G1
+
 ## [2026-11-15 17:09] Commit Summary
 
 **Change Type:** Refactor

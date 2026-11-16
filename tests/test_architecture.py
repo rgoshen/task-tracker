@@ -17,6 +17,7 @@ _PACKAGE = Path(task_tracker.__file__).parent
 # What each layer may import from this package: itself and the layers below it.
 _ALLOWED = {
     "domain": frozenset({"domain"}),
+    "infrastructure": frozenset({"domain", "infrastructure"}),
 }
 
 
