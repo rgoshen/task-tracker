@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-15 17:22] Commit Summary
+
+**Change Type:** CI
+
+**Scope:** `.github/workflows/tests.yml`
+
+**Summary:**
+The Tests workflow now runs `uv run pytest --cov=task_tracker --cov-fail-under=80`, so a drop in total coverage fails the job. Coverage is 97.71% today, 17 points above the gate.
+Shown locally with the same command: at 80 it exits 0 ("Required test coverage of 80% reached"), and at 99 it exits 1 ("FAIL Required test coverage of 99% not reached").
+
+**Rationale:**
+This answers the M8 question "should CI enforce `--cov-fail-under=80`?" with yes. The gate is on the total and not per file: pytest-cov dropped subprocess measurement in 7.0.0, so the terminal failure branches of `cli.py` that run in child processes count as missed, and a per-file gate would fail for the wrong reason.
+Because a total gate does not hold changed code to 80% by itself, step 7 checks the two new modules by hand.
+`pytest-cov` is in the dev group, which `uv sync --locked` installs, so the workflow needs no other change. Checked locally with the CI-version tools: prettier, actionlint and zizmor are clean, and yamllint only repeats a line-length warning on the pinned `setup-uv` line that was there before.
+The edit tripped the security-reminder hook for workflow files, which warns once per file; the change adds no `${{ }}` expression and no untrusted input.
+Not verified: the job itself on `ubuntu-latest`, which runs when the branch is pushed.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 5
+- Issue: #12
+
 ## [2026-11-15 17:20] Commit Summary
 
 **Change Type:** Refactor
