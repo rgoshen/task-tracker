@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-15 20:43] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `SUMMARY.md`
+
+**Summary:**
+The headings of the six entries written earlier in the PR #34 review round now carry the times of their commits (20:24, 20:25, 20:27, 20:28, 20:31 and 20:37). The text of the entries does not change.
+
+**Rationale:**
+I wrote those six times from memory of how long the work took, and did not read the clock, so they ran ahead of it: four were later than the commit they describe, and the last was 21:26 when the clock said 20:37. A commit log whose times cannot be trusted is worse than none, because the next reader will trust it.
+The times come from `git log` (author date, to the minute), and from here each heading is read from `date` before the entry is written.
+The newer entries (20:41, 20:42 and this one) were read from the clock and are not touched.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 8
+- PR: #34
+
 ## [2026-11-15 20:42] Commit Summary
 
 **Change Type:** Test
@@ -44,7 +63,7 @@ Four more breaks in the real files (a `json` import, a `Path` import and a `prin
 - `TODO.md`: 2026-11-15 Fix: PR #34 review, step 6
 - PR: #34, review comment on `tests/test_architecture.py` line 18
 
-## [2026-11-15 21:26] Commit Summary
+## [2026-11-15 20:37] Commit Summary
 
 **Change Type:** Refactor
 
@@ -66,7 +85,7 @@ The plan's "known leak" sentences and the M8 risk bullet in `TODO.md` now say it
 - `TODO.md`: 2026-11-15 Fix: PR #34 review, step 5
 - PR: #34, review comment on `infrastructure/location.py` line 33
 
-## [2026-11-15 21:08] Commit Summary
+## [2026-11-15 20:31] Commit Summary
 
 **Change Type:** Refactor
 
@@ -87,7 +106,7 @@ Test first: the refusal test failed with `DID NOT RAISE ValueError`, the other f
 - `TODO.md`: 2026-11-15 Fix: PR #34 review, step 4
 - PR: #34, review comment on `infrastructure/location.py` line 37
 
-## [2026-11-15 20:58] Commit Summary
+## [2026-11-15 20:28] Commit Summary
 
 **Change Type:** Docs
 
@@ -106,7 +125,7 @@ The wording is the reviewer's, with the second sentence split off to keep the li
 - `TODO.md`: 2026-11-15 Fix: PR #34 review, step 3
 - PR: #34, review comment on `domain/task_list.py` line 18
 
-## [2026-11-15 20:52] Commit Summary
+## [2026-11-15 20:27] Commit Summary
 
 **Change Type:** Test
 
@@ -128,7 +147,7 @@ The CI-version Python gate (nine tools on 16 files) is clean, JSCPD finds 0 clon
 - PR: #34, review comment on `domain/task_list.py` line 1
 - Issue: #32
 
-## [2026-11-15 20:38] Commit Summary
+## [2026-11-15 20:25] Commit Summary
 
 **Change Type:** Fix
 
@@ -149,7 +168,7 @@ Not verified yet: the CI run. The patch sets `parallel = true`, so data files ar
 - `TODO.md`: 2026-11-15 Fix: PR #34 review, step 1
 - PR: #34, review comment on `.github/workflows/tests.yml` line 37
 
-## [2026-11-15 20:31] Commit Summary
+## [2026-11-15 20:24] Commit Summary
 
 **Change Type:** Docs
 
