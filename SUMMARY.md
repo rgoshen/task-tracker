@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-15 20:31] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `TODO.md`
+
+**Summary:**
+The plan for the seven review comments on PR #34 is written down before any fix: one test-first commit per comment, in a set order, with the tests and the costs.
+
+**Rationale:**
+The global rules ask for the plan in `TODO.md` before code. Each claim was checked first. The coverage numbers, `list_path` with both options and the `~nosuchuser` message were run, and the other four were read against the source and the other test files.
+All seven comments are agreed. One part of #1 is declined: a per-file coverage gate, because coverage.py's `fail_under` is a total. The owner picked 95 for the total gate at the checkpoint, from 95, 100 and 80.
+My earlier statement that pytest-cov "does not measure the child processes" was wrong: it was a missing setting (`patch = subprocess`). The entry says so, and the first fix corrects the statement in `CLAUDE.md` and in the plan.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review
+- PR: #34
+
 ## [2026-11-15 17:48] Commit Summary
 
 **Change Type:** Docs

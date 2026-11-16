@@ -682,9 +682,47 @@ Each break on purpose below runs with `PYTHONDONTWRITEBYTECODE=1` and a cleared 
 - **#27's lock.** The load, change, save sequence stays in the commands on purpose. The lock then goes around each command or into an `infrastructure` context manager, and that choice is #27's.
 - **Scope held back.** No application layer, no `Store` protocol, no split of `cli.py` or `tests/test_cli.py`, and no `ARCHITECTURE.md` (the global rules ask for one, so step 7 files an issue for it).
 
+## [2026-11-15] Fix: PR #34 review
+
+**Objective:**
+Answer the seven inline comments on PR #34 (M8, the layers). Each claim was checked first. Three were reproduced by running the code: the coverage numbers (`cli.py` 94% to 100% and the total 97.7% to 100%, with the same 437 tests), `list_path` ignoring `directory` when `use_global` is true, and the `--dir ~nosuchuser/x` message. The other four were confirmed against the source and the other test files.
+All seven are fixed. One part of #1 is declined: a per-file coverage gate, because coverage.py's `fail_under` is a total ([coverage fail_under]).
+
+**Approach:**
+One test-first commit per comment on `feature/refactor-layers`, each with its own `SUMMARY.md` entry, in this order. The plan is committed first.
+
+1. #1 (coverage): `[tool.coverage.run] patch = ["subprocess"]` in `pyproject.toml`, and the gate in `tests.yml` goes from 80 to 95. The owner picked 95 at the checkpoint, from 95, 100 and 80.
+   The statements that gave the wrong reason are corrected in `CLAUDE.md` and in the plan. Red: a `--cov-fail-under=100` run fails without the patch (97.71%) and passes with it. Commit: `ci(tests): count child processes and fail under 95 percent`.
+2. #7 (direct tests): `tests/test_task_list.py` for `next_id`, `find`, the current order, the done order and the `done_tasks` error. These pin code that already exists, so they pass at once, and each is proven by a break on purpose. No existing test changes, so the M8 rule holds. Commit: `test(domain): test the task list rules directly`.
+3. #2: the `next_id` docstring says that deleting the highest ID frees it. The two cases are pinned by step 2. Commit: `docs(domain): say that deleting the highest ID frees it`.
+4. #3: `list_path` raises `ValueError` when `use_global` and `directory` are both given. Red first, in a new `tests/test_location.py`, which also covers the other `list_path` branches. The text names neither flag. Commit: `refactor(infrastructure): refuse a global list together with a directory`.
+5. #4: `HomeDirectoryError(ValueError)` in `location.py` carries the bare reason, and `main` adds "use --dir with a full path". First a test that pins the whole message through `main` (it passes now), then the change. Commit: `refactor(infrastructure): keep the CLI hint out of location`.
+6. #5: `tests/test_architecture.py` gets a deny-list of imports that must not appear in a layer, and a check for `print`, `open` and `input` calls in `domain`. Red: new flag cases fail first. Commit: `test(architecture): keep I/O out of the domain layer`.
+7. #6: the reason line above the pylint suppression in `tests/test_architecture.py`. Commit: `test(architecture): give the reason for the pylint suppression`.
+8. Docs and the remote: issue #12 and issue #32 follow the plan, the PR text is corrected where it is now false, and each thread gets a reply (resolved only where a fix was pushed).
+
+**Tests:**
+
+- #1: the gate run in step 1, both ways. The CI run on the branch is the proof that the patch works there, because the local run is not the CI environment.
+- #7 and #2: `next_id([])` is 1, a gap below the highest ID is not reused, the highest ID is. `find` on a missing ID raises with the text the CLI prints. The current order is due date, then priority, then ID, with no due date last. The done order is date completed, then ID, and a done task with no date completed raises.
+- #3: `list_path(use_global=True, directory=Path("/x"))` raises, and each of the three valid forms still returns what it did.
+- #4: `main(["--dir", "~nosuchuser_zz/x", "list"])` prints exactly `task-tracker: error: cannot expand '~nosuchuser_zz/x': no home directory found; use --dir with a full path` and exits 1, before and after. The same for the relative `HOME` case.
+- #5: `import json`, `from pathlib import Path`, `import sys` and a `print` call in `domain` are flagged, and `import argparse` in `infrastructure`. `from collections.abc import Sequence` and `from pathlib import Path` in `infrastructure` are accepted.
+
+**Risks & Trade-offs:**
+
+- **#1: how strict the gate is.** 95 catches a new untested module of more than about 22 statements. 100 would catch every line, but one unreachable line on another platform would block a merge until a `pragma: no cover` is added. The `subprocess` patch sets `parallel = true` ([coverage patch]), so data files are combined. That is checked locally and not in CI until the branch runs.
+  Rejected: a per-file gate, which would need a script that reads a JSON report.
+- **#3: `ValueError`, not a changed signature.** One value for the choice (`directory` plus a separate `global_list()`) would make the invalid state unrepresentable, but it changes `main` and the call in every test double. argparse already refuses both options with exit 2, so the new error is reachable only from another caller, and `main` would print it as a one-line error.
+- **#4: one more name in the `infrastructure` interface.** The cost is a small exception class and an `isinstance` in `main`. The gain is that `infrastructure` no longer knows a flag name, which is the point of the layers. The output stays byte for byte, so M8's rule holds. The plan's "known leak" for this is removed.
+- **#5: the deny-list is a tripwire and not a proof.** It misses `socket`, `subprocess`, `logging` and an alias such as `p = print`. An allow-list for `domain` would be stricter but would fail on every new stdlib import, so it is not built.
+- **#7: still only part of #32.** `tests/test_cli.py` is not split, and the direct tests are for the new functions only.
+
 [ast]: https://docs.python.org/3/library/ast.html
 [namespace packages]: https://docs.python.org/3/reference/import.html#namespace-packages
 [uv build backend]: https://docs.astral.sh/uv/concepts/build-backend/
 [pytest-cov changelog]: https://pytest-cov.readthedocs.io/en/latest/changelog.html
 [pathlib]: https://docs.python.org/3/library/pathlib.html#pathlib.Path.mkdir
 [cmdline]: https://docs.python.org/3/using/cmdline.html#controlling-color
+[coverage fail_under]: https://coverage.readthedocs.io/en/latest/config.html#report-fail-under
+[coverage patch]: https://coverage.readthedocs.io/en/latest/config.html#run-patch
