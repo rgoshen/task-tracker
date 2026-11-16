@@ -5,8 +5,8 @@ from dataclasses import KW_ONLY, dataclass, field, fields
 from datetime import date, datetime, time
 from typing import Any, Self
 
-from task_tracker.priority import Priority
-from task_tracker.status import Status
+from task_tracker.domain.priority import Priority
+from task_tracker.domain.status import Status
 
 # Stands in for "not given" so a timestamp can default to the clock reading the
 # task already holds while the field stays typed `datetime`. Always compared with

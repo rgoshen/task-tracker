@@ -8,10 +8,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, TextIO
 
-from task_tracker.priority import Priority
-from task_tracker.status import Status
+from task_tracker.domain.priority import Priority
+from task_tracker.domain.status import Status
+from task_tracker.domain.task import Task, as_naive_datetime
 from task_tracker.storage import load, save
-from task_tracker.task import Task, as_naive_datetime
 
 # D2: the project list is `tasks.json` in the current directory; the global list is
 # the same file name inside `.task-tracker` in the home directory.

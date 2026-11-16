@@ -663,6 +663,7 @@ Each break on purpose below runs with `PYTHONDONTWRITEBYTECODE=1` and a cleared 
 **Tests:**
 
 - `test_layers_only_import_downward[domain]` and `[infrastructure]` (new): the layers import only downward, with no relative import and no bare-package import, and no layer is empty.
+- Two parametrized tests of the rule itself, added in step 1 (12 cases): one set of imports the check must flag, one it must accept. The rule lives in one small function, so a break of it fails a test of its own and not only the test that walks the files.
 - `test_list_without_all_ignores_a_done_task_without_a_date_completed` (new): plain `list` exits 0 and does not show the broken task.
 - Every existing test passes with only its imports and the four `_now` strings changed (the plan's second box). Coverage stays at 98% or better, and the total gate is 80%.
 - The `--help` output of the program and of the four commands equals `develop`'s, captured with `NO_COLOR=1` and `COLUMNS=80`. The installed wheel runs `task-tracker list` from outside the project.

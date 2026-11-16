@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-15 17:06] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** `domain` package (`src/task_tracker/domain/`), imports in `cli.py` and `storage.py`, and the tests
+
+**Summary:**
+`priority.py`, `status.py` and `task.py` moved into a new `task_tracker/domain/` package with `git mv`, so history follows them. `domain/__init__.py` holds a docstring only.
+The imports in `cli.py`, `storage.py` and `domain/task.py` point at the new paths, and the four test files changed 14 lines: imports, and the four `task_tracker.task._now` patch strings (they are import paths, and a missed one fails with `ModuleNotFoundError`).
+`tests/test_architecture.py` is new: `test_layers_only_import_downward[domain]` reads every file under the layer with `ast` and fails on a relative import, on the bare `task_tracker` package (which reexports `cli`) and on any layer outside the allowed set. It also fails for a layer with no modules. 435 tests pass (422 plus 13), and coverage is unchanged at 98%, `cli.py` at 95%.
+
+**Rationale:**
+Test-first. The new test failed with `domain has no modules`. Then the test imports were repointed and the suite failed with `No module named 'task_tracker.domain'`. Then the move made it green.
+The rule is its own small function with 12 cases (7 it must flag, 5 it must accept), so breaking the rule fails a test of its own.
+Breaks on purpose, with bytecode off and `__pycache__` cleared: relative imports not flagged (2 red), the bare package not flagged (2 red), any `task_tracker` import accepted (3 red), and a sideways `from . import priority` in `domain/status.py` (the layer test red). Each file was restored and compared with its backup.
+The CI-version linters ran over the recursive file set (`git ls-files -co`, the G2 fix), pylint with and without an editable install. They found two things that ruff and pyright did not: `missing-function-docstring` (every test module disables it at the top, so this one does too) and a pylint inference error on a loop variable named `module`. JSCPD finds 0 clones and codespell is clean.
+Alternatives: reexports in `domain/__init__.py` (rejected, YAGNI) and checking by importing the modules (rejected, it cannot fail for a module that does not import yet).
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 1
+- Issue: #12
+
 ## [2026-11-15 16:58] Commit Summary
 
 **Change Type:** Docs

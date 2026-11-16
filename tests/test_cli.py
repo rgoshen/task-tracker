@@ -23,10 +23,10 @@ import pytest
 
 from task_tracker import main
 from task_tracker.cli import _discard_stdout, _printable
-from task_tracker.priority import Priority
-from task_tracker.status import Status
+from task_tracker.domain.priority import Priority
+from task_tracker.domain.status import Status
+from task_tracker.domain.task import Task
 from task_tracker.storage import load, save
-from task_tracker.task import Task
 
 # D6 chose naive local time on purpose, so DTZ001 does not apply to these values.
 CLOCK = datetime(2026, 10, 31, 9, 30, 0)  # noqa: DTZ001
@@ -79,7 +79,7 @@ def _plain_help(monkeypatch: pytest.MonkeyPatch) -> None:
 def fixed_clock(monkeypatch: pytest.MonkeyPatch) -> None:
     # Two runs of `add` a moment apart must stamp the same time, or comparing
     # the tasks they store would fail on whichever second the clock ticked over.
-    monkeypatch.setattr("task_tracker.task._now", lambda: CLOCK)
+    monkeypatch.setattr("task_tracker.domain.task._now", lambda: CLOCK)
 
 
 def test_add_stores_a_first_task_with_id_1_and_prints_the_id(
@@ -1072,9 +1072,9 @@ def test_update_works_when_the_clock_is_behind_the_stored_time(
 ):
     # A time zone change can put the clock hours behind the task's own stamps.
     later = CLOCK + timedelta(hours=13)
-    monkeypatch.setattr("task_tracker.task._now", lambda: later)
+    monkeypatch.setattr("task_tracker.domain.task._now", lambda: later)
     save([Task(1, "Fly home")], project)
-    monkeypatch.setattr("task_tracker.task._now", lambda: CLOCK)
+    monkeypatch.setattr("task_tracker.domain.task._now", lambda: CLOCK)
 
     exit_code = main(["update", "1", *argv])
 

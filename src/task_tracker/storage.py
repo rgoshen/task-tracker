@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from task_tracker.task import Task
+from task_tracker.domain.task import Task
 
 
 def _to_record(task: Task) -> dict[str, Any]:
