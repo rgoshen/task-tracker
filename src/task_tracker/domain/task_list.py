@@ -15,7 +15,8 @@ _PRIORITY_RANK = {priority: rank for rank, priority in enumerate(Priority)}
 def next_id(tasks: Sequence[Task]) -> int:
     """Return the ID for a new task: the highest ID plus one (D5).
 
-    Not a count, so a gap left by a delete is not reused.
+    Not a count, so a gap below the highest ID is not reused. Deleting the highest
+    ID frees it again, and the next task gets it.
     """
     return max((task.id for task in tasks), default=0) + 1
 

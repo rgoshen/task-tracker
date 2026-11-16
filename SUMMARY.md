@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-15 20:58] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `domain/task_list.py`
+
+**Summary:**
+The `next_id` docstring said that "a gap left by a delete is not reused". That holds only below the highest ID. It now says: a gap below the highest ID is not reused, and deleting the highest ID frees it again, so the next task gets it.
+
+**Rationale:**
+Review comment #2 on PR #34 was right, and the sentence contradicted `README.md` ("an ID can be reused: deleting the highest-numbered task frees its ID") and decision D5 in the plan. It was a one-line note inside the private `_add` in `cli.py`, and it became the contract of a public domain function when M8 moved it.
+A later caller (a lock, an undo) could have relied on IDs never coming back. Both cases are pinned by `test_next_id_is_the_highest_id_plus_one` (`[1, 2]` gives 3, `[1, 3]` gives 4), which the previous commit added.
+The wording is the reviewer's, with the second sentence split off to keep the lines short.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 3
+- PR: #34, review comment on `domain/task_list.py` line 18
+
 ## [2026-11-15 20:52] Commit Summary
 
 **Change Type:** Test
