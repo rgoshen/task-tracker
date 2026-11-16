@@ -9,7 +9,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Of the seven features, 2 (`--global` and `--dir PATH`, the choice of list), 3 (`list`, the current tasks), 4 (`list --all`, short `-a`), 5 (`add`), 6 (`update`) and 7 (`delete`) exist. Only 1 (install) is not built.
 The two list options belong to the top-level parser and go before the command (`task-tracker --global add ...`): a subcommand that also took `-d` would turn the slip `add Milk -d 2026-11-02` (for `-D`) into a directory.
 `list_path` in `infrastructure/location.py` is the one place that chooses the list file from them and the cwd, and `_expanded` in the same module is the one place that looks up the home directory (for `--global` and for a leading `~` in `--dir`): with none, or a relative one, it gives one error line and exit 1.
-What exists is three layers under `src/task_tracker/` that depend only downward, and `tests/test_architecture.py` fails when one reaches up, or uses a relative import or the bare `task_tracker` package:
+What exists is three layers under `src/task_tracker/` that depend only downward, and `tests/test_architecture.py` fails when one reaches up, or uses a relative import or the bare `task_tracker` package,
+or when `domain` imports a file or terminal module (`os`, `sys`, `pathlib`, `json`, `tempfile`, `shutil`, `argparse`) or calls `print`, `open` or `input`, or `infrastructure` imports `argparse`:
 
 - `domain/`: `priority.py` and `status.py` (the `Priority` and `Status` `StrEnum`s), `task.py` (the `Task` dataclass, with `Task.restore` for rebuilding a stored task and `Task.update` for changing one), and `task_list.py` (the rules over a list: `next_id`, `find`, `current_tasks` and `done_tasks`).
 - `infrastructure/`: `storage.py` (`load` / `save`) and `location.py` (`list_path`). It may import `domain`.

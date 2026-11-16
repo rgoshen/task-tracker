@@ -1,5 +1,32 @@
 # Summary
 
+## [2026-11-15 20:41] Commit Summary
+
+**Change Type:** Test
+
+**Scope:** `tests/test_architecture.py`
+
+**Summary:**
+The architecture test now also keeps each layer to its job. `domain` may not import `os`, `sys`, `pathlib`, `json`, `tempfile`, `shutil` or `argparse`, and may not call `print`, `open` or `input`.
+`infrastructure` may not import `argparse`. 26 new cases: 14 the check must flag, 9 it must accept (look-alikes such as `ossified` and `console.print`), a pair for `infrastructure`, and two that walk the real layers.
+
+**Rationale:**
+Review comment #5 on PR #34 was right: the check only looked at `task_tracker.*` imports, so `import json`, `from pathlib import Path` or `import sys` in `domain/` passed, although `domain/__init__.py` promises "no files and no terminal". A convenience `Path` read in `task_list.py` is the likeliest slip.
+One addition goes past the comment's list: the reviewer names a `print` as a likely slip, and `print` and `open` need no import, so an import list cannot see them. The check also names those three built-ins for `domain`. It is a tripwire and not a proof: `p = print` and an import of `socket` or `subprocess` get past it.
+An allow-list for `domain` would be stricter, but every new standard-library import would fail it, so it is not built.
+The code that reads imports is shared (`_imports`), and so is the walk over a layer's files (`_layer_sources`), so the new check does not copy the old one (JSCPD counts a copy as a failure).
+Test first: all 26 failed with `NameError` (`_io_uses`, `_IO_IMPORTS`), the 14 earlier tests passed.
+Then 22 breaks of the check each turned a test red:
+each of the seven names and the three calls dropped from its list, the `infrastructure` list emptied, imports never flagged, a module compared whole instead of by its top name, a prefix match, calls never flagged, every other call flagged, method calls counted, a relative import not noticed, the downward rule never flagging,
+the bare package accepted, import statements not read, and an empty layer not noticed.
+Four more breaks in the real files (a `json` import, a `Path` import and a `print` in `domain/task_list.py`, `argparse` in `infrastructure/storage.py`) each turned the walk test red.
+`CLAUDE.md` now lists what the test enforces.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 6
+- PR: #34, review comment on `tests/test_architecture.py` line 18
+
 ## [2026-11-15 21:26] Commit Summary
 
 **Change Type:** Refactor
