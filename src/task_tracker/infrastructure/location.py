@@ -8,6 +8,14 @@ _LIST_FILE = "tasks.json"
 _GLOBAL_DIR = ".task-tracker"
 
 
+class HomeDirectoryError(ValueError):
+    """The home directory is needed and cannot be found or used.
+
+    The message gives the reason only. What the user can do instead depends on how
+    the program was started, so the caller adds that.
+    """
+
+
 def _expanded(path: Path) -> Path:
     """Return `path` with a leading `~` replaced by the home directory it names.
 
@@ -18,8 +26,9 @@ def _expanded(path: Path) -> Path:
     try:
         expanded = path.expanduser()
     except RuntimeError:
-        # `main` does not catch RuntimeError, on purpose: a bug elsewhere must stay
-        # visible. `expanduser` raises it when there is no home directory to find:
+        # A caller handles ValueError and does not catch RuntimeError, on purpose: a
+        # bug elsewhere must stay visible. `expanduser` raises it when there is no
+        # home directory to find:
         # HOME unset and no password-file entry (a container started with an
         # arbitrary user ID), or `~name` for a user who does not exist.
         problem = "no home directory found"
@@ -29,9 +38,7 @@ def _expanded(path: Path) -> Path:
         if expanded == path or expanded.is_absolute():
             return expanded
         problem = "the home directory is not an absolute path"
-    raise ValueError(
-        f"cannot expand {str(path)!r}: {problem}; use --dir with a full path"
-    )
+    raise HomeDirectoryError(f"cannot expand {str(path)!r}: {problem}")
 
 
 def list_path(*, use_global: bool, directory: Path | None) -> Path:

@@ -1872,6 +1872,36 @@ def test_dir_with_a_tilde_that_cannot_be_expanded_gives_one_error_line(
 
 
 @pytest.mark.usefixtures("project")
+def test_a_home_directory_that_cannot_be_found_ends_with_the_hint_for_a_full_path(
+    capsys: pytest.CaptureFixture[str],
+):
+    # The whole line, because the reason and the hint now come from two layers and
+    # the output must stay the same.
+    exit_code = main(["--dir", "~no-such-user-m7/x", "list"])
+
+    assert exit_code == 1
+    assert capsys.readouterr().err == (
+        "task-tracker: error: cannot expand '~no-such-user-m7/x': "
+        "no home directory found; use --dir with a full path\n"
+    )
+
+
+@pytest.mark.usefixtures("project")
+def test_a_relative_home_directory_ends_with_the_same_hint(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    monkeypatch.setenv("HOME", "relative/home")
+
+    exit_code = main(["--global", "list"])
+
+    assert exit_code == 1
+    assert capsys.readouterr().err == (
+        "task-tracker: error: cannot expand '~/.task-tracker/tasks.json': "
+        "the home directory is not an absolute path; use --dir with a full path\n"
+    )
+
+
+@pytest.mark.usefixtures("project")
 def test_an_empty_dir_is_a_bad_option_value(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ):

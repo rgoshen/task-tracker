@@ -12,7 +12,7 @@ from task_tracker.domain.priority import Priority
 from task_tracker.domain.status import Status
 from task_tracker.domain.task import Task, as_naive_datetime
 from task_tracker.domain.task_list import current_tasks, done_tasks, find, next_id
-from task_tracker.infrastructure.location import list_path
+from task_tracker.infrastructure.location import HomeDirectoryError, list_path
 from task_tracker.infrastructure.storage import load, save
 
 
@@ -389,6 +389,12 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# What the user can do when the home directory cannot be used: `--global` and a `~` in
+# `--dir` need it, and a full path to `--dir` does not. `infrastructure` gives the
+# reason and this is the advice, so the layer below names no option.
+_FULL_PATH_HINT = "; use --dir with a full path"
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the command in `argv` (the process arguments by default).
 
@@ -405,7 +411,8 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, OSError) as error:
         # `Task` and `load` raise ValueError for a blank name or a corrupt file
         # (M2 made it the one type); OSError is a file that cannot be read or written.
+        hint = _FULL_PATH_HINT if isinstance(error, HomeDirectoryError) else ""
         _release_stdout()
-        _say(f"{parser.prog}: error: {error}", sys.stderr)
+        _say(f"{parser.prog}: error: {error}{hint}", sys.stderr)
         return 1
     return _show(lines, parser.prog)

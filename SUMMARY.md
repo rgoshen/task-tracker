@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-15 21:26] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** `infrastructure/location.py`, `cli.py`, `tests/test_location.py`, `tests/test_cli.py`, plan and `TODO.md`
+
+**Summary:**
+The CLI hint "use --dir with a full path" moves out of `infrastructure`. `location.py` raises a new `HomeDirectoryError(ValueError)` with the reason only, and `main` adds the hint when it prints that error. The output is the same, byte for byte.
+
+**Rationale:**
+Review comment #4 on PR #34 was right: `infrastructure` named a command line option, and the comment beside it named `main`, so the layer rule that `tests/test_architecture.py` enforces (imports only) could not see it. The PR text listed it as a known leak. It was cheap to remove now, and the plan's "messages move byte for byte" rule still holds because the text a user sees does not change.
+The reviewer's other point is also true: for `--dir ~nosuchuser/x` the hint repeats the flag the user just used, though "with a full path" is the useful part. I kept the text, because changing the words is a change of output that M8 does not make. The caller now owns the advice, so reworded advice is a one-line change in `cli.py`.
+Test first: two tests through `main` pin the whole line for both reasons (no home directory found, and a relative `HOME`), and they passed before and after. Two unit tests in `tests/test_location.py` check that the bare reason has no hint, and they failed with `cannot import name 'HomeDirectoryError'` first.
+With only the `location.py` half done the two pins failed with the hint missing, which showed they guard the right thing.
+Seven breaks on purpose each turned a test red: the hint never added, added to every error, added to every `ValueError`, its text changed, the new error no longer a `ValueError` (it ends in a traceback), the hint put back inside `location.py`, and a plain `ValueError` raised.
+The plan's "known leak" sentences and the M8 risk bullet in `TODO.md` now say it was removed.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 5
+- PR: #34, review comment on `infrastructure/location.py` line 33
+
 ## [2026-11-15 21:08] Commit Summary
 
 **Change Type:** Refactor

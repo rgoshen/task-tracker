@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from task_tracker.infrastructure.location import list_path
+from task_tracker.infrastructure.location import HomeDirectoryError, list_path
 
 
 @pytest.fixture(name="home")
@@ -59,3 +59,28 @@ def test_the_global_list_together_with_a_directory_is_refused():
     # won), so the caller finds out. The command line refuses it first, with exit 2.
     with pytest.raises(ValueError, match="together"):
         list_path(use_global=True, directory=Path("/groceries"))
+
+
+def test_a_home_directory_that_cannot_be_found_gives_the_reason_and_no_hint():
+    # `~name` for a user who does not exist. What the user can do about it depends
+    # on how the program was started, so the hint is the caller's to add.
+    with pytest.raises(HomeDirectoryError) as caught:
+        list_path(use_global=False, directory=Path("~no-such-user-m7/x"))
+
+    assert str(caught.value) == (
+        "cannot expand '~no-such-user-m7/x': no home directory found"
+    )
+
+
+def test_a_relative_home_directory_gives_the_reason_and_no_hint(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("HOME", "relative/home")
+
+    with pytest.raises(HomeDirectoryError) as caught:
+        list_path(use_global=True, directory=None)
+
+    assert str(caught.value) == (
+        "cannot expand '~/.task-tracker/tasks.json': "
+        "the home directory is not an absolute path"
+    )
