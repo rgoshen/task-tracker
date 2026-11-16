@@ -398,7 +398,7 @@ Produces: three layers that depend only downward. `domain` holds what a task is 
 - [x] Given `uv build`, then the wheel holds `domain/` and `infrastructure/`, and the installed `task-tracker list` runs from a directory outside the project.
 - [x] Given `.github/workflows/tests.yml`, then it runs pytest with `--cov=task_tracker --cov-fail-under=80`, and the same run with `--cov-fail-under=99` fails locally.
 - [x] Given `CLAUDE.md`, then its project state names the layers, no line still places `_list_path` or `_expanded` in `cli.py`, and the tests.yml and coverage lines match the workflow.
-- [ ] Given the work deferred here, then two issues exist: one to split `tests/test_cli.py` by layer, and one to add `ARCHITECTURE.md`.
+- [x] Given the work deferred here, then two issues exist: #32 to split `tests/test_cli.py` by layer, and #33 to add `ARCHITECTURE.md`.
 
 **Think about:**
 

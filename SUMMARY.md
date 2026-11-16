@@ -1,5 +1,23 @@
 # Summary
 
+## [2026-11-15 17:48] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `docs/implementation-plan.md` (and issue #12, which mirrors it)
+
+**Summary:**
+The last M8 box is ticked: the work deferred from M8 now has issues. #32 splits `tests/test_cli.py` by layer and adds direct unit tests for `domain/task_list.py` and `infrastructure/location.py`, and #33 adds `ARCHITECTURE.md`. All 11 M8 boxes are done.
+
+**Rationale:**
+The global rules ask for an issue for every deferred item, and the plan named both in its "Decided" block. The owner asked for them to be filed. Each issue states the problem, what it should hold and acceptance boxes, and says that it was found in M8 and why it was left out (the M8 rule "tests change only their imports", and no `ARCHITECTURE.md` existing yet).
+Issue #12 is regenerated from the plan so both say the same.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 7
+- Issues: #12, #32, #33
+
 ## [2026-11-15 17:28] Commit Summary
 
 **Change Type:** Docs
