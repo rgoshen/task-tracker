@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-15 21:08] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** `infrastructure/location.py`, `tests/test_location.py`
+
+**Summary:**
+`list_path` now raises `ValueError` when it is given both `use_global=True` and a `directory`, and `tests/test_location.py` is new: six tests that call `list_path` directly (the current directory, `--global`'s path, a directory, a relative directory, a `~` directory, and the refusal).
+
+**Rationale:**
+Review comment #3 on PR #34 was right, and I reproduced it: `list_path(use_global=True, directory=Path("/x"))` returned `~/.task-tracker/tasks.json` and ignored `directory`. The only thing that stopped it was argparse's mutually exclusive group in `cli.py`.
+When M8 moved the choice into a public function with no argparse, the rule went with it, and a second caller (a test helper, the install command) could write to the global file while asking for another list.
+Two ways to fix it were weighed. A signature that cannot express both (`directory` plus a separate `global_list()`) is stricter, but it changes `main` and every place that builds the arguments. A `ValueError` is three lines.
+I took the second: argparse still refuses both options first with exit 2, so no command-line behavior changes, and the new error is reachable only from another caller. The text names neither flag, because `infrastructure` should not know the CLI's words.
+Test first: the refusal test failed with `DID NOT RAISE ValueError`, the other five passed because the code existed. Seven breaks on purpose each turned a test red: the refusal removed, the refusal firing for a directory alone, the hidden directory dropped from the global path, `.absolute()` dropped, the `~` not expanded, the directory ignored, and the list name changed.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 4
+- PR: #34, review comment on `infrastructure/location.py` line 37
+
 ## [2026-11-15 20:58] Commit Summary
 
 **Change Type:** Docs

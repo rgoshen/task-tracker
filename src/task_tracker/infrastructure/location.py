@@ -38,8 +38,12 @@ def list_path(*, use_global: bool, directory: Path | None) -> Path:
     """Return the list file a command works on.
 
     That is the global list for `use_global`, `directory/tasks.json` for a chosen
-    directory, and the list in the current directory for neither.
+    directory, and the list in the current directory for neither. Both together
+    raise `ValueError`: one of them would have to be ignored, and the caller would
+    work on a list it did not choose.
     """
+    if use_global and directory is not None:
+        raise ValueError("the global list and a directory cannot be chosen together")
     if use_global:
         return _expanded(Path("~") / _GLOBAL_DIR / _LIST_FILE)
     if directory is not None:
