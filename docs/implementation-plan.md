@@ -394,8 +394,8 @@ Produces: three layers that depend only downward. `domain` holds what a task is 
 - [x] Given a stored `DONE` task with no date completed, when `list` runs without `--all`, then the exit code is 0 and the task is not shown. The check that raises for it runs only under `--all` (new test, passes at once, pins the call).
 - [x] Given `storage.py` moved into `task_tracker/infrastructure/`, then `test_storage.py` passes with only its imports changed.
 - [x] Given `infrastructure/location.py` with `list_path(*, use_global: bool, directory: Path | None) -> Path`, then `cli.py` holds neither `_list_path`, `_expanded`, `_LIST_FILE` nor `_GLOBAL_DIR`, every M7 test passes, and the error texts are unchanged byte for byte.
-- [ ] Given `--help` for the program and for `add`, `list`, `update` and `delete`, captured with `NO_COLOR=1` and `COLUMNS=80`, then each output equals the one from `develop`.
-- [ ] Given `uv build`, then the wheel holds `domain/` and `infrastructure/`, and the installed `task-tracker list` runs from a directory outside the project.
+- [x] Given `--help` for the program and for `add`, `list`, `update` and `delete`, captured with `NO_COLOR=1` and `COLUMNS=80`, then each output equals the one from `develop`.
+- [x] Given `uv build`, then the wheel holds `domain/` and `infrastructure/`, and the installed `task-tracker list` runs from a directory outside the project.
 - [x] Given `.github/workflows/tests.yml`, then it runs pytest with `--cov=task_tracker --cov-fail-under=80`, and the same run with `--cov-fail-under=99` fails locally.
 - [x] Given `CLAUDE.md`, then its project state names the layers, no line still places `_list_path` or `_expanded` in `cli.py`, and the tests.yml and coverage lines match the workflow.
 - [ ] Given the work deferred here, then two issues exist: one to split `tests/test_cli.py` by layer, and one to add `ARCHITECTURE.md`.

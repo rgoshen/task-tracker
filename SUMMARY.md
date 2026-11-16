@@ -1,5 +1,30 @@
 # Summary
 
+## [2026-11-15 17:28] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `docs/implementation-plan.md` (and issue #12, which mirrors it)
+
+**Summary:**
+Two more M8 boxes are ticked, because they were checked: the wheel and the `--help` text. 10 of 11 boxes are done. The last one is the two follow-up issues, which wait for the owner's go-ahead.
+
+**Rationale:**
+The wheel (built into the scratchpad, not `dist/`) holds both subpackages and all ten modules, and so does the sdist. The installed wheel ran from a directory outside the project with a throwaway `HOME`:
+`list`, `add`, `--global add`, `--dir groceries add`, `update --status DONE`, `list --all` and a bad priority (exit 2) all behave, and the three lists stay separate.
+The `--help` comparison had a false pass that I caught. The first capture loop word-split wrongly under Zsh, so four of the five "help pages" were the same argparse error, and the diff of identical errors said "IDENTICAL". One capture showed `exit 2` and gave it away.
+It was redone as a Bash script with real argument arrays, and it now fails unless it finds five genuine usage pages with no `error:` line. Result: `develop` and the branch each give five usage pages, all exit 0, 67 lines, identical, from wheels built from a `develop` worktree.
+The acceptance rule was checked line by line against `develop`: the four existing test files changed 24 import lines, 8 `_now` string lines and added one test (14 lines), with no other removed line, and `tests/test_architecture.py` is the only new test file.
+The final gate is clean on the committed state: 437 tests at 97.71% with the CI command, nine linters on the recursive set, JSCPD 0 clones, codespell, the Markdown gate and all pre-commit hooks.
+
+The real super-linter v8.7.0 also passes in the CI container (`act`, "Job succeeded", exit status 0 read from the log, with every file under `domain/` and `infrastructure/` in the 15 files given to pylint, mypy, black, isort, flake8 and ruff).
+Its first run failed on `BIOME_FORMAT` alone, because `act` copies the untracked `.claude/settings.local.json`, which CI never sees. The second run turned that one linter off and nothing else.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 7
+- Issue: #12
+
 ## [2026-11-15 17:23] Commit Summary
 
 **Change Type:** Docs
