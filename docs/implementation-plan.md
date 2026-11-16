@@ -387,17 +387,17 @@ Branch `feature/refactor-layers`. No behavior change: every test stays green, an
 
 Produces: three layers that depend only downward. `domain` holds what a task is and how a list of tasks is numbered, found and ordered. `infrastructure` holds the files: the task file and which one to use. `cli` holds argparse, the commands and the terminal.
 
-- [ ] Given every module under `src/task_tracker/domain/` and `src/task_tracker/infrastructure/`, when its imports are read with `ast`, then `domain` imports nothing from `task_tracker` outside `domain`, and `infrastructure` imports only `domain` and itself.
+- [x] Given every module under `src/task_tracker/domain/` and `src/task_tracker/infrastructure/`, when its imports are read with `ast`, then `domain` imports nothing from `task_tracker` outside `domain`, and `infrastructure` imports only `domain` and itself.
       No import is relative, and none names the bare `task_tracker` package, which reexports `cli`. An empty layer fails the test, so it cannot pass by finding no files.
-- [ ] Given `priority.py`, `status.py` and `task.py` moved into `task_tracker/domain/`, then all 422 tests from M7 pass. The only test edits are imports and the four `task_tracker.task._now` patch strings, which are import paths too.
-- [ ] Given `domain/task_list.py` with `next_id`, `find`, `current_tasks` and `done_tasks`, then `cli.py` holds none of those rules, and breaking each on purpose (a count for the ID, a reversed priority rank, the first task for any ID, done tasks sorted by ID) fails a test.
-- [ ] Given a stored `DONE` task with no date completed, when `list` runs without `--all`, then the exit code is 0 and the task is not shown. The check that raises for it runs only under `--all` (new test, passes at once, pins the call).
-- [ ] Given `storage.py` moved into `task_tracker/infrastructure/`, then `test_storage.py` passes with only its imports changed.
-- [ ] Given `infrastructure/location.py` with `list_path(*, use_global: bool, directory: Path | None) -> Path`, then `cli.py` holds neither `_list_path`, `_expanded`, `_LIST_FILE` nor `_GLOBAL_DIR`, every M7 test passes, and the error texts are unchanged byte for byte.
+- [x] Given `priority.py`, `status.py` and `task.py` moved into `task_tracker/domain/`, then all 422 tests from M7 pass. The only test edits are imports and the four `task_tracker.task._now` patch strings, which are import paths too.
+- [x] Given `domain/task_list.py` with `next_id`, `find`, `current_tasks` and `done_tasks`, then `cli.py` holds none of those rules, and breaking each on purpose (a count for the ID, a reversed priority rank, the first task for any ID, done tasks sorted by ID) fails a test.
+- [x] Given a stored `DONE` task with no date completed, when `list` runs without `--all`, then the exit code is 0 and the task is not shown. The check that raises for it runs only under `--all` (new test, passes at once, pins the call).
+- [x] Given `storage.py` moved into `task_tracker/infrastructure/`, then `test_storage.py` passes with only its imports changed.
+- [x] Given `infrastructure/location.py` with `list_path(*, use_global: bool, directory: Path | None) -> Path`, then `cli.py` holds neither `_list_path`, `_expanded`, `_LIST_FILE` nor `_GLOBAL_DIR`, every M7 test passes, and the error texts are unchanged byte for byte.
 - [ ] Given `--help` for the program and for `add`, `list`, `update` and `delete`, captured with `NO_COLOR=1` and `COLUMNS=80`, then each output equals the one from `develop`.
 - [ ] Given `uv build`, then the wheel holds `domain/` and `infrastructure/`, and the installed `task-tracker list` runs from a directory outside the project.
-- [ ] Given `.github/workflows/tests.yml`, then it runs pytest with `--cov=task_tracker --cov-fail-under=80`, and the same run with `--cov-fail-under=99` fails locally.
-- [ ] Given `CLAUDE.md`, then its project state names the layers, no line still places `_list_path` or `_expanded` in `cli.py`, and the tests.yml and coverage lines match the workflow.
+- [x] Given `.github/workflows/tests.yml`, then it runs pytest with `--cov=task_tracker --cov-fail-under=80`, and the same run with `--cov-fail-under=99` fails locally.
+- [x] Given `CLAUDE.md`, then its project state names the layers, no line still places `_list_path` or `_expanded` in `cli.py`, and the tests.yml and coverage lines match the workflow.
 - [ ] Given the work deferred here, then two issues exist: one to split `tests/test_cli.py` by layer, and one to add `ARCHITECTURE.md`.
 
 **Think about:**

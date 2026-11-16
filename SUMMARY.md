@@ -1,5 +1,28 @@
 # Summary
 
+## [2026-11-15 17:23] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `CLAUDE.md` and `docs/implementation-plan.md` (and issue #12, which mirrors the plan)
+
+**Summary:**
+`CLAUDE.md` now describes the code as it is after steps 1 to 5. The project state names the three layers (`domain/`, `infrastructure/`, `cli.py`), says that `tests/test_architecture.py` enforces the direction, and puts `list_path` and `_expanded` in `infrastructure/location.py` and no longer in `cli.py`.
+It also says why the commands stay in one module: the tests patch `task_tracker.cli.load` and `task_tracker.cli.save`.
+Three lines changed with the workflow: the Testing paragraph and the tests.yml bullet say that CI runs `--cov=task_tracker --cov-fail-under=80` and that the gate is on the total, and the milestone range reads M1 to M8.
+The Python lint bullet gains the rule from audit finding G2: give the linters the recursive file set, because `src/task_tracker/*.py` now matches only two files.
+The plan's M8 boxes are ticked for what is done (8 of 11); the `--help` diff, the wheel check and the two follow-up issues stay open for step 7.
+
+**Rationale:**
+The project rule is that the plan, the issue and the docs change together, so issue #12 is regenerated from the plan. "Decisions D1 to D6" in `CLAUDE.md` needed no change, because the M8 decisions went into a "Decided" block.
+A `grep` of `CLAUDE.md` and `README.md` for the old module paths finds only the new layer description and one closed M1 box in the plan that records where `priority.py` was when it was renamed, which is history and stays.
+Noticed and left alone: `CLAUDE.md` still says that no Git tags exist yet, and `v0.1.0` was tagged in M0. That belongs to M9, which already touches the release text.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 6
+- Issue: #12
+
 ## [2026-11-15 17:22] Commit Summary
 
 **Change Type:** CI
