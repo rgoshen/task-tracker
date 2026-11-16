@@ -1,5 +1,24 @@
 # Summary
 
+## [2026-11-15 17:18] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `docs/implementation-plan.md`, `TODO.md` (and issue #12, which mirrors the plan)
+
+**Summary:**
+The plan and the `TODO.md` entry said that a missing `infrastructure/__init__.py` makes CI's pylint resolve the module name wrongly. That is withdrawn. The "Decided" block, the risk bullet and the audit line now say what was tested in step 3: with the file removed, mypy 2.1.0 and pylint 4.0.6 are clean. The file stays so that each layer is a regular package.
+
+**Rationale:**
+The audit (finding G1, rated Should-fix) had inferred the failure and said it was unverified for mypy. I wrote it into the plan as fact. The record should say what was tested, so the claim is corrected where it was made and the `SUMMARY.md` entry of 16:58, which repeats it, is left as history and answered here.
+The other Should-fix, the lint file set (G2), stands: after step 3 the old glob `src/task_tracker/*.py` matches only `__init__.py` and `cli.py`, and the recursive set adds the seven files under `domain/` and `infrastructure/` that it would skip.
+Issue #12 gets the same text as the plan, as the project rule asks.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, risks
+- Issue: #12, audit findings G1 and G2
+
 ## [2026-11-15 17:15] Commit Summary
 
 **Change Type:** Refactor

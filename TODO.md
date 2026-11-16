@@ -670,8 +670,9 @@ Each break on purpose below runs with `PYTHONDONTWRITEBYTECODE=1` and a cleared 
 
 **Risks & Trade-offs:**
 
-- **A missing `__init__.py` passes every local check.** Without it `infrastructure` is an implicit namespace package ([namespace packages]). pytest and the wheel build both work, but CI's pylint, which is given file paths, resolves the module name wrongly.
-  Both packages get an `__init__.py` in the step that creates them. Verified in the Lint log of run 42552303918: CI passes all 10 files in one call by absolute path.
+- **A missing `__init__.py` is not a CI failure (corrected 2026-11-15).** Without it `infrastructure` is an implicit namespace package ([namespace packages]). The audit inferred that CI's pylint and mypy would then resolve the module name wrongly, and the plan first said so as fact.
+  Tested in step 3 with the file removed: mypy 2.1.0 and pylint 4.0.6 (plain and editable) are clean on all 13 files, so the claim is withdrawn. Both packages still get an `__init__.py` in the step that creates them, so each layer is a regular package.
+  What CI really does is pass all 10 files to pylint in one call by absolute path (Lint log of run 42552303918), which is why the file set matters (the next bullet).
 - **The usual lint recipe skips the moved modules.** `src/task_tracker/*.py` matches only `__init__.py` and `cli.py` after step 1. Step 7 names the recursive file set, and the memory recipe is updated afterwards.
 - **The four `_now` strings are import paths.** `monkeypatch.setattr("task_tracker.task._now", ...)` imports its dotted path, so a missed one fails loudly with `ModuleNotFoundError` and never silently. The rule "tests change only their imports" is read to include them, and the plan says so.
 - **Packaging.** `uv_build` includes every subpackage under the module root and leaves out only `__pycache__`, `*.pyc` and `*.pyo` ([uv build backend]), so no configuration is expected. The wheel check in step 7 proves it, and M9 would otherwise be the first to find out.
