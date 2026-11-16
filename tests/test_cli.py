@@ -23,10 +23,10 @@ import pytest
 
 from task_tracker import main
 from task_tracker.cli import _discard_stdout, _printable
-from task_tracker.priority import Priority
-from task_tracker.status import Status
-from task_tracker.storage import load, save
-from task_tracker.task import Task
+from task_tracker.domain.priority import Priority
+from task_tracker.domain.status import Status
+from task_tracker.domain.task import Task
+from task_tracker.infrastructure.storage import load, save
 
 # D6 chose naive local time on purpose, so DTZ001 does not apply to these values.
 CLOCK = datetime(2026, 10, 31, 9, 30, 0)  # noqa: DTZ001
@@ -79,7 +79,7 @@ def _plain_help(monkeypatch: pytest.MonkeyPatch) -> None:
 def fixed_clock(monkeypatch: pytest.MonkeyPatch) -> None:
     # Two runs of `add` a moment apart must stamp the same time, or comparing
     # the tasks they store would fail on whichever second the clock ticked over.
-    monkeypatch.setattr("task_tracker.task._now", lambda: CLOCK)
+    monkeypatch.setattr("task_tracker.domain.task._now", lambda: CLOCK)
 
 
 def test_add_stores_a_first_task_with_id_1_and_prints_the_id(
@@ -294,6 +294,24 @@ def test_list_all_reports_a_done_task_without_a_date_completed_as_one_line(
 
     assert exit_code == 1
     _assert_one_line_error(capsys, "task 7")
+
+
+def test_list_without_all_ignores_a_done_task_without_a_date_completed(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+):
+    # The same broken task, but only `--all` sorts the done tasks (M8). Plain `list`
+    # must neither fail on it nor show it, so the check that raises stays behind
+    # `--all` when the ordering rules move out of the CLI.
+    ghost = Task(5, "ghost")
+    ghost.status = Status.DONE
+    monkeypatch.setattr("task_tracker.cli.load", lambda _path: [ghost])
+
+    exit_code = main(["list"])
+
+    shown = capsys.readouterr().out
+    assert exit_code == 0
+    assert shown.startswith("No current tasks in ")
+    assert "ghost" not in shown
 
 
 def test_list_all_puts_done_task_due_first_after_every_current_task(
@@ -1072,9 +1090,9 @@ def test_update_works_when_the_clock_is_behind_the_stored_time(
 ):
     # A time zone change can put the clock hours behind the task's own stamps.
     later = CLOCK + timedelta(hours=13)
-    monkeypatch.setattr("task_tracker.task._now", lambda: later)
+    monkeypatch.setattr("task_tracker.domain.task._now", lambda: later)
     save([Task(1, "Fly home")], project)
-    monkeypatch.setattr("task_tracker.task._now", lambda: CLOCK)
+    monkeypatch.setattr("task_tracker.domain.task._now", lambda: CLOCK)
 
     exit_code = main(["update", "1", *argv])
 
@@ -1851,6 +1869,36 @@ def test_dir_with_a_tilde_that_cannot_be_expanded_gives_one_error_line(
     assert exit_code == 1
     _assert_one_line_error(capsys, "'~no-such-user-m7/x'")
     assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.usefixtures("project")
+def test_a_home_directory_that_cannot_be_found_ends_with_the_hint_for_a_full_path(
+    capsys: pytest.CaptureFixture[str],
+):
+    # The whole line, because the reason and the hint now come from two layers and
+    # the output must stay the same.
+    exit_code = main(["--dir", "~no-such-user-m7/x", "list"])
+
+    assert exit_code == 1
+    assert capsys.readouterr().err == (
+        "task-tracker: error: cannot expand '~no-such-user-m7/x': "
+        "no home directory found; use --dir with a full path\n"
+    )
+
+
+@pytest.mark.usefixtures("project")
+def test_a_relative_home_directory_ends_with_the_same_hint(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    monkeypatch.setenv("HOME", "relative/home")
+
+    exit_code = main(["--global", "list"])
+
+    assert exit_code == 1
+    assert capsys.readouterr().err == (
+        "task-tracker: error: cannot expand '~/.task-tracker/tasks.json': "
+        "the home directory is not an absolute path; use --dir with a full path\n"
+    )
 
 
 @pytest.mark.usefixtures("project")

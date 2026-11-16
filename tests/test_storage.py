@@ -15,10 +15,10 @@ from typing import Any
 
 import pytest
 
-from task_tracker.priority import Priority
-from task_tracker.status import Status
-from task_tracker.storage import load, save
-from task_tracker.task import Task
+from task_tracker.domain.priority import Priority
+from task_tracker.domain.status import Status
+from task_tracker.domain.task import Task
+from task_tracker.infrastructure.storage import load, save
 
 # D6 chose naive local time on purpose, so DTZ001 does not apply to these values.
 DUE = datetime(2026, 11, 1, 9, 0, 0)  # noqa: DTZ001

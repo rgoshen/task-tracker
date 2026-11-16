@@ -1,5 +1,408 @@
 # Summary
 
+## [2026-11-15 20:43] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `SUMMARY.md`
+
+**Summary:**
+The headings of the six entries written earlier in the PR #34 review round now carry the times of their commits (20:24, 20:25, 20:27, 20:28, 20:31 and 20:37). The text of the entries does not change.
+
+**Rationale:**
+I wrote those six times from memory of how long the work took, and did not read the clock, so they ran ahead of it: four were later than the commit they describe, and the last was 21:26 when the clock said 20:37. A commit log whose times cannot be trusted is worse than none, because the next reader will trust it.
+The times come from `git log` (author date, to the minute), and from here each heading is read from `date` before the entry is written.
+The newer entries (20:41, 20:42 and this one) were read from the clock and are not touched.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 8
+- PR: #34
+
+## [2026-11-15 20:42] Commit Summary
+
+**Change Type:** Test
+
+**Scope:** `tests/test_architecture.py`
+
+**Summary:**
+The `# pylint: disable=missing-function-docstring` at the top of `tests/test_architecture.py` now has its reason on the line above it: "Test names state the intent, so per-test docstrings would only repeat them." It is the same line the four other test modules carry.
+
+**Rationale:**
+Review comment #6 on PR #34 was right. The project `CLAUDE.md` says pylint suppressions are inline with the reason beside them, and this was the only test module with a bare one. A comment-only change: the CI-version Python gate (nine tools on 17 files) and the 486 tests are unchanged, and no new test is needed.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 7
+- PR: #34, review comment on `tests/test_architecture.py` line 7
+
+## [2026-11-15 20:41] Commit Summary
+
+**Change Type:** Test
+
+**Scope:** `tests/test_architecture.py`
+
+**Summary:**
+The architecture test now also keeps each layer to its job. `domain` may not import `os`, `sys`, `pathlib`, `json`, `tempfile`, `shutil` or `argparse`, and may not call `print`, `open` or `input`.
+`infrastructure` may not import `argparse`. 26 new cases: 14 the check must flag, 9 it must accept (look-alikes such as `ossified` and `console.print`), a pair for `infrastructure`, and two that walk the real layers.
+
+**Rationale:**
+Review comment #5 on PR #34 was right: the check only looked at `task_tracker.*` imports, so `import json`, `from pathlib import Path` or `import sys` in `domain/` passed, although `domain/__init__.py` promises "no files and no terminal". A convenience `Path` read in `task_list.py` is the likeliest slip.
+One addition goes past the comment's list: the reviewer names a `print` as a likely slip, and `print` and `open` need no import, so an import list cannot see them. The check also names those three built-ins for `domain`. It is a tripwire and not a proof: `p = print` and an import of `socket` or `subprocess` get past it.
+An allow-list for `domain` would be stricter, but every new standard-library import would fail it, so it is not built.
+The code that reads imports is shared (`_imports`), and so is the walk over a layer's files (`_layer_sources`), so the new check does not copy the old one (JSCPD counts a copy as a failure).
+Test first: all 26 failed with `NameError` (`_io_uses`, `_IO_IMPORTS`), the 14 earlier tests passed.
+Then 22 breaks of the check each turned a test red:
+each of the seven names and the three calls dropped from its list, the `infrastructure` list emptied, imports never flagged, a module compared whole instead of by its top name, a prefix match, calls never flagged, every other call flagged, method calls counted, a relative import not noticed, the downward rule never flagging,
+the bare package accepted, import statements not read, and an empty layer not noticed.
+Four more breaks in the real files (a `json` import, a `Path` import and a `print` in `domain/task_list.py`, `argparse` in `infrastructure/storage.py`) each turned the walk test red.
+`CLAUDE.md` now lists what the test enforces.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 6
+- PR: #34, review comment on `tests/test_architecture.py` line 18
+
+## [2026-11-15 20:37] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** `infrastructure/location.py`, `cli.py`, `tests/test_location.py`, `tests/test_cli.py`, plan and `TODO.md`
+
+**Summary:**
+The CLI hint "use --dir with a full path" moves out of `infrastructure`. `location.py` raises a new `HomeDirectoryError(ValueError)` with the reason only, and `main` adds the hint when it prints that error. The output is the same, byte for byte.
+
+**Rationale:**
+Review comment #4 on PR #34 was right: `infrastructure` named a command line option, and the comment beside it named `main`, so the layer rule that `tests/test_architecture.py` enforces (imports only) could not see it. The PR text listed it as a known leak. It was cheap to remove now, and the plan's "messages move byte for byte" rule still holds because the text a user sees does not change.
+The reviewer's other point is also true: for `--dir ~nosuchuser/x` the hint repeats the flag the user just used, though "with a full path" is the useful part. I kept the text, because changing the words is a change of output that M8 does not make. The caller now owns the advice, so reworded advice is a one-line change in `cli.py`.
+Test first: two tests through `main` pin the whole line for both reasons (no home directory found, and a relative `HOME`), and they passed before and after. Two unit tests in `tests/test_location.py` check that the bare reason has no hint, and they failed with `cannot import name 'HomeDirectoryError'` first.
+With only the `location.py` half done the two pins failed with the hint missing, which showed they guard the right thing.
+Seven breaks on purpose each turned a test red: the hint never added, added to every error, added to every `ValueError`, its text changed, the new error no longer a `ValueError` (it ends in a traceback), the hint put back inside `location.py`, and a plain `ValueError` raised.
+The plan's "known leak" sentences and the M8 risk bullet in `TODO.md` now say it was removed.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 5
+- PR: #34, review comment on `infrastructure/location.py` line 33
+
+## [2026-11-15 20:31] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** `infrastructure/location.py`, `tests/test_location.py`
+
+**Summary:**
+`list_path` now raises `ValueError` when it is given both `use_global=True` and a `directory`, and `tests/test_location.py` is new: six tests that call `list_path` directly (the current directory, `--global`'s path, a directory, a relative directory, a `~` directory, and the refusal).
+
+**Rationale:**
+Review comment #3 on PR #34 was right, and I reproduced it: `list_path(use_global=True, directory=Path("/x"))` returned `~/.task-tracker/tasks.json` and ignored `directory`. The only thing that stopped it was argparse's mutually exclusive group in `cli.py`.
+When M8 moved the choice into a public function with no argparse, the rule went with it, and a second caller (a test helper, the install command) could write to the global file while asking for another list.
+Two ways to fix it were weighed. A signature that cannot express both (`directory` plus a separate `global_list()`) is stricter, but it changes `main` and every place that builds the arguments. A `ValueError` is three lines.
+I took the second: argparse still refuses both options first with exit 2, so no command-line behavior changes, and the new error is reachable only from another caller. The text names neither flag, because `infrastructure` should not know the CLI's words.
+Test first: the refusal test failed with `DID NOT RAISE ValueError`, the other five passed because the code existed. Seven breaks on purpose each turned a test red: the refusal removed, the refusal firing for a directory alone, the hidden directory dropped from the global path, `.absolute()` dropped, the `~` not expanded, the directory ignored, and the list name changed.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 4
+- PR: #34, review comment on `infrastructure/location.py` line 37
+
+## [2026-11-15 20:28] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `domain/task_list.py`
+
+**Summary:**
+The `next_id` docstring said that "a gap left by a delete is not reused". That holds only below the highest ID. It now says: a gap below the highest ID is not reused, and deleting the highest ID frees it again, so the next task gets it.
+
+**Rationale:**
+Review comment #2 on PR #34 was right, and the sentence contradicted `README.md` ("an ID can be reused: deleting the highest-numbered task frees its ID") and decision D5 in the plan. It was a one-line note inside the private `_add` in `cli.py`, and it became the contract of a public domain function when M8 moved it.
+A later caller (a lock, an undo) could have relied on IDs never coming back. Both cases are pinned by `test_next_id_is_the_highest_id_plus_one` (`[1, 2]` gives 3, `[1, 3]` gives 4), which the previous commit added.
+The wording is the reviewer's, with the second sentence split off to keep the lines short.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 3
+- PR: #34, review comment on `domain/task_list.py` line 18
+
+## [2026-11-15 20:27] Commit Summary
+
+**Change Type:** Test
+
+**Scope:** `tests/test_task_list.py`
+
+**Summary:**
+The four rules in `domain/task_list.py` now have tests that call them directly: 13 cases for `next_id`, `find`, `current_tasks` and `done_tasks`. They cover the empty list, the highest ID plus one against a count, the highest ID coming back after a delete, a gap that stays, a missing ID, the three-way order of the current tasks, the order of the done tasks, and the done task with no date completed.
+
+**Rationale:**
+Review comment #7 on PR #34 was right that the cheap part did not need the `tests/test_cli.py` split. A new test file changes no existing test, so the M8 rule "tests change only their imports" holds, and #32 still splits `tests/test_cli.py` by layer.
+These tests pin code that already exists, so they passed at once. To show they can fail, each rule was broken on purpose (bytecode caching off, `__pycache__` cleared) and every break turned a test red, 11 of 11:
+the ID as a count, an empty list starting at 2, `find` returning the first task, its message, the priority ranked by label text, a missing due date first, the ID dropped from the order, done tasks in the current list, done tasks ordered by ID, current tasks in the done list, and the missing date completed no longer refused.
+The done tasks are built by setting the status and the date completed directly: the ordering reads only those, and a past date completed passes the timeline rules only through `Task.restore`.
+The CI-version Python gate (nine tools on 16 files) is clean, JSCPD finds 0 clones and codespell is clean.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 2
+- PR: #34, review comment on `domain/task_list.py` line 1
+- Issue: #32
+
+## [2026-11-15 20:25] Commit Summary
+
+**Change Type:** Fix
+
+**Scope:** `pyproject.toml`, `.github/workflows/tests.yml`, `CLAUDE.md`, `docs/implementation-plan.md`, `TODO.md`
+
+**Summary:**
+The coverage run now counts the child processes (`[tool.coverage.run] patch = ["subprocess"]`), and the CI gate goes from 80 to 95. With the same 437 tests, `cli.py` goes from 94% to 100% and the total from 97.71% to 100%.
+The statements that said the child processes cannot be measured are corrected in `CLAUDE.md`, the plan (the tests.yml box and the "Decided" block) and the M8 entry of `TODO.md`.
+
+**Rationale:**
+Review comment #1 on PR #34 was right. I had written that a per-file gate is wrong because pytest-cov does not measure the child processes, and treated that as a limit. It was a missing setting: pytest-cov 7.0 dropped its own subprocess support and says to enable coverage's `patch = subprocess` (coverage 7.10 and later, 7.17.0 here).
+Checked both ways: a `--cov-fail-under=100` run passes with the patch (100%) and fails without it (97.71%), so the gate depends on the setting. The owner picked 95 at the checkpoint: it fails a new untested module of more than about 22 statements and leaves room for one line that cannot run on another platform.
+Not done: a per-file gate. coverage.py's `fail_under` is a total, so it would need a script over a JSON report.
+Not verified yet: the CI run. The patch sets `parallel = true`, so data files are combined, and that works locally but the CI environment is a different one.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 1
+- PR: #34, review comment on `.github/workflows/tests.yml` line 37
+
+## [2026-11-15 20:24] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `TODO.md`
+
+**Summary:**
+The plan for the seven review comments on PR #34 is written down before any fix: one test-first commit per comment, in a set order, with the tests and the costs.
+
+**Rationale:**
+The global rules ask for the plan in `TODO.md` before code. Each claim was checked first. The coverage numbers, `list_path` with both options and the `~nosuchuser` message were run, and the other four were read against the source and the other test files.
+All seven comments are agreed. One part of #1 is declined: a per-file coverage gate, because coverage.py's `fail_under` is a total. The owner picked 95 for the total gate at the checkpoint, from 95, 100 and 80.
+My earlier statement that pytest-cov "does not measure the child processes" was wrong: it was a missing setting (`patch = subprocess`). The entry says so, and the first fix corrects the statement in `CLAUDE.md` and in the plan.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review
+- PR: #34
+
+## [2026-11-15 17:48] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `docs/implementation-plan.md` (and issue #12, which mirrors it)
+
+**Summary:**
+The last M8 box is ticked: the work deferred from M8 now has issues. #32 splits `tests/test_cli.py` by layer and adds direct unit tests for `domain/task_list.py` and `infrastructure/location.py`, and #33 adds `ARCHITECTURE.md`. All 11 M8 boxes are done.
+
+**Rationale:**
+The global rules ask for an issue for every deferred item, and the plan named both in its "Decided" block. The owner asked for them to be filed. Each issue states the problem, what it should hold and acceptance boxes, and says that it was found in M8 and why it was left out (the M8 rule "tests change only their imports", and no `ARCHITECTURE.md` existing yet).
+Issue #12 is regenerated from the plan so both say the same.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 7
+- Issues: #12, #32, #33
+
+## [2026-11-15 17:28] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `docs/implementation-plan.md` (and issue #12, which mirrors it)
+
+**Summary:**
+Two more M8 boxes are ticked, because they were checked: the wheel and the `--help` text. 10 of 11 boxes are done. The last one is the two follow-up issues, which wait for the owner's go-ahead.
+
+**Rationale:**
+The wheel (built into the scratchpad, not `dist/`) holds both subpackages and all ten modules, and so does the sdist. The installed wheel ran from a directory outside the project with a throwaway `HOME`:
+`list`, `add`, `--global add`, `--dir groceries add`, `update --status DONE`, `list --all` and a bad priority (exit 2) all behave, and the three lists stay separate.
+The `--help` comparison had a false pass that I caught. The first capture loop word-split wrongly under Zsh, so four of the five "help pages" were the same argparse error, and the diff of identical errors said "IDENTICAL". One capture showed `exit 2` and gave it away.
+It was redone as a Bash script with real argument arrays, and it now fails unless it finds five genuine usage pages with no `error:` line. Result: `develop` and the branch each give five usage pages, all exit 0, 67 lines, identical, from wheels built from a `develop` worktree.
+The acceptance rule was checked line by line against `develop`: the four existing test files changed 24 import lines, 8 `_now` string lines and added one test (14 lines), with no other removed line, and `tests/test_architecture.py` is the only new test file.
+The final gate is clean on the committed state: 437 tests at 97.71% with the CI command, nine linters on the recursive set, JSCPD 0 clones, codespell, the Markdown gate and all pre-commit hooks.
+
+The real super-linter v8.7.0 also passes in the CI container (`act`, "Job succeeded", exit status 0 read from the log, with every file under `domain/` and `infrastructure/` in the 15 files given to pylint, mypy, black, isort, flake8 and ruff).
+Its first run failed on `BIOME_FORMAT` alone, because `act` copies the untracked `.claude/settings.local.json`, which CI never sees. The second run turned that one linter off and nothing else.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 7
+- Issue: #12
+
+## [2026-11-15 17:23] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `CLAUDE.md` and `docs/implementation-plan.md` (and issue #12, which mirrors the plan)
+
+**Summary:**
+`CLAUDE.md` now describes the code as it is after steps 1 to 5. The project state names the three layers (`domain/`, `infrastructure/`, `cli.py`), says that `tests/test_architecture.py` enforces the direction, and puts `list_path` and `_expanded` in `infrastructure/location.py` and no longer in `cli.py`.
+It also says why the commands stay in one module: the tests patch `task_tracker.cli.load` and `task_tracker.cli.save`.
+Three lines changed with the workflow: the Testing paragraph and the tests.yml bullet say that CI runs `--cov=task_tracker --cov-fail-under=80` and that the gate is on the total, and the milestone range reads M1 to M8.
+The Python lint bullet gains the rule from audit finding G2: give the linters the recursive file set, because `src/task_tracker/*.py` now matches only two files.
+The plan's M8 boxes are ticked for what is done (8 of 11); the `--help` diff, the wheel check and the two follow-up issues stay open for step 7.
+
+**Rationale:**
+The project rule is that the plan, the issue and the docs change together, so issue #12 is regenerated from the plan. "Decisions D1 to D6" in `CLAUDE.md` needed no change, because the M8 decisions went into a "Decided" block.
+A `grep` of `CLAUDE.md` and `README.md` for the old module paths finds only the new layer description and one closed M1 box in the plan that records where `priority.py` was when it was renamed, which is history and stays.
+Noticed and left alone: `CLAUDE.md` still says that no Git tags exist yet, and `v0.1.0` was tagged in M0. That belongs to M9, which already touches the release text.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 6
+- Issue: #12
+
+## [2026-11-15 17:22] Commit Summary
+
+**Change Type:** CI
+
+**Scope:** `.github/workflows/tests.yml`
+
+**Summary:**
+The Tests workflow now runs `uv run pytest --cov=task_tracker --cov-fail-under=80`, so a drop in total coverage fails the job. Coverage is 97.71% today, 17 points above the gate.
+Shown locally with the same command: at 80 it exits 0 ("Required test coverage of 80% reached"), and at 99 it exits 1 ("FAIL Required test coverage of 99% not reached").
+
+**Rationale:**
+This answers the M8 question "should CI enforce `--cov-fail-under=80`?" with yes. The gate is on the total and not per file: pytest-cov dropped subprocess measurement in 7.0.0, so the terminal failure branches of `cli.py` that run in child processes count as missed, and a per-file gate would fail for the wrong reason.
+Because a total gate does not hold changed code to 80% by itself, step 7 checks the two new modules by hand.
+`pytest-cov` is in the dev group, which `uv sync --locked` installs, so the workflow needs no other change. Checked locally with the CI-version tools: prettier, actionlint and zizmor are clean, and yamllint only repeats a line-length warning on the pinned `setup-uv` line that was there before.
+The edit tripped the security-reminder hook for workflow files, which warns once per file; the change adds no `${{ }}` expression and no untrusted input.
+Not verified: the job itself on `ubuntu-latest`, which runs when the branch is pushed.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 5
+- Issue: #12
+
+## [2026-11-15 17:20] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** list file selection (`src/task_tracker/infrastructure/location.py`) and `cli.py`
+
+**Summary:**
+Choosing the list file left the CLI. `infrastructure/location.py` now holds `_LIST_FILE`, `_GLOBAL_DIR`, `_expanded` and the public `list_path(*, use_global: bool, directory: Path | None) -> Path`, which takes plain values so that argparse stays in `cli.py`.
+`main` calls it with `args.use_global` and `args.directory` inside the same `try`, so the one-line error and exit 1 stay as they were. `cli.py` is 411 lines, from 494 before M8. 437 tests pass, `location.py` is at 100%, and the total is 98%.
+The code was cut out of `cli.py` by a script and not retyped, so the error texts, the comments and the logic are byte for byte the same, including `use --dir with a full path` (CLI wording that now lives in `infrastructure`; M8 changes no output, so it is recorded as a known leak). The `_directory` docstring now names `list_path`.
+
+**Rationale:**
+A move under green: the M7 tests are the characterization suite. Five breaks on purpose, with bytecode off and `__pycache__` cleared: the relative-`HOME` check (2 red), the `RuntimeError` branch (3 red), `.absolute()` dropped (1 red), `.task-tracker` left out of the global path (8 red), and `main` ignoring `--global` (10 red).
+The plan named the first two. Both files were restored and compared with their backups.
+`absolute()` is held by one test only (the `short-relative` case), which is thin but real. The CI-version linters over the recursive file set, JSCPD (0 clones) and codespell are clean. The architecture test covers the new module without a change: it imports only `pathlib`.
+Alternative: pass `args` to `list_path` (rejected, it would tie `infrastructure` to argparse, and the plan says plain values).
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 4
+- Issue: #12
+
+## [2026-11-15 17:18] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `docs/implementation-plan.md`, `TODO.md` (and issue #12, which mirrors the plan)
+
+**Summary:**
+The plan and the `TODO.md` entry said that a missing `infrastructure/__init__.py` makes CI's pylint resolve the module name wrongly. That is withdrawn. The "Decided" block, the risk bullet and the audit line now say what was tested in step 3: with the file removed, mypy 2.1.0 and pylint 4.0.6 are clean. The file stays so that each layer is a regular package.
+
+**Rationale:**
+The audit (finding G1, rated Should-fix) had inferred the failure and said it was unverified for mypy. I wrote it into the plan as fact. The record should say what was tested, so the claim is corrected where it was made and the `SUMMARY.md` entry of 16:58, which repeats it, is left as history and answered here.
+The other Should-fix, the lint file set (G2), stands: after step 3 the old glob `src/task_tracker/*.py` matches only `__init__.py` and `cli.py`, and the recursive set adds the seven files under `domain/` and `infrastructure/` that it would skip.
+Issue #12 gets the same text as the plan, as the project rule asks.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, risks
+- Issue: #12, audit findings G1 and G2
+
+## [2026-11-15 17:15] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** `infrastructure` package (`src/task_tracker/infrastructure/`), imports in `cli.py`, and the tests
+
+**Summary:**
+`storage.py` moved into a new `task_tracker/infrastructure/` package with `git mv`, and `infrastructure/__init__.py` holds a docstring only. `cli.py`, `test_storage.py` and `test_cli.py` import `load` and `save` from the new path, and nothing else changed in them.
+`tests/test_architecture.py` gained `infrastructure`, which may import `domain` and itself. 437 tests pass, and coverage is unchanged at 98%.
+
+**Rationale:**
+Test-first, as in step 1: the extended test failed with `infrastructure has no modules`, then repointing the imports failed the suite with `No module named 'task_tracker.infrastructure'`, then the move made it green. The patch targets `task_tracker.cli.load` and `task_tracker.cli.save` are untouched, because the commands still live in `cli.py`.
+Breaks on purpose, with bytecode off and `__pycache__` cleared: an upward import hidden in a function that never runs (`from task_tracker.cli import main` inside `storage.py`, which the layer test finds because it reads the source) and `infrastructure` no longer allowed to import `domain` (both turn the layer test red).
+The files were restored and compared with their backups.
+I also tested the claim that a missing `infrastructure/__init__.py` would fail CI. It does not: with the file removed, mypy 2.1.0 and pylint 4.0.6 (plain and editable) are clean on all 13 files.
+The audit had only inferred this, and the plan and `TODO.md` stated it as fact. The file stays because an explicit regular package is the better layout and matches `domain`, and the wording is corrected in the next commit.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 3
+- Issue: #12, audit finding G1
+
+## [2026-11-15 17:09] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** domain rules (`src/task_tracker/domain/task_list.py`), `cli.py`, and one test in `tests/test_cli.py`
+
+**Summary:**
+The rules that decide what a list of tasks means moved out of the CLI into `domain/task_list.py`: `next_id` (highest ID plus one, D5), `find` (raises `ValueError("no task with ID {n}")`), `current_tasks` (not done, by due date, priority, ID) and `done_tasks` (by date completed, then ID; raises for a done task with no date completed).
+`cli.py` lost `_find`, `_PRIORITY_RANK`, `_current_order`, `_done_order`, the inline ID arithmetic and the filter-and-sort in `_list`, and went from 494 to 455 lines. `_describe` stays, because it is presentation.
+One new test, `test_list_without_all_ignores_a_done_task_without_a_date_completed`: plain `list` exits 0 and shows nothing for a done task with no date completed. It passes before and after the move, and it pins that the check that raises runs only under `--all`. 436 tests pass, and coverage is 98% with `task_list.py` at 100%.
+
+**Rationale:**
+This is a move under green, so the 422 existing tests are the characterization suite and the moved code has no Red of its own. The proof is five breaks on purpose, with bytecode off and `__pycache__` cleared: `len(tasks) + 1` for the ID (2 red), a reversed priority rank (6 red), `find` returning the first task (23 red), done tasks sorted by ID (4 red), and `done_tasks` called without `--all` (1 red).
+The last one is the one that matters: only the new test catches it, and the other 435 stay green. That is audit finding G4, now shown and not argued. The `find` docstring says "raise", not "refuse the command", so no CLI wording lands in `domain` (G5), and the D5 comment moved into the docstring of `next_id`.
+Alternatives: making the two sort keys public (rejected, a caller needs the ordered list and not the key) and direct unit tests for the four functions (deferred to the split of `tests/test_cli.py`, G10). The CI-version linters over the recursive file set, JSCPD (0 clones) and codespell are clean.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 2
+- Issue: #12
+
+## [2026-11-15 17:06] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** `domain` package (`src/task_tracker/domain/`), imports in `cli.py` and `storage.py`, and the tests
+
+**Summary:**
+`priority.py`, `status.py` and `task.py` moved into a new `task_tracker/domain/` package with `git mv`, so history follows them. `domain/__init__.py` holds a docstring only.
+The imports in `cli.py`, `storage.py` and `domain/task.py` point at the new paths, and the four test files changed 14 lines: imports, and the four `task_tracker.task._now` patch strings (they are import paths, and a missed one fails with `ModuleNotFoundError`).
+`tests/test_architecture.py` is new: `test_layers_only_import_downward[domain]` reads every file under the layer with `ast` and fails on a relative import, on the bare `task_tracker` package (which reexports `cli`) and on any layer outside the allowed set. It also fails for a layer with no modules. 435 tests pass (422 plus 13), and coverage is unchanged at 98%, `cli.py` at 95%.
+
+**Rationale:**
+Test-first. The new test failed with `domain has no modules`. Then the test imports were repointed and the suite failed with `No module named 'task_tracker.domain'`. Then the move made it green.
+The rule is its own small function with 12 cases (7 it must flag, 5 it must accept), so breaking the rule fails a test of its own.
+Breaks on purpose, with bytecode off and `__pycache__` cleared: relative imports not flagged (2 red), the bare package not flagged (2 red), any `task_tracker` import accepted (3 red), and a sideways `from . import priority` in `domain/status.py` (the layer test red). Each file was restored and compared with its backup.
+The CI-version linters ran over the recursive file set (`git ls-files -co`, the G2 fix), pylint with and without an editable install. They found two things that ruff and pyright did not: `missing-function-docstring` (every test module disables it at the top, so this one does too) and a pylint inference error on a loop variable named `module`. JSCPD finds 0 clones and codespell is clean.
+Alternatives: reexports in `domain/__init__.py` (rejected, YAGNI) and checking by importing the modules (rejected, it cannot fail for a module that does not import yet).
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 1
+- Issue: #12
+
+## [2026-11-15 16:58] Commit Summary
+
+**Change Type:** Docs
+
+**Scope:** `TODO.md` and `docs/implementation-plan.md` (and issue #12, which mirrors the plan)
+
+**Summary:**
+M8 (refactor into layers) is planned and nothing is built yet. `TODO.md` gets the entry for 2026-11-15 with eight steps (0 to 7), one commit each, and the plan's M8 section gets 11 acceptance boxes and a "Decided (2026-11-15)" block next to the existing "Think about" questions, which it answers.
+The layers are `domain` (the model, plus numbering, lookup and ordering in a new `task_list.py`), `infrastructure` (storage, plus the choice of list file in a new `location.py`) and `cli`. `cli.py` stays one module.
+
+**Rationale:**
+The tests patch `task_tracker.cli.load` and `task_tracker.cli.save`, so keeping the commands in `cli.py` is what lets "tests change only their imports" hold. Splitting `cli.py` or `tests/test_cli.py` would break that rule, so both go to follow-up issues. A `Store` protocol was rejected: one adapter is a hypothetical seam, and the plan answers the SQLite question by listing what leaks.
+The plan was audited by an independent Opus sub-agent with the spec-gap auditor before any code. It found 11 gaps (none Material, 2 Should-fix) and all are closed here.
+The two that mattered would have passed every local check: `infrastructure` without an `__init__.py` becomes an implicit namespace package that CI's pylint resolves wrongly, and the usual lint file set `src/task_tracker/*.py` skips every moved module.
+The M8 decisions go in a "Decided" block and not under new D numbers, because decisions since M3 have been recorded that way and D1 to D6 are the M0 set.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers
+- Issue: #12
+
 ## [2026-11-08 20:45] Commit Summary
 
 **Change Type:** Docs

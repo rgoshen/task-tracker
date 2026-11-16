@@ -5,7 +5,7 @@
 
 import pytest
 
-from task_tracker.priority import Priority
+from task_tracker.domain.priority import Priority
 
 
 @pytest.mark.parametrize("name", ["CRITICAL", "HIGH", "MEDIUM", "LOW"])

@@ -12,9 +12,9 @@ from typing import Any
 
 import pytest
 
-from task_tracker.priority import Priority
-from task_tracker.status import Status
-from task_tracker.task import Task
+from task_tracker.domain.priority import Priority
+from task_tracker.domain.status import Status
+from task_tracker.domain.task import Task
 
 TIMESTAMP_FIELDS = ["created", "updated", "start", "stop"]
 # D6 chose naive local time on purpose, so DTZ001 does not apply to these values.
@@ -31,7 +31,7 @@ def _readings(monkeypatch: pytest.MonkeyPatch) -> Iterator[datetime]:
     # Each call to the task's clock hands out the next second, so a task that
     # reads the clock twice ends up holding two different times.
     ticks = (FIRST_READING + timedelta(seconds=n) for n in count())
-    monkeypatch.setattr("task_tracker.task._now", lambda: next(ticks))
+    monkeypatch.setattr("task_tracker.domain.task._now", lambda: next(ticks))
     return ticks
 
 

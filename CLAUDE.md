@@ -5,11 +5,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project state
 
 `task-tracker` is a Python 3.14 CLI for task management, grown in vertical slices, one milestone at a time.
-`README.md` is the product spec (task fields, status/priority enums, the seven features); the code implements the task model, storage, and the first slice of commands so far (M1 to M7).
+`README.md` is the product spec (task fields, status/priority enums, the seven features); the code implements the task model, storage, and the first slice of commands so far (M1 to M8).
 Of the seven features, 2 (`--global` and `--dir PATH`, the choice of list), 3 (`list`, the current tasks), 4 (`list --all`, short `-a`), 5 (`add`), 6 (`update`) and 7 (`delete`) exist. Only 1 (install) is not built.
 The two list options belong to the top-level parser and go before the command (`task-tracker --global add ...`): a subcommand that also took `-d` would turn the slip `add Milk -d 2026-11-02` (for `-D`) into a directory.
-`_list_path` in `cli.py` is the one place that chooses the list file from them and the cwd, and `_expanded` is the one place that looks up the home directory (for `--global` and for a leading `~` in `--dir`): with none, or a relative one, it gives one error line and exit 1.
-What exists: `main()` and the `add`, `list` (with `list --all`), `update` and `delete` commands in `src/task_tracker/cli.py` (`__init__.py` reexports `main`), the `Status` / `Priority` `StrEnum`s, the `Task` dataclass in `src/task_tracker/task.py` (with `Task.restore` for rebuilding a stored task and `Task.update` for changing one), and `load` / `save` in `src/task_tracker/storage.py`.
+`list_path` in `infrastructure/location.py` is the one place that chooses the list file from them and the cwd, and `_expanded` in the same module is the one place that looks up the home directory (for `--global` and for a leading `~` in `--dir`): with none, or a relative one, it gives one error line and exit 1.
+What exists is three layers under `src/task_tracker/` that depend only downward, and `tests/test_architecture.py` fails when one reaches up, or uses a relative import or the bare `task_tracker` package,
+or when `domain` imports a file or terminal module (`os`, `sys`, `pathlib`, `json`, `tempfile`, `shutil`, `argparse`) or calls `print`, `open` or `input`, or `infrastructure` imports `argparse`:
+
+- `domain/`: `priority.py` and `status.py` (the `Priority` and `Status` `StrEnum`s), `task.py` (the `Task` dataclass, with `Task.restore` for rebuilding a stored task and `Task.update` for changing one), and `task_list.py` (the rules over a list: `next_id`, `find`, `current_tasks` and `done_tasks`).
+- `infrastructure/`: `storage.py` (`load` / `save`) and `location.py` (`list_path`). It may import `domain`.
+- `cli.py`: `main()`, argparse, the `add`, `list` (with `list --all`), `update` and `delete` commands, and the terminal output (`__init__.py` reexports `main`). The commands stay in this one module on purpose: the tests patch `task_tracker.cli.load` and `task_tracker.cli.save`.
+
 `main` returns the exit code and the console script passes it to `sys.exit`: 0 on success, 2 for a bad option value (argparse), 1 for anything else that goes wrong, with one `task-tracker: error:` line and no traceback.
 
 Labels are reconciled (Q1): users type and see the enum names (`TO_DO`, `IN_PROGRESS`, `DONE`; `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`), and `Priority.MED` was renamed `MEDIUM` to match `README.md` (M1).
@@ -42,7 +48,10 @@ act push -j build --container-architecture linux/amd64 --env RUN_LOCAL=true --en
 
 ## Testing
 
-Python tests use pytest with pytest-cov (D4) and live in `tests/`. Run them with `uv run pytest`; add `--cov=task_tracker --cov-report=term-missing --cov-fail-under=80` for coverage. Work test-first: watch each test fail for the expected reason before writing the code that passes it.
+Python tests use pytest with pytest-cov (D4) and live in `tests/`. Run them with `uv run pytest`; add `--cov=task_tracker --cov-report=term-missing` to see the missed lines.
+CI runs with `--cov=task_tracker --cov-fail-under=95`, so a total below 95% fails the job (the total is 100% now).
+`[tool.coverage.run] patch = ["subprocess"]` in `pyproject.toml` is what counts the child processes that run the terminal failure branches of `cli.py`: pytest-cov 7 no longer does it, and without the patch the total drops to 97.7%.
+The gate is on the total because coverage.py has no per-file threshold. Work test-first: watch each test fail for the expected reason before writing the code that passes it.
 
 The bump script has its own tests, `scripts/test_bump_version.sh`, a dependency-free Bash self-check. It builds throwaway Git repos in `mktemp` dirs, seeds them with Conventional Commits, runs `bump-version.sh`, and asserts the bump level and `CHANGELOG.md` contents. It needs `uv` on `PATH`. There is no single-test flag; to run one case, comment out the other calls at the bottom of the file.
 
@@ -59,9 +68,10 @@ Versioning is driven entirely by Conventional Commit messages, so commit message
 ## Lint and CI conventions
 
 - `.github/workflows/super-linter.yml` (super-linter v8.7.0) runs on every push and PR and excludes `.serena/` and `.claude/`. Third-party actions are pinned to full commit SHAs with a version comment. Keep that when bumping them.
-- `.github/workflows/tests.yml` runs `uv sync --locked` and `uv run pytest` on every push and PR with read-only permissions. A `pytest` run that collects no tests exits with code 5 and fails the job.
+- `.github/workflows/tests.yml` runs `uv sync --locked` and `uv run pytest --cov=task_tracker --cov-fail-under=95` on every push and PR with read-only permissions. A `pytest` run that collects no tests exits with code 5 and fails the job.
 - Super-linter runs markdownlint (lines up to 400 characters) and textlint's terminology rule on every Markdown file, and pre-commit does not. Check Markdown locally before pushing, or the PR fails on wording such as `README` without its `.md` or the unhyphenated `Tradeoffs`.
 - Super-linter also runs pylint, isort, black, flake8, and mypy on Python files, each with its own pinned version and defaults, separately from ruff and pyright. They first mattered with the `Task` model: `ruff check` passed while pylint scored 8.67 and isort failed. Run them locally at the versions in the CI log before pushing Python.
+  Give them the recursive file set (`git ls-files -co --exclude-standard '*.py'`), not `src/task_tracker/*.py`, which skips `domain/` and `infrastructure/`. CI passes every file to pylint in one call by absolute path with no editable install, and its config disables `import-error`.
 - `.github/linters/.isort.cfg` marks `task_tracker` as first-party, because isort does not see the `src` layout and would otherwise reject the usual empty line before project imports. Pylint suppressions are inline with the reason beside them, like the ruff `DTZ005` one; do not loosen the rules project-wide.
 - `.github/linters/.ruff.toml` sets `line-length = 88`. The super-linter template says 120, which disagrees with local ruff and with the `black` check, so a call between 89 and 120 characters failed one formatter or the other. CI also runs an older ruff (0.15.17) than the lockfile, so check with `uvx ruff==0.15.17 format --config .github/linters/.ruff.toml --check`.
 - Pre-commit runs `ruff-check --fix`, `ruff-format` (also on Markdown), `shellcheck`, and `shfmt`. Shell scripts are tab-indented because that is shfmt's default.
