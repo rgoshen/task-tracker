@@ -11,6 +11,7 @@ from typing import Any, TextIO
 from task_tracker.domain.priority import Priority
 from task_tracker.domain.status import Status
 from task_tracker.domain.task import Task, as_naive_datetime
+from task_tracker.domain.task_list import current_tasks, done_tasks, find, next_id
 from task_tracker.storage import load, save
 
 # D2: the project list is `tasks.json` in the current directory; the global list is
@@ -22,9 +23,7 @@ _GLOBAL_DIR = ".task-tracker"
 def _add(args: argparse.Namespace, path: Path) -> list[str]:
     """Store the new task and return the lines to show."""
     tasks = load(path)
-    # D5: highest + 1, not a count, so a gap left by a delete is not reused.
-    next_id = max((task.id for task in tasks), default=0) + 1
-    task = Task(next_id, args.name, priority=args.priority, due=args.due)
+    task = Task(next_id(tasks), args.name, priority=args.priority, due=args.due)
     save([*tasks, task], path)
     return [f"Added task {task.id}: {task.name}"]
 
@@ -48,14 +47,6 @@ _NOTHING_TO_UPDATE = (
 )
 
 
-def _find(tasks: list[Task], task_id: int) -> Task:
-    """Return the task with `task_id`, or refuse the command if there is none."""
-    for task in tasks:
-        if task.id == task_id:
-            return task
-    raise ValueError(f"no task with ID {task_id}")
-
-
 def _update(args: argparse.Namespace, path: Path) -> list[str]:
     """Change task `args.id` and return the line to show."""
     changes = _changes(args)
@@ -64,7 +55,7 @@ def _update(args: argparse.Namespace, path: Path) -> list[str]:
     if not changes:
         raise ValueError(_NOTHING_TO_UPDATE)
     tasks = load(path)
-    task = _find(tasks, args.id)
+    task = find(tasks, args.id)
     if not task.update(**changes):
         # Nothing to write: the file keeps its layout, and a concurrent command has
         # no window to lose (#27) for a command that changed nothing.
@@ -110,7 +101,7 @@ def _ask(prompt: str) -> str | None:
 def _delete(args: argparse.Namespace, path: Path) -> list[str]:
     """Ask about task `args.id`, delete it only on a yes, and return the line to show."""
     tasks = load(path)
-    task = _find(tasks, args.id)
+    task = find(tasks, args.id)
     answer = _ask(f"Delete task {task.id}: {task.name}? [y/N] ")
     if answer is None:
         raise ValueError(f"no answer to the prompt: task {task.id} was not deleted")
@@ -128,29 +119,10 @@ def _delete(args: argparse.Namespace, path: Path) -> list[str]:
     return [f"Deleted task {task.id}: {task.name}"]
 
 
-# Highest priority first. The rank is the enum's definition order, because the
-# string values sort CRITICAL, HIGH, LOW, MEDIUM (Review Focus 1).
-_PRIORITY_RANK = {priority: rank for rank, priority in enumerate(Priority)}
 _STATUS_WIDTH = max(map(len, Status))
 _PRIORITY_WIDTH = max(map(len, Priority))
 # Every datetime prints as YYYY-MM-DDTHH:MM:SS (D6), 19 characters.
 _DATETIME_WIDTH = 19
-
-
-def _current_order(task: Task) -> tuple[datetime, int, int]:
-    """Sort key for the current tasks: due date, priority, then ID.
-
-    `datetime.max` stands in for a missing due date, so those tasks sort after
-    every task that has one (Q2). A stored date has whole seconds, so it can never
-    equal it. The ID settles ties, so the order does not depend on how the file
-    was written.
-    """
-    # D6 chose naive local time on purpose, so DTZ901 does not apply to `max`.
-    return (
-        task.due or datetime.max,  # noqa: DTZ901
-        _PRIORITY_RANK[task.priority],
-        task.id,
-    )
 
 
 def _describe(task: Task) -> str:
@@ -161,23 +133,12 @@ def _describe(task: Task) -> str:
     )
 
 
-def _done_order(task: Task) -> tuple[datetime, int]:
-    """Sort key for the done tasks: date completed, then ID (M4)."""
-    # `Task` and `load` already refuse a DONE task without a date completed. This
-    # says so again in every mode (`python -O` removes an assert), and tells pyright.
-    if task.date_completed is None:
-        raise ValueError(f"task {task.id} is DONE but has no date completed")
-    return (task.date_completed, task.id)
-
-
 def _list(args: argparse.Namespace, path: Path) -> list[str]:
     """Return the lines to show: the current tasks, then the done ones with `--all`."""
     tasks = load(path)
-    current = [task for task in tasks if task.status is not Status.DONE]
-    shown = sorted(current, key=_current_order)
+    shown = current_tasks(tasks)
     if args.include_done:
-        done = [task for task in tasks if task.status is Status.DONE]
-        shown += sorted(done, key=_done_order)
+        shown += done_tasks(tasks)
     if not shown:
         # Under `--all` the done tasks count too, so "current" would mislead.
         scope = "tasks" if args.include_done else "current tasks"

@@ -1,5 +1,26 @@
 # Summary
 
+## [2026-11-15 17:09] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** domain rules (`src/task_tracker/domain/task_list.py`), `cli.py`, and one test in `tests/test_cli.py`
+
+**Summary:**
+The rules that decide what a list of tasks means moved out of the CLI into `domain/task_list.py`: `next_id` (highest ID plus one, D5), `find` (raises `ValueError("no task with ID {n}")`), `current_tasks` (not done, by due date, priority, ID) and `done_tasks` (by date completed, then ID; raises for a done task with no date completed).
+`cli.py` lost `_find`, `_PRIORITY_RANK`, `_current_order`, `_done_order`, the inline ID arithmetic and the filter-and-sort in `_list`, and went from 494 to 455 lines. `_describe` stays, because it is presentation.
+One new test, `test_list_without_all_ignores_a_done_task_without_a_date_completed`: plain `list` exits 0 and shows nothing for a done task with no date completed. It passes before and after the move, and it pins that the check that raises runs only under `--all`. 436 tests pass, and coverage is 98% with `task_list.py` at 100%.
+
+**Rationale:**
+This is a move under green, so the 422 existing tests are the characterization suite and the moved code has no Red of its own. The proof is five breaks on purpose, with bytecode off and `__pycache__` cleared: `len(tasks) + 1` for the ID (2 red), a reversed priority rank (6 red), `find` returning the first task (23 red), done tasks sorted by ID (4 red), and `done_tasks` called without `--all` (1 red).
+The last one is the one that matters: only the new test catches it, and the other 435 stay green. That is audit finding G4, now shown and not argued. The `find` docstring says "raise", not "refuse the command", so no CLI wording lands in `domain` (G5), and the D5 comment moved into the docstring of `next_id`.
+Alternatives: making the two sort keys public (rejected, a caller needs the ordered list and not the key) and direct unit tests for the four functions (deferred to the split of `tests/test_cli.py`, G10). The CI-version linters over the recursive file set, JSCPD (0 clones) and codespell are clean.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 2
+- Issue: #12
+
 ## [2026-11-15 17:06] Commit Summary
 
 **Change Type:** Refactor

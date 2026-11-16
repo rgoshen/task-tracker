@@ -296,6 +296,24 @@ def test_list_all_reports_a_done_task_without_a_date_completed_as_one_line(
     _assert_one_line_error(capsys, "task 7")
 
 
+def test_list_without_all_ignores_a_done_task_without_a_date_completed(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+):
+    # The same broken task, but only `--all` sorts the done tasks (M8). Plain `list`
+    # must neither fail on it nor show it, so the check that raises stays behind
+    # `--all` when the ordering rules move out of the CLI.
+    ghost = Task(5, "ghost")
+    ghost.status = Status.DONE
+    monkeypatch.setattr("task_tracker.cli.load", lambda _path: [ghost])
+
+    exit_code = main(["list"])
+
+    shown = capsys.readouterr().out
+    assert exit_code == 0
+    assert shown.startswith("No current tasks in ")
+    assert "ghost" not in shown
+
+
 def test_list_all_puts_done_task_due_first_after_every_current_task(
     project: Path, capsys: pytest.CaptureFixture[str]
 ):
