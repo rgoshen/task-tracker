@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-15 20:52] Commit Summary
+
+**Change Type:** Test
+
+**Scope:** `tests/test_task_list.py`
+
+**Summary:**
+The four rules in `domain/task_list.py` now have tests that call them directly: 13 cases for `next_id`, `find`, `current_tasks` and `done_tasks`. They cover the empty list, the highest ID plus one against a count, the highest ID coming back after a delete, a gap that stays, a missing ID, the three-way order of the current tasks, the order of the done tasks, and the done task with no date completed.
+
+**Rationale:**
+Review comment #7 on PR #34 was right that the cheap part did not need the `tests/test_cli.py` split. A new test file changes no existing test, so the M8 rule "tests change only their imports" holds, and #32 still splits `tests/test_cli.py` by layer.
+These tests pin code that already exists, so they passed at once. To show they can fail, each rule was broken on purpose (bytecode caching off, `__pycache__` cleared) and every break turned a test red, 11 of 11:
+the ID as a count, an empty list starting at 2, `find` returning the first task, its message, the priority ranked by label text, a missing due date first, the ID dropped from the order, done tasks in the current list, done tasks ordered by ID, current tasks in the done list, and the missing date completed no longer refused.
+The done tasks are built by setting the status and the date completed directly: the ordering reads only those, and a past date completed passes the timeline rules only through `Task.restore`.
+The CI-version Python gate (nine tools on 16 files) is clean, JSCPD finds 0 clones and codespell is clean.
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Fix: PR #34 review, step 2
+- PR: #34, review comment on `domain/task_list.py` line 1
+- Issue: #32
+
 ## [2026-11-15 20:38] Commit Summary
 
 **Change Type:** Fix
