@@ -1,5 +1,27 @@
 # Summary
 
+## [2026-11-15 17:20] Commit Summary
+
+**Change Type:** Refactor
+
+**Scope:** list file selection (`src/task_tracker/infrastructure/location.py`) and `cli.py`
+
+**Summary:**
+Choosing the list file left the CLI. `infrastructure/location.py` now holds `_LIST_FILE`, `_GLOBAL_DIR`, `_expanded` and the public `list_path(*, use_global: bool, directory: Path | None) -> Path`, which takes plain values so that argparse stays in `cli.py`.
+`main` calls it with `args.use_global` and `args.directory` inside the same `try`, so the one-line error and exit 1 stay as they were. `cli.py` is 411 lines, from 494 before M8. 437 tests pass, `location.py` is at 100%, and the total is 98%.
+The code was cut out of `cli.py` by a script and not retyped, so the error texts, the comments and the logic are byte for byte the same, including `use --dir with a full path` (CLI wording that now lives in `infrastructure`; M8 changes no output, so it is recorded as a known leak). The `_directory` docstring now names `list_path`.
+
+**Rationale:**
+A move under green: the M7 tests are the characterization suite. Five breaks on purpose, with bytecode off and `__pycache__` cleared: the relative-`HOME` check (2 red), the `RuntimeError` branch (3 red), `.absolute()` dropped (1 red), `.task-tracker` left out of the global path (8 red), and `main` ignoring `--global` (10 red).
+The plan named the first two. Both files were restored and compared with their backups.
+`absolute()` is held by one test only (the `short-relative` case), which is thin but real. The CI-version linters over the recursive file set, JSCPD (0 clones) and codespell are clean. The architecture test covers the new module without a change: it imports only `pathlib`.
+Alternative: pass `args` to `list_path` (rejected, it would tie `infrastructure` to argparse, and the plan says plain values).
+
+**References:**
+
+- `TODO.md`: 2026-11-15 Feature: M8 Refactor into layers, step 4
+- Issue: #12
+
 ## [2026-11-15 17:18] Commit Summary
 
 **Change Type:** Docs

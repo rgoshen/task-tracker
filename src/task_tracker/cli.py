@@ -12,12 +12,8 @@ from task_tracker.domain.priority import Priority
 from task_tracker.domain.status import Status
 from task_tracker.domain.task import Task, as_naive_datetime
 from task_tracker.domain.task_list import current_tasks, done_tasks, find, next_id
+from task_tracker.infrastructure.location import list_path
 from task_tracker.infrastructure.storage import load, save
-
-# D2: the project list is `tasks.json` in the current directory; the global list is
-# the same file name inside `.task-tracker` in the home directory.
-_LIST_FILE = "tasks.json"
-_GLOBAL_DIR = ".task-tracker"
 
 
 def _add(args: argparse.Namespace, path: Path) -> list[str]:
@@ -307,52 +303,11 @@ def _directory(text: str) -> Path:
 
     An empty value is refused: `Path("")` is the current directory, so an unset
     shell variable would pick the wrong list. A leading `~` is expanded later, by
-    `_expanded`, because the home directory is looked up in one place.
+    `list_path`, because the home directory is looked up in one place.
     """
     if not text:
         raise argparse.ArgumentTypeError("must not be empty")
     return Path(text)
-
-
-def _expanded(path: Path) -> Path:
-    """Return `path` with a leading `~` replaced by the home directory it names.
-
-    A shell expands `~` in `--dir ~/x` but not in `--dir=~/x`, which would make a
-    directory literally named `~`, so the program expands it. `--global` is the
-    path `~/.task-tracker/tasks.json`, so it goes through here too.
-    """
-    try:
-        expanded = path.expanduser()
-    except RuntimeError:
-        # `main` does not catch RuntimeError, on purpose: a bug elsewhere must stay
-        # visible. `expanduser` raises it when there is no home directory to find:
-        # HOME unset and no password-file entry (a container started with an
-        # arbitrary user ID), or `~name` for a user who does not exist.
-        problem = "no home directory found"
-    else:
-        # A relative HOME would put the "global" list under whichever directory the
-        # command runs in. A `path` without `~` comes back unchanged and may be relative.
-        if expanded == path or expanded.is_absolute():
-            return expanded
-        problem = "the home directory is not an absolute path"
-    raise ValueError(
-        f"cannot expand {str(path)!r}: {problem}; use --dir with a full path"
-    )
-
-
-def _list_path(args: argparse.Namespace) -> Path:
-    """Return the list file the command works on.
-
-    That is the global list for `--global`, `PATH/tasks.json` for `--dir PATH`, and
-    the list in the current directory for neither.
-    """
-    if args.use_global:
-        return _expanded(Path("~") / _GLOBAL_DIR / _LIST_FILE)
-    if args.directory is not None:
-        # `absolute()` joins a relative path to the cwd and leaves an absolute one
-        # alone without reading the cwd, which `Path.cwd() / directory` would do.
-        return _expanded(args.directory).absolute() / _LIST_FILE
-    return Path.cwd() / _LIST_FILE
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -445,7 +400,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     try:
-        lines = args.run(args, _list_path(args))
+        path = list_path(use_global=args.use_global, directory=args.directory)
+        lines = args.run(args, path)
     except (ValueError, OSError) as error:
         # `Task` and `load` raise ValueError for a blank name or a corrupt file
         # (M2 made it the one type); OSError is a file that cannot be read or written.
